@@ -23,15 +23,17 @@ import {
   Activity, 
   Building2, 
   ClipboardList,
-  DatabaseZap
+  DatabaseZap,
+  Menu
 } from 'lucide-react';
 
 type AppTab = 'dashboard' | 'compliance' | 'performance';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppTab>('dashboard');
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   
-  // DB 초기화 및 상태 로드
+  // 상태 관리
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [logs, setLogs] = useState<InspectionLog[]>([]);
   const [inspectionItems, setInspectionItems] = useState<InspectionItem[]>([]);
@@ -46,26 +48,34 @@ const App: React.FC = () => {
   const [aiInsights, setAiInsights] = useState<string>('');
   const [isLoadingInsights, setIsLoadingInsights] = useState(false);
 
-  // 1. 컴포넌트 마운트 시 DB 로드
+  // 1. 초기 로드 (마운트 시 1회)
   useEffect(() => {
     db.init();
-    setFacilities(db.getFacilities());
-    setLogs(db.getLogs());
-    setInspectionItems(db.getInspectionItems());
+    const savedFacilities = db.getFacilities();
+    const savedLogs = db.getLogs();
+    const savedItems = db.getInspectionItems();
+    
+    setFacilities(savedFacilities);
+    setLogs(savedLogs);
+    setInspectionItems(savedItems);
+    
+    // 데이터 로드가 완료되었음을 표시 (이후부터 저장 기능 활성화)
+    setIsDataLoaded(true);
+    console.log('[SafeLink] Data synchronization complete.');
   }, []);
 
-  // 2. 상태 변경 시 DB에 즉시 영구 저장 (Database Synchronizer)
+  // 2. 데이터 영구 저장 (데이터가 로드된 상태에서 변경이 일어날 때만 수행)
   useEffect(() => {
-    if (facilities.length > 0) db.saveFacilities(facilities);
-  }, [facilities]);
+    if (isDataLoaded) db.saveFacilities(facilities);
+  }, [facilities, isDataLoaded]);
 
   useEffect(() => {
-    if (logs.length > 0) db.saveLogs(logs);
-  }, [logs]);
+    if (isDataLoaded) db.saveLogs(logs);
+  }, [logs, isDataLoaded]);
 
   useEffect(() => {
-    if (inspectionItems.length > 0) db.saveInspectionItems(inspectionItems);
-  }, [inspectionItems]);
+    if (isDataLoaded) db.saveInspectionItems(inspectionItems);
+  }, [inspectionItems, isDataLoaded]);
 
   const dDayUrgentCount = useMemo(() => {
     return facilities.filter(f => {
@@ -80,7 +90,6 @@ const App: React.FC = () => {
   }, [facilities]);
 
   const preventiveRatio = useMemo(() => {
-    if (logs.length === 0) return 0;
     const activeLogs = logs.filter(l => l.status !== LogStatus.FALSE_ALARM);
     if (activeLogs.length === 0) return 0;
     const planned = activeLogs.filter(l => l.type === InspectionType.PLANNED).length;
@@ -109,45 +118,36 @@ const App: React.FC = () => {
   }, [logs]);
 
   const handleFetchInsights = useCallback(async () => {
-    if (logs.length === 0) return;
+    if (logs.length === 0) {
+      setAiInsights("분석할 점검 데이터가 충분하지 않습니다. 현장 로그를 등록해주세요.");
+      return;
+    }
     setIsLoadingInsights(true);
     try {
       const activeLogs = logs.filter(l => l.status !== LogStatus.FALSE_ALARM);
       const result = await getSafetyInsights(activeLogs, facilities);
       setAiInsights(result || '');
     } catch (err) {
-      setAiInsights("AI 분석 결과를 가져오는 중에 문제가 발생했습니다.");
+      setAiInsights("AI 분석 중 오류가 발생했습니다.");
     } finally {
       setIsLoadingInsights(false);
     }
   }, [logs, facilities]);
 
   useEffect(() => {
-    if (activeTab === 'dashboard' && logs.length > 0) {
+    if (activeTab === 'dashboard' && isDataLoaded && logs.length > 0) {
       handleFetchInsights();
     }
-  }, [handleFetchInsights, activeTab, logs.length]);
-
-  // --- CRUD 핵심 로직 (상태 업데이트 안정화) ---
+  }, [handleFetchInsights, activeTab, isDataLoaded]);
 
   const handleAddFacility = useCallback((newFacility: Facility) => {
-    setFacilities(prev => {
-      const updated = [newFacility, ...prev];
-      db.saveFacilities(updated);
-      return updated;
-    });
+    setFacilities(prev => [newFacility, ...prev]);
   }, []);
 
   const handleAddLog = useCallback((data: Partial<InspectionLog>) => {
     if (data.id) {
-      // 수정
-      setLogs(prev => {
-        const updated = prev.map(l => l.id === data.id ? { ...l, ...data } as InspectionLog : l);
-        db.saveLogs(updated);
-        return updated;
-      });
+      setLogs(prev => prev.map(l => l.id === data.id ? { ...l, ...data } as InspectionLog : l));
     } else {
-      // 신규 등록
       const newLog: InspectionLog = {
         id: `LOG-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         facilityId: data.facilityId || (facilities[0]?.id || 'F1'),
@@ -163,30 +163,18 @@ const App: React.FC = () => {
         responder: '현장 대응팀',
         distanceToResponder: '150m'
       };
-      setLogs(prev => {
-        const updated = [newLog, ...prev];
-        db.saveLogs(updated);
-        return updated;
-      });
+      setLogs(prev => [newLog, ...prev]);
     }
   }, [facilities]);
 
   const handleDeleteLog = useCallback((id: string) => {
-    setLogs(prev => {
-      const updated = prev.filter(l => l.id !== id);
-      db.saveLogs(updated);
-      return updated;
-    });
+    setLogs(prev => prev.filter(l => l.id !== id));
     setIsLogModalOpen(false);
   }, []);
 
   const handleAddOrEditItem = useCallback((data: Partial<InspectionItem>) => {
     if (data.id) {
-      setInspectionItems(prev => {
-        const updated = prev.map(item => item.id === data.id ? { ...item, ...data } as InspectionItem : item);
-        db.saveInspectionItems(updated);
-        return updated;
-      });
+      setInspectionItems(prev => prev.map(item => item.id === data.id ? { ...item, ...data } as InspectionItem : item));
     } else {
       const newItem: InspectionItem = {
         id: `ITEM-${Date.now()}`,
@@ -195,31 +183,17 @@ const App: React.FC = () => {
         cycle: data.cycle || '',
         remarks: data.remarks || ''
       };
-      setInspectionItems(prev => {
-        const updated = [...prev, newItem];
-        db.saveInspectionItems(updated);
-        return updated;
-      });
+      setInspectionItems(prev => [...prev, newItem]);
     }
     setIsItemModalOpen(false);
     setSelectedItem(undefined);
   }, []);
 
   const handleDeleteItem = useCallback((id: string) => {
-    if (confirm("해당 점검 계획을 영구적으로 삭제하시겠습니까?")) {
-      setInspectionItems(prev => {
-        const updated = prev.filter(item => item.id !== id);
-        db.saveInspectionItems(updated);
-        return updated;
-      });
+    if (confirm("해당 항목을 영구적으로 삭제하시겠습니까?")) {
+      setInspectionItems(prev => prev.filter(item => item.id !== id));
     }
   }, []);
-
-  // --- 이벤트 핸들러 ---
-  const handleEditItemRequest = (item: InspectionItem) => {
-    setSelectedItem(item);
-    setIsItemModalOpen(true);
-  };
 
   const handleMapClick = useCallback((x: number, y: number) => {
     setSelectedLog({ x, y, status: LogStatus.ACTIVE });
@@ -233,50 +207,50 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fcfcfd]">
-      <nav className="bg-slate-900 border-b border-slate-800 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-10">
-            <div className="flex items-center gap-3">
-              <div className="bg-indigo-600 p-2 rounded-xl shadow-[0_0_20px_rgba(79,70,229,0.4)]">
+      <nav className="bg-slate-900 border-b border-slate-800 sticky top-0 z-40 w-full">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4 sm:gap-10 overflow-hidden">
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="bg-indigo-600 p-2 rounded-xl">
                 <Activity className="w-5 h-5 text-white" />
               </div>
-              <div>
-                <h1 className="text-lg font-black tracking-tighter text-white leading-none">SAFELINK AI</h1>
-                <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-[0.2em] leading-none mt-1">Intelligent Tactical Control</p>
+              <div className="hidden xs:block">
+                <h1 className="text-base sm:text-lg font-black tracking-tighter text-white leading-none uppercase">SAFELINK</h1>
+                <p className="text-[9px] text-indigo-400 font-bold uppercase tracking-[0.2em] mt-1">Tactical Control</p>
               </div>
             </div>
 
-            <div className="hidden md:flex items-center bg-slate-800/50 p-1.5 rounded-2xl border border-slate-700">
+            <div className="flex items-center bg-slate-800/50 p-1 rounded-xl border border-slate-700 overflow-x-auto no-scrollbar max-w-[400px]">
               <button 
                 onClick={() => setActiveTab('dashboard')}
-                className={`flex items-center gap-2 px-6 py-2 rounded-xl text-[11px] font-black transition-all tracking-widest uppercase ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                className={`flex items-center gap-2 px-3 sm:px-5 py-1.5 rounded-lg text-[10px] font-black transition-all uppercase whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
               >
-                <LayoutDashboard className="w-4 h-4" /> 실시간 관제
+                <LayoutDashboard className="w-3.5 h-3.5" /> <span className="hidden sm:inline">관제</span>
               </button>
               <button 
                 onClick={() => setActiveTab('compliance')}
-                className={`flex items-center gap-2 px-6 py-2 rounded-xl text-[11px] font-black transition-all tracking-widest uppercase ${activeTab === 'compliance' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                className={`flex items-center gap-2 px-3 sm:px-5 py-1.5 rounded-lg text-[10px] font-black transition-all uppercase whitespace-nowrap ${activeTab === 'compliance' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
               >
-                <Building2 className="w-4 h-4" /> 의료서비스센터 관리
+                <Building2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">시설 관리</span>
               </button>
               <button 
                 onClick={() => setActiveTab('performance')}
-                className={`flex items-center gap-2 px-6 py-2 rounded-xl text-[11px] font-black transition-all tracking-widest uppercase ${activeTab === 'performance' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                className={`flex items-center gap-2 px-3 sm:px-5 py-1.5 rounded-lg text-[10px] font-black transition-all uppercase whitespace-nowrap ${activeTab === 'performance' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
               >
-                <Target className="w-4 h-4" /> 성과관리(KPI)
+                <Target className="w-3.5 h-3.5" /> <span className="hidden sm:inline">성과지표</span>
               </button>
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <button 
               onClick={() => db.resetAll()}
-              className="p-2.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-xl transition-all border border-slate-700 group"
-              title="데이터베이스 리셋"
+              className="p-2 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-all border border-slate-700"
+              title="DB 초기화"
             >
-              <DatabaseZap className="w-5 h-5 group-hover:animate-pulse" />
+              <DatabaseZap className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
-            <button className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all relative border border-slate-700">
+            <button className="hidden sm:flex p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all relative border border-slate-700">
               <Bell className="w-5 h-5" />
               <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-slate-900"></span>
             </button>
@@ -284,84 +258,83 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      <main className="flex-1 max-w-7xl mx-auto px-4 py-8 w-full">
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 w-full space-y-6 sm:space-y-8">
         {activeTab === 'dashboard' && (
-          <div className="space-y-6">
+          <>
             <TopKpiBar safetyScore={safetyScore} dDayCount={dDayUrgentCount} preventiveRatio={preventiveRatio} />
             
-            <div className="relative">
+            <div className="relative group">
               <HotSpotMap logs={logs} onMapClick={handleMapClick} onPointClick={handlePointClick} />
               <button 
                 onClick={() => { setSelectedLog({ x: 50, y: 50, status: LogStatus.ACTIVE }); setIsLogModalOpen(true); }}
-                className="absolute top-6 right-6 bg-white hover:bg-slate-50 text-slate-900 px-5 py-3 rounded-2xl text-[11px] font-black flex items-center gap-2 shadow-2xl z-30 transition-transform active:scale-95 border border-slate-200 uppercase tracking-widest"
+                className="absolute top-4 right-4 sm:top-6 sm:right-6 bg-white hover:bg-slate-50 text-slate-900 px-4 py-2.5 sm:px-5 sm:py-3 rounded-xl sm:rounded-2xl text-[10px] sm:text-[11px] font-black flex items-center gap-2 shadow-2xl z-30 transition-transform active:scale-95 border border-slate-200 uppercase tracking-widest"
               >
-                <Plus className="w-4 h-4" /> 위험 마커 등록
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> 위험 등록
               </button>
             </div>
             
-            <div className="bg-white rounded-[2.5rem] p-10 border border-slate-100 shadow-[0_20px_40px_-12px_rgba(0,0,0,0.05)] relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-50/40 rounded-full -mr-20 -mt-20 blur-3xl"></div>
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-10">
-                  <div className="flex items-center gap-5">
-                    <div className="p-4 bg-slate-900 rounded-[1.5rem] shadow-2xl"><Sparkles className="w-7 h-7 text-indigo-400" /></div>
+            <div className="bg-white rounded-3xl sm:rounded-[2.5rem] p-6 sm:p-10 border border-slate-100 shadow-xl relative overflow-hidden">
+              <div className="relative z-10 space-y-6 sm:space-y-8">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-slate-900 rounded-xl shadow-lg"><Sparkles className="w-6 h-6 text-indigo-400" /></div>
                     <div>
-                      <h3 className="text-2xl font-black text-slate-900 tracking-tight">AI 전술 분석 보고</h3>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em] mt-1">지능형 위험 예측 엔진 v4.2</p>
+                      <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">AI 전술 분석 보고</h3>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mt-0.5">Risk Prediction Engine v4.2</p>
                     </div>
                   </div>
                   <button 
                     onClick={handleFetchInsights}
                     disabled={isLoadingInsights}
-                    className="text-[11px] bg-slate-900 hover:bg-black text-white font-black px-6 py-3 rounded-2xl transition-all disabled:opacity-50 shadow-2xl uppercase tracking-widest"
+                    className="w-full sm:w-auto text-[11px] bg-slate-900 hover:bg-black text-white font-black px-6 py-3 rounded-2xl transition-all disabled:opacity-50 uppercase tracking-widest"
                   >
-                    {isLoadingInsights ? <Loader2 className="w-4 h-4 animate-spin" /> : '현장 안전 진단 실행'}
+                    {isLoadingInsights ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : '안전 진단 실행'}
                   </button>
                 </div>
-                <div className="text-sm leading-relaxed text-slate-600 bg-slate-50 p-8 rounded-[2rem] border border-slate-100 min-h-[140px] shadow-inner">
+                <div className="text-sm leading-relaxed text-slate-600 bg-slate-50 p-6 sm:p-8 rounded-2xl sm:rounded-[2rem] border border-slate-100 shadow-inner min-h-[140px]">
                   {isLoadingInsights ? (
                     <div className="space-y-4 animate-pulse">
-                      <div className="h-3.5 bg-slate-200 rounded-full w-full"></div>
-                      <div className="h-3.5 bg-slate-200 rounded-full w-11/12"></div>
-                      <div className="h-3.5 bg-slate-200 rounded-full w-10/12"></div>
+                      <div className="h-3 bg-slate-200 rounded-full w-full"></div>
+                      <div className="h-3 bg-slate-200 rounded-full w-11/12"></div>
+                      <div className="h-3 bg-slate-200 rounded-full w-4/5"></div>
                     </div>
                   ) : (
-                    <div className="whitespace-pre-line font-medium text-base leading-[1.8] tracking-tight">{aiInsights || "시스템 데이터 분석 중입니다. 잠시만 기다려주세요."}</div>
+                    <div className="whitespace-pre-line font-medium text-sm sm:text-base leading-[1.8] tracking-tight">{aiInsights || "데이터 분석 대기 중..."}</div>
                   )}
                 </div>
               </div>
             </div>
 
             <AnalyticsCharts monthlyRatioData={monthlyStats} />
-          </div>
+          </>
         )}
 
         {activeTab === 'compliance' && (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-12">
-            <div className="flex items-center justify-between">
+          <div className="space-y-8 sm:space-y-12 animate-in fade-in duration-500">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div>
-                <h2 className="text-3xl font-black text-slate-900 tracking-tight">의료서비스센터 관리</h2>
-                <p className="text-sm text-slate-400 font-bold uppercase tracking-widest mt-1">센터 내 시설물별 법정 검사 이행 및 정밀 유지보수 현황</p>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">의료서비스센터 관리</h2>
+                <p className="text-xs sm:text-sm text-slate-400 font-bold uppercase tracking-widest mt-1">Asset Compliance & Protocol Master</p>
               </div>
-              <div className="flex gap-4">
+              <div className="flex gap-3 sm:gap-4 w-full md:w-auto">
                 <button 
                   onClick={() => { setSelectedItem(undefined); setIsItemModalOpen(true); }}
-                  className="flex items-center gap-2 bg-white border border-slate-200 text-slate-900 px-6 py-3.5 rounded-2xl text-sm font-black hover:bg-slate-50 transition-all shadow-xl shadow-slate-100"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-900 px-4 sm:px-6 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-[10px] sm:text-xs font-black hover:bg-slate-50 shadow-sm transition-all"
                 >
-                  <ClipboardList className="w-5 h-5 text-indigo-500" /> 점검항목 등록
+                  <ClipboardList className="w-4 h-4 text-indigo-500" /> <span className="whitespace-nowrap">점검항목 추가</span>
                 </button>
                 <button 
                   onClick={() => setIsComplianceModalOpen(true)}
-                  className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3.5 rounded-2xl text-sm font-black hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 sm:px-6 py-3 sm:py-3.5 rounded-xl sm:rounded-2xl text-[10px] sm:text-xs font-black hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all"
                 >
-                  <ShieldPlus className="w-5 h-5" /> 자산 신규 등록
+                  <ShieldPlus className="w-4 h-4" /> <span className="whitespace-nowrap">자산 신규 등록</span>
                 </button>
               </div>
             </div>
             
-            <section>
-              <h3 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-3">
-                <div className="w-2 h-8 bg-indigo-600 rounded-full"></div>
+            <section className="space-y-6">
+              <h3 className="text-lg sm:text-xl font-black text-slate-800 flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
                 법정 검사 대상 리스트
               </h3>
               <StatutoryAlertList 
@@ -374,53 +347,30 @@ const App: React.FC = () => {
               />
             </section>
 
-            <section>
-               <h3 className="text-xl font-black text-slate-800 mb-2 flex items-center gap-3">
-                <div className="w-2 h-8 bg-amber-500 rounded-full"></div>
-                시설물 및 각종 설비 유지관리 점검 계획
+            <section className="space-y-4">
+               <h3 className="text-lg sm:text-xl font-black text-slate-800 flex items-center gap-3">
+                <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
+                시설물 유지관리 점검 계획
               </h3>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mb-6 ml-5">Safety and Maintenance Protocols based on Facility Standards</p>
               <InspectionItemTable 
                 items={inspectionItems} 
-                onEdit={handleEditItemRequest}
+                onEdit={(item) => { setSelectedItem(item); setIsItemModalOpen(true); }}
                 onDelete={handleDeleteItem}
               />
             </section>
           </div>
         )}
 
-        {activeTab === 'performance' && (
-          <PerformanceManagement />
-        )}
+        {activeTab === 'performance' && <PerformanceManagement />}
       </main>
 
-      {isLogModalOpen && (
-        <LogModal 
-          isOpen={isLogModalOpen} 
-          onClose={() => setIsLogModalOpen(false)} 
-          onSubmit={handleAddLog} 
-          onDelete={handleDeleteLog}
-          initialData={selectedLog}
-          facilities={facilities}
-        />
-      )}
+      <footer className="max-w-7xl mx-auto w-full px-6 py-10 border-t border-slate-100 text-center">
+        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.4em]">SafeLink AI Intelligence • Healthcare Town Integration v4.2.0</p>
+      </footer>
 
-      {isComplianceModalOpen && (
-        <ComplianceFormModal
-          isOpen={isComplianceModalOpen}
-          onClose={() => setIsComplianceModalOpen(false)}
-          onSubmit={handleAddFacility}
-        />
-      )}
-
-      {isItemModalOpen && (
-        <InspectionItemModal
-          isOpen={isItemModalOpen}
-          onClose={() => { setIsItemModalOpen(false); setSelectedItem(undefined); }}
-          onSubmit={handleAddOrEditItem}
-          initialData={selectedItem}
-        />
-      )}
+      {isLogModalOpen && <LogModal isOpen={isLogModalOpen} onClose={() => setIsLogModalOpen(false)} onSubmit={handleAddLog} onDelete={handleDeleteLog} initialData={selectedLog} facilities={facilities} />}
+      {isComplianceModalOpen && <ComplianceFormModal isOpen={isComplianceModalOpen} onClose={() => setIsComplianceModalOpen(false)} onSubmit={handleAddFacility} />}
+      {isItemModalOpen && <InspectionItemModal isOpen={isItemModalOpen} onClose={() => { setIsItemModalOpen(false); setSelectedItem(undefined); }} onSubmit={handleAddOrEditItem} initialData={selectedItem} />}
     </div>
   );
 };

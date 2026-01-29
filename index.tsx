@@ -41,11 +41,11 @@ interface EBState {
 /**
  * ErrorBoundary 클래스 컴포넌트
  * 
- * Fix: Explicitly extend Component from react to ensure that 'this.props' 
+ * Fix: Explicitly extend React.Component to ensure that 'this.props' 
  * is correctly identified by the TypeScript compiler and correctly 
  * inherits members from the base React class.
  */
-class ErrorBoundary extends Component<EBProps, EBState> {
+class ErrorBoundary extends React.Component<EBProps, EBState> {
   // state 초기화
   public state: EBState = {
     hasError: false
@@ -91,7 +91,7 @@ class ErrorBoundary extends Component<EBProps, EBState> {
     }
     
     // 정상 시 자식 컴포넌트 반환
-    // Fix: Correctly identifying 'props' through the explicitly extended Component base class
+    // Fix: Correctly identifying 'props' through the explicitly extended React.Component base class
     return this.props.children;
   }
 }
