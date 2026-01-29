@@ -1,0 +1,8 @@
+{
+  "name": "제주 헬스케어타운 안전관리 통합 대시보드",
+  "description": "A comprehensive facility maintenance and safety monitoring system with interactive spatial mapping, statutory alert tracking, and AI-powered risk analytics.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
