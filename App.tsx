@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { db } from './services/storageService.ts';
-import { Facility, InspectionLog, InspectionType, SeverityLevel, LogStatus, InspectionItem } from './types.ts';
+import { Facility, InspectionLog, InspectionType, SeverityLevel, LogStatus, InspectionItem, TaskKPI } from './types.ts';
 import { getSafetyInsights } from './services/geminiService.ts';
 import TopKpiBar from './components/TopKpiBar.tsx';
 import HotSpotMap from './components/HotSpotMap.tsx';
@@ -28,16 +28,31 @@ import {
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'compliance' | 'performance'>('dashboard');
-  
-  // 데이터 상태
-  const [facilities, setFacilities] = useState<Facility[]>([]);
-  const [logs, setLogs] = useState<InspectionLog[]>([]);
-  const [inspectionItems, setInspectionItems] = useState<InspectionItem[]>([]);
-  
-  // 저장 활성화 플래그 (중요: 초기 로딩 완료 후에만 true)
-  const [isHydrated, setIsHydrated] = useState(false);
 
-  // 모달 상태
+  const [facilities, setFacilities] = useState<Facility[]>(() => {
+    db.init();
+    return db.getFacilities();
+  });
+  
+  const [logs, setLogs] = useState<InspectionLog[]>(() => {
+    return db.getLogs();
+  });
+
+  const [inspectionItems, setInspectionItems] = useState<InspectionItem[]>(() => {
+    return db.getInspectionItems();
+  });
+
+  const [kpiData, setKpiData] = useState<TaskKPI[]>(() => {
+    return db.getKpiData();
+  });
+
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    setIsReady(true);
+    console.log('[SafeLink] Tactical Data Integrity Confirmed (v6)');
+  }, []);
+
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isComplianceModalOpen, setIsComplianceModalOpen] = useState(false);
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
@@ -48,35 +63,6 @@ const App: React.FC = () => {
   const [aiInsights, setAiInsights] = useState<string>('');
   const [isLoadingInsights, setIsLoadingInsights] = useState(false);
 
-  // 1. 초기 데이터 로드
-  useEffect(() => {
-    db.init();
-    const savedFacilities = db.getFacilities();
-    const savedLogs = db.getLogs();
-    const savedItems = db.getInspectionItems();
-    
-    setFacilities(savedFacilities);
-    setLogs(savedLogs);
-    setInspectionItems(savedItems);
-    
-    // 상태 업데이트가 완료된 후 하이드레이션 완료 표시
-    setTimeout(() => setIsHydrated(true), 100);
-  }, []);
-
-  // 2. 저장 로직 (하이드레이션 완료 후에만 데이터 변경 시 저장)
-  useEffect(() => {
-    if (isHydrated) db.saveFacilities(facilities);
-  }, [facilities, isHydrated]);
-
-  useEffect(() => {
-    if (isHydrated) db.saveLogs(logs);
-  }, [logs, isHydrated]);
-
-  useEffect(() => {
-    if (isHydrated) db.saveInspectionItems(inspectionItems);
-  }, [inspectionItems, isHydrated]);
-
-  // KPI 계산부
   const dDayUrgentCount = useMemo(() => {
     return facilities.filter(f => {
       try {
@@ -112,6 +98,74 @@ const App: React.FC = () => {
     });
   }, [logs]);
 
+  const handleAddLog = (data: Partial<InspectionLog>) => {
+    setLogs(prev => {
+      let next;
+      if (data.id) {
+        next = prev.map(l => l.id === data.id ? { ...l, ...data } as InspectionLog : l);
+      } else {
+        const newLog: InspectionLog = {
+          id: `LOG-${Date.now()}`,
+          facilityId: data.facilityId || (facilities[0]?.id || 'F1'),
+          complexFacilityId: data.complexFacilityId || '',
+          type: data.type || InspectionType.PLANNED,
+          severity: data.severity || SeverityLevel.LOW,
+          status: LogStatus.ACTIVE,
+          x: data.x || 50,
+          y: data.y || 50,
+          description: data.description || '',
+          timestamp: new Date().toISOString(),
+          leadTimeHours: 4,
+          responder: '현장 대응팀',
+          distanceToResponder: '150m'
+        };
+        next = [newLog, ...prev];
+      }
+      db.saveLogs(next);
+      return next;
+    });
+  };
+
+  // [수정] 삭제 로직을 좀 더 명시적으로 강화
+  const handleDeleteLog = (id: string) => {
+    console.log(`[SafeLink] Deleting log ID: ${id}`);
+    setLogs(prev => {
+      const next = prev.filter(l => l.id !== id);
+      db.saveLogs(next); // 즉시 스토리지 반영
+      return [...next]; // 새 참조 반환으로 리렌더링 확실히 유도
+    });
+    setIsLogModalOpen(false);
+    setSelectedLog(undefined);
+  };
+
+  const handleFacilitySubmit = (f: Facility) => {
+    setFacilities(prev => {
+      const next = [f, ...prev];
+      db.saveFacilities(next);
+      return next;
+    });
+  };
+
+  const handleInspectionItemSubmit = (i: Partial<InspectionItem>) => {
+    setInspectionItems(prev => {
+      let next;
+      if (i.id) {
+        next = prev.map(it => it.id === i.id ? {...it, ...i} as InspectionItem : it);
+      } else {
+        next = [{...i, id: `II${Date.now()}`} as InspectionItem, ...prev];
+      }
+      db.saveInspectionItems(next);
+      return next;
+    });
+    setIsItemModalOpen(false);
+    setSelectedItem(undefined);
+  };
+
+  const handleKpiUpdate = (data: TaskKPI[]) => {
+    setKpiData(data);
+    db.saveKpiData(data);
+  };
+
   const handleFetchInsights = useCallback(async () => {
     if (logs.length === 0) return;
     setIsLoadingInsights(true);
@@ -125,42 +179,6 @@ const App: React.FC = () => {
       setIsLoadingInsights(false);
     }
   }, [logs, facilities]);
-
-  useEffect(() => {
-    if (activeTab === 'dashboard' && logs.length > 0 && !aiInsights) {
-      handleFetchInsights();
-    }
-  }, [handleFetchInsights, activeTab, logs.length, aiInsights]);
-
-  // 핸들러
-  const handleAddLog = (data: Partial<InspectionLog>) => {
-    if (data.id) {
-      setLogs(prev => prev.map(l => l.id === data.id ? { ...l, ...data } as InspectionLog : l));
-    } else {
-      const newLog: InspectionLog = {
-        id: `LOG-${Date.now()}`,
-        facilityId: data.facilityId || (facilities[0]?.id || 'F1'),
-        complexFacilityId: data.complexFacilityId || '',
-        type: data.type || InspectionType.PLANNED,
-        severity: data.severity || SeverityLevel.LOW,
-        status: data.status || LogStatus.ACTIVE,
-        x: data.x || 50,
-        y: data.y || 50,
-        description: data.description || '',
-        timestamp: new Date().toISOString(),
-        leadTimeHours: 4,
-        responder: '현장 대응팀',
-        distanceToResponder: '150m'
-      };
-      setLogs(prev => [newLog, ...prev]);
-    }
-  };
-
-  const handleDeleteLog = (id: string) => {
-    setLogs(prev => prev.filter(l => l.id !== id));
-    setIsLogModalOpen(false);
-    setSelectedLog(undefined);
-  };
 
   return (
     <div className="min-h-screen flex flex-col bg-[#fcfcfd]">
@@ -183,14 +201,14 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={() => db.resetAll()} className="p-2.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-xl transition-all border border-slate-700"><DatabaseZap className="w-5 h-5" /></button>
+            <button onClick={() => { if(confirm("시스템 데이터를 초기화하시겠습니까?")) db.resetAll(); }} className="p-2.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-xl transition-all border border-slate-700"><DatabaseZap className="w-5 h-5" /></button>
             <button className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all relative border border-slate-700"><Bell className="w-5 h-5" /><span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-slate-900"></span></button>
           </div>
         </div>
       </nav>
 
       <main className="flex-1 max-w-7xl mx-auto px-6 py-8 w-full space-y-8 pb-20">
-        {!isHydrated ? (
+        {!isReady ? (
           <div className="h-[60vh] flex flex-col items-center justify-center gap-4 text-slate-400">
             <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
             <p className="font-black uppercase tracking-widest text-xs">Synchronizing Intelligence...</p>
@@ -235,17 +253,23 @@ const App: React.FC = () => {
             </section>
             <section className="space-y-4">
                <h3 className="text-xl font-black text-slate-800 flex items-center gap-3"><div className="w-1.5 h-6 bg-amber-500 rounded-full"></div> 시설물 유지관리 점검 계획</h3>
-              <InspectionItemTable items={inspectionItems} onEdit={(i) => { setSelectedItem(i); setIsItemModalOpen(true); }} onDelete={(id) => { if(confirm("삭제하시겠습니까?")) setInspectionItems(prev => prev.filter(item => item.id !== id)); }} />
+              <InspectionItemTable items={inspectionItems} onEdit={(i) => { setSelectedItem(i); setIsItemModalOpen(true); }} onDelete={(id) => { if(confirm("삭제하시겠습니까?")) { 
+                setInspectionItems(prev => {
+                  const next = prev.filter(item => item.id !== id);
+                  db.saveInspectionItems(next);
+                  return next;
+                });
+              } }} />
             </section>
           </div>
         ) : (
-          <PerformanceManagement />
+          <PerformanceManagement initialKpis={kpiData} onKpiUpdate={handleKpiUpdate} />
         )}
       </main>
 
       {isLogModalOpen && <LogModal isOpen={isLogModalOpen} onClose={() => setIsLogModalOpen(false)} onSubmit={handleAddLog} onDelete={handleDeleteLog} initialData={selectedLog} facilities={facilities} />}
-      {isComplianceModalOpen && <ComplianceFormModal isOpen={isComplianceModalOpen} onClose={() => setIsComplianceModalOpen(false)} onSubmit={(f) => setFacilities(prev => [{...f, id: `F${Date.now()}`}, ...prev])} />}
-      {isItemModalOpen && <InspectionItemModal isOpen={isItemModalOpen} onClose={() => { setIsItemModalOpen(false); setSelectedItem(undefined); }} onSubmit={(i) => { if (i.id) setInspectionItems(p => p.map(it => it.id === i.id ? {...it, ...i} as InspectionItem : it)); else setInspectionItems(p => [{...i, id: `II${Date.now()}`} as InspectionItem, ...p]); setIsItemModalOpen(false); }} initialData={selectedItem} />}
+      {isComplianceModalOpen && <ComplianceFormModal isOpen={isComplianceModalOpen} onClose={() => setIsComplianceModalOpen(false)} onSubmit={handleFacilitySubmit} />}
+      {isItemModalOpen && <InspectionItemModal isOpen={isItemModalOpen} onClose={() => { setIsItemModalOpen(false); setSelectedItem(undefined); }} onSubmit={handleInspectionItemSubmit} initialData={selectedItem} />}
     </div>
   );
 };

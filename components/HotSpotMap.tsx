@@ -6,14 +6,13 @@ import L from 'leaflet';
 import { 
   Loader2, 
   Maximize2,
-  Compass,
   Activity,
   Zap,
   Flame,
   Wind,
   Layers,
   ArrowUpCircle,
-  GripVertical
+  MousePointer2
 } from 'lucide-react';
 
 interface HotSpotMapProps {
@@ -41,6 +40,11 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ logs, onPointClick, onMapClick 
   const zoomStartY = useRef(0);
   const zoomStartLevel = useRef(0);
 
+  // [핵심] 로그 데이터가 변경(삭제/수정)될 때마다 지도상의 마커 위치를 재계산하도록 트리거
+  useEffect(() => {
+    setMapUpdateTick(t => t + 1);
+  }, [logs]);
+
   // 1. 지도 초기화
   useEffect(() => {
     if (!mapContainerRef.current || leafletMap.current) return;
@@ -50,7 +54,8 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ logs, onPointClick, onMapClick 
       zoom: 17,
       zoomControl: false,
       attributionControl: false,
-      scrollWheelZoom: true, // 휠은 유지
+      scrollWheelZoom: true,
+      dragging: true,
     });
 
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
@@ -58,7 +63,7 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ logs, onPointClick, onMapClick 
     }).addTo(map);
 
     map.on('click', (e: L.LeafletMouseEvent) => {
-      if (viewMode !== 'SATELLITE') return;
+      if (viewMode !== 'SATELLITE' || isZooming) return;
       const lat = e.latlng.lat;
       const lng = e.latlng.lng;
       const y = ((CENTER[0] + LAT_RANGE / 2 - lat) / LAT_RANGE) * 100;
@@ -83,51 +88,43 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ logs, onPointClick, onMapClick 
         leafletMap.current = null;
       }
     };
-  }, [onMapClick, viewMode]);
+  }, [onMapClick, viewMode, isZooming]);
 
   // 2. 택티컬 줌 (Vertical Drag Zoom) 로직
-  const onZoomMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    if (!leafletMap.current) return;
-    setIsZooming(true);
-    zoomStartY.current = e.clientY;
-    zoomStartLevel.current = leafletMap.current.getZoom();
-    document.body.style.cursor = 'ns-resize';
-  }, []);
+  const handleMapMouseDown = (e: React.MouseEvent) => {
+    if (e.shiftKey || e.button === 2) { 
+      if (!leafletMap.current) return;
+      e.preventDefault();
+      setIsZooming(true);
+      zoomStartY.current = e.clientY;
+      zoomStartLevel.current = leafletMap.current.getZoom();
+      leafletMap.current.dragging.disable();
+    }
+  };
 
   const onZoomMouseMove = useCallback((e: MouseEvent) => {
     if (!isZooming || !leafletMap.current) return;
-    
-    // 수직 이동량 계산 (위로 드래그 = 마이너스 deltaY)
     const deltaY = e.clientY - zoomStartY.current;
-    
-    // 50px 이동당 1단계 줌 변경으로 설정
-    // 위로 드래그(deltaY < 0) -> Zoom Out (축소)
-    // 아래로 드래그(deltaY > 0) -> Zoom In (확대)
-    const zoomDelta = deltaY / 100; 
+    const zoomDelta = deltaY / 80; 
     const nextZoom = Math.max(14, Math.min(19, zoomStartLevel.current + zoomDelta));
-    
     leafletMap.current.setZoom(nextZoom, { animate: false });
   }, [isZooming]);
 
   const onZoomMouseUp = useCallback(() => {
-    setIsZooming(false);
-    document.body.style.cursor = '';
-  }, []);
+    if (isZooming) {
+      setIsZooming(false);
+      if (leafletMap.current) leafletMap.current.dragging.enable();
+    }
+  }, [isZooming]);
 
   useEffect(() => {
-    if (isZooming) {
-      window.addEventListener('mousemove', onZoomMouseMove);
-      window.addEventListener('mouseup', onZoomMouseUp);
-    } else {
-      window.removeEventListener('mousemove', onZoomMouseMove);
-      window.removeEventListener('mouseup', onZoomMouseUp);
-    }
+    window.addEventListener('mousemove', onZoomMouseMove);
+    window.addEventListener('mouseup', onZoomMouseUp);
     return () => {
       window.removeEventListener('mousemove', onZoomMouseMove);
       window.removeEventListener('mouseup', onZoomMouseUp);
     };
-  }, [isZooming, onZoomMouseMove, onZoomMouseUp]);
+  }, [onZoomMouseMove, onZoomMouseUp]);
 
   // 3. 마커 위치 계산
   const getMarkerPosition = (log: InspectionLog) => {
@@ -158,14 +155,16 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ logs, onPointClick, onMapClick 
   };
 
   return (
-    <div className="relative h-[750px] bg-slate-950 rounded-[3rem] shadow-2xl border-[12px] border-slate-900 overflow-hidden">
-      {/* 위성 지도 */}
+    <div 
+      className={`relative h-[750px] bg-slate-950 rounded-[3rem] shadow-2xl border-[12px] border-slate-900 overflow-hidden ${isZooming ? 'cursor-ns-resize' : ''}`}
+      onMouseDown={handleMapMouseDown}
+      onContextMenu={(e) => e.preventDefault()}
+    >
       <div 
         ref={mapContainerRef} 
         className={`absolute inset-0 z-0 bg-slate-950 transition-opacity duration-500 ${viewMode === 'SATELLITE' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} 
       />
       
-      {/* 도면 */}
       <div 
         className={`absolute inset-0 z-10 transition-all duration-700 ease-in-out bg-[#0f172a] ${viewMode === 'BLUEPRINT' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={(e) => {
@@ -181,8 +180,8 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ logs, onPointClick, onMapClick 
         </div>
       </div>
 
-      {/* 마커 레이어 */}
-      <div className="absolute inset-0 z-20 pointer-events-none" key={mapUpdateTick}>
+      {/* [수정] 마커 레이어에 logs.length를 키로 포함시켜 삭제 시 DOM을 완전히 재구성하게 함 */}
+      <div className="absolute inset-0 z-20 pointer-events-none" key={`marker-layer-${mapUpdateTick}-${logs.length}`}>
         {logs.map(log => {
           if (log.status === LogStatus.FALSE_ALARM) return null;
           const pos = getMarkerPosition(log);
@@ -210,13 +209,12 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ logs, onPointClick, onMapClick 
         })}
       </div>
 
-      {/* UI 컨트롤 오버레이 */}
       <div className="absolute inset-0 z-30 pointer-events-none flex flex-col justify-between p-8">
         <div className="flex justify-between items-start pointer-events-auto gap-4">
           <div className="bg-slate-900/90 backdrop-blur-xl px-6 py-4 rounded-[1.5rem] border border-slate-700/50 flex items-center gap-4 shadow-2xl">
             <div className={`w-3 h-3 rounded-full ${isLoaded ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-amber-500 animate-pulse'}`} />
             <div>
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Status</p>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none mb-1">Tactical View</p>
               <p className="text-xs font-black text-white uppercase tracking-tight">
                 {viewMode === 'SATELLITE' ? 'Satellite Live' : 'Strategic Map'}
               </p>
@@ -230,19 +228,13 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ logs, onPointClick, onMapClick 
 
         <div className="flex justify-between items-end">
           <div className="flex bg-slate-900/90 backdrop-blur-xl px-4 py-3 rounded-xl border border-slate-700/50 items-center gap-3">
-            <Compass className="w-4 h-4 text-indigo-400 animate-spin-slow" />
-            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Jeju Node Linked</span>
+            <MousePointer2 className="w-4 h-4 text-indigo-400" />
+            <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-tight">
+              Shift + Drag: Tactical Zoom<br/>
+              Right Click: Zoom Controller
+            </span>
           </div>
           <div className="flex gap-4 items-center">
-             {/* 택티컬 줌 핸들 */}
-            <div 
-              onMouseDown={onZoomMouseDown}
-              className="group pointer-events-auto flex flex-col items-center gap-2 px-3 py-6 bg-slate-900/90 backdrop-blur-xl rounded-full border border-slate-700/50 shadow-2xl cursor-ns-resize active:bg-indigo-600 transition-colors"
-            >
-              <p className="text-[8px] font-black text-slate-500 uppercase vertical-text">Zoom</p>
-              <GripVertical className="w-4 h-4 text-slate-400 group-hover:text-white" />
-            </div>
-            
             <button 
               className="p-4 bg-slate-900/90 hover:bg-slate-800 backdrop-blur-xl rounded-2xl text-slate-400 transition-all border border-slate-700/50 shadow-2xl pointer-events-auto"
               onClick={() => leafletMap.current?.setView(CENTER, 17)}
@@ -253,20 +245,20 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ logs, onPointClick, onMapClick 
         </div>
       </div>
 
+      {isZooming && (
+        <div className="absolute inset-0 z-[100] bg-indigo-500/5 pointer-events-none border-4 border-indigo-500/20 animate-pulse flex items-center justify-center">
+           <div className="bg-slate-900/90 px-6 py-4 rounded-3xl border border-indigo-500 shadow-2xl">
+              <p className="text-white text-xs font-black uppercase tracking-widest">Tactical Zoom Active</p>
+           </div>
+        </div>
+      )}
+
       {!isLoaded && (
         <div className="absolute inset-0 z-50 bg-[#0f172a] flex flex-col items-center justify-center gap-4">
           <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
           <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.3em]">Syncing SAT-Link...</p>
         </div>
       )}
-
-      <style>{`
-        .vertical-text {
-          writing-mode: vertical-rl;
-          text-orientation: mixed;
-          transform: rotate(180deg);
-        }
-      `}</style>
     </div>
   );
 };

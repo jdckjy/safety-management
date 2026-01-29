@@ -1,6 +1,6 @@
 
 // Fix: Use standard React imports and ensure ErrorBoundary correctly extends React.Component to resolve member visibility issues.
-import React, { Component, ErrorInfo, ReactNode, StrictMode } from 'react';
+import React, { ErrorInfo, ReactNode, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 
@@ -41,8 +41,8 @@ interface EBState {
 /**
  * ErrorBoundary 클래스 컴포넌트
  */
-// Fix: Explicitly extending Component (imported from 'react') with proper generics to ensure 'props' is inherited correctly.
-class ErrorBoundary extends Component<EBProps, EBState> {
+// Fix: Extending 'React.Component' with explicit generic types to ensure 'props' is correctly identified by the TypeScript compiler.
+class ErrorBoundary extends React.Component<EBProps, EBState> {
   // state 초기화
   public state: EBState = {
     hasError: false
@@ -88,7 +88,7 @@ class ErrorBoundary extends Component<EBProps, EBState> {
     }
     
     // 정상 시 자식 컴포넌트 반환
-    // Fix: Accessing children through this.props which is now correctly inherited from Component.
+    // Fix: Accessing 'children' from 'this.props' which is now correctly inherited from React.Component.
     return this.props.children;
   }
 }

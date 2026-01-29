@@ -1,7 +1,6 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TaskKPI } from '../types';
-import { MOCK_KPI_DATA } from '../constants';
 import { 
   Plus, 
   Search, 
@@ -15,8 +14,12 @@ import {
   Target
 } from 'lucide-react';
 
-const PerformanceManagement: React.FC = () => {
-  const [kpiList, setKpiList] = useState<TaskKPI[]>(MOCK_KPI_DATA);
+interface PerformanceManagementProps {
+  initialKpis: TaskKPI[];
+  onKpiUpdate: (data: TaskKPI[]) => void;
+}
+
+const PerformanceManagement: React.FC<PerformanceManagementProps> = ({ initialKpis, onKpiUpdate }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSub, setFilterSub] = useState('All');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -32,9 +35,9 @@ const PerformanceManagement: React.FC = () => {
     manager: ''
   });
 
-  const subCategories = ['All', ...new Set(kpiList.map(k => k.subCategory))];
+  const subCategories = ['All', ...new Set(initialKpis.map(k => k.subCategory))];
 
-  const filteredList = kpiList.filter(k => {
+  const filteredList = initialKpis.filter(k => {
     const matchesSearch = k.unitTask.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          k.kpi.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          k.manager.toLowerCase().includes(searchTerm.toLowerCase());
@@ -44,7 +47,7 @@ const PerformanceManagement: React.FC = () => {
 
   const handleDelete = (id: string) => {
     if (confirm('정말 삭제하시겠습니까?')) {
-      setKpiList(prev => prev.filter(k => k.id !== id));
+      onKpiUpdate(initialKpis.filter(k => k.id !== id));
     }
   };
 
@@ -71,13 +74,13 @@ const PerformanceManagement: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
-      setKpiList(prev => prev.map(k => k.id === editingId ? { ...k, ...formData } as TaskKPI : k));
+      onKpiUpdate(initialKpis.map(k => k.id === editingId ? { ...k, ...formData } as TaskKPI : k));
     } else {
       const newItem: TaskKPI = {
         ...formData as TaskKPI,
         id: `K${Date.now()}`
       };
-      setKpiList(prev => [newItem, ...prev]);
+      onKpiUpdate([newItem, ...initialKpis]);
     }
     setIsModalOpen(false);
   };
@@ -90,7 +93,7 @@ const PerformanceManagement: React.FC = () => {
             <Target className="w-6 h-6 text-indigo-600" />
             2026 성과관리 및 KPI 체계
           </h2>
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">팀 업무분장 및 R&R 최적화 인터페이스</p>
+          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">PDF 3페이지 기반 업무분장 및 R&R 현황</p>
         </div>
         <button 
           onClick={handleAddNew}
