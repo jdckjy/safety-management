@@ -17,7 +17,7 @@ const Header: React.FC<HeaderProps> = ({ activeMenu }) => {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-black transition-colors" size={18} />
           <input 
             type="text" 
-            placeholder='Try searching "insights"' 
+            placeholder='"인사이트"를 검색해 보세요' 
             className="pl-12 pr-6 py-2.5 bg-white border border-transparent rounded-full text-sm w-96 outline-none shadow-sm focus:border-gray-200 transition-all font-medium text-gray-600"
           />
         </div>

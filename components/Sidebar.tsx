@@ -25,13 +25,13 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange, customTabs, onAddTabOpen }) => {
   const menuSections = [
     {
-      title: 'Navigation',
+      title: '탐색',
       items: [
-        { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-        { key: 'safety', label: 'Safety Mgt', icon: <ShieldCheck size={18} /> },
-        { key: 'lease', label: 'Lease & Units', icon: <Building2 size={18} /> },
-        { key: 'asset', label: 'Asset Value', icon: <Landmark size={18} /> },
-        { key: 'infra', label: 'Infra Dev', icon: <HardHat size={18} /> },
+        { key: 'dashboard', label: '대시보드', icon: <LayoutDashboard size={18} /> },
+        { key: 'safety', label: '안전 관리', icon: <ShieldCheck size={18} /> },
+        { key: 'lease', label: '임대 및 세대', icon: <Building2 size={18} /> },
+        { key: 'asset', label: '자산 가치', icon: <Landmark size={18} /> },
+        { key: 'infra', label: '인프라 개발', icon: <HardHat size={18} /> },
       ]
     }
   ];
@@ -51,11 +51,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange, customTabs,
       <div className="mb-6 px-2 space-y-1">
         <div className="flex items-center gap-3 px-4 py-2 text-gray-400 hover:text-black cursor-pointer transition-colors">
           <Star size={16} />
-          <span className="text-xs font-semibold">Starred</span>
+          <span className="text-xs font-semibold">즐겨찾기</span>
         </div>
         <div className="flex items-center gap-3 px-4 py-2 text-gray-400 hover:text-black cursor-pointer transition-colors">
           <Clock size={16} />
-          <span className="text-xs font-semibold">Recent</span>
+          <span className="text-xs font-semibold">최근</span>
         </div>
       </div>
 
@@ -96,7 +96,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange, customTabs,
         {customTabs.length > 0 && (
           <div>
             <div className="flex items-center justify-between px-4 mb-2">
-              <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">Reports</span>
+              <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">보고서</span>
               <button className="text-gray-300 hover:text-black transition-colors">
                 <ChevronDown size={14} />
               </button>
@@ -129,7 +129,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange, customTabs,
       <div className="mt-auto px-4 py-4">
         <div className="flex items-center gap-3 text-gray-400 hover:text-black cursor-pointer transition-colors text-xs font-semibold">
           <Layers size={16} />
-          <span>Manage folders</span>
+          <span>폴더 관리</span>
         </div>
       </div>
     </div>
