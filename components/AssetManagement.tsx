@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Landmark, ArrowUpRight } from 'lucide-react';
+import { Landmark, ArrowUpRight, Plus, ChevronDown } from 'lucide-react';
 import KPIManager from './KPIManager';
 import { KPI, StateUpdater } from '../types';
 
@@ -13,29 +13,35 @@ interface AssetManagementProps {
 const AssetManagement: React.FC<AssetManagementProps> = ({ kpis, onUpdate, mainValue }) => {
   return (
     <div className="space-y-8">
-      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-[40px] p-8 text-white relative overflow-hidden shadow-lg">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-5">
-            <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center">
-              <Landmark size={36} />
-            </div>
-            <div>
-              <p className="text-emerald-100 font-bold text-sm uppercase tracking-wider">총 자산 가치</p>
-              <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mt-1">{mainValue.value}조원</h2>
-            </div>
+      <div className="bg-white rounded-5xl p-10 shadow-sm border border-gray-50 flex flex-col md:flex-row justify-between items-center gap-10">
+        <div className="flex-1">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Total Assets Under Management</p>
+          <div className="flex items-baseline gap-2">
+            <h2 className="text-6xl font-black tracking-tighter text-[#1A1D1F]">${mainValue.value}T</h2>
+            <div className="px-3 py-1 bg-emerald-100 text-emerald-600 rounded-full text-xs font-black">↗ ${mainValue.change}T Growth</div>
           </div>
-          <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-6 py-4 rounded-3xl border border-white/20">
-            <ArrowUpRight size={24} className="text-emerald-300" />
-            <div>
-              <p className="text-[10px] font-bold text-emerald-100 uppercase">전분기 대비</p>
-              <p className="text-xl font-black">+{mainValue.change}조원</p>
-            </div>
+          <div className="flex items-center gap-4 mt-6">
+             <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-full text-xs font-bold text-gray-500">
+               <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+               Market Value Indexed
+             </div>
+             <span className="text-xs font-bold text-gray-400">Next Audit: Dec 2024</span>
           </div>
+        </div>
+        
+        <div className="w-full md:w-80 flex flex-col gap-4">
+           <div className="bg-emerald-50/50 p-6 rounded-4xl border border-emerald-100 flex items-center justify-between group cursor-pointer hover:bg-emerald-50 transition-all">
+              <div>
+                <p className="text-[10px] font-bold text-emerald-600/60 uppercase tracking-wider mb-1">Appreciation</p>
+                <h4 className="text-lg font-black leading-tight text-emerald-700">+12.5%</h4>
+              </div>
+              <ChevronDown size={18} className="text-emerald-300" />
+           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
-        <KPIManager sectionTitle="자산관리" kpis={kpis} onUpdate={onUpdate} accentColor="emerald" />
+      <div className="grid grid-cols-1">
+        <KPIManager sectionTitle="Asset Valuation" kpis={kpis} onUpdate={onUpdate} accentColor="emerald" />
       </div>
     </div>
   );

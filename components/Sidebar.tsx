@@ -6,10 +6,12 @@ import {
   Building2, 
   Landmark,
   HardHat,
-  Settings, 
-  LogOut,
   Plus,
-  Layers
+  Layers,
+  Star,
+  Clock,
+  ChevronDown,
+  FolderOpen
 } from 'lucide-react';
 import { MenuKey, CustomTab } from '../types';
 
@@ -21,99 +23,114 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange, customTabs, onAddTabOpen }) => {
-  const baseMenuItems = [
-    { key: 'dashboard', label: '대시보드', icon: <LayoutDashboard size={20} /> },
-    { key: 'safety', label: '안전관리', icon: <ShieldCheck size={20} /> },
-    { key: 'lease', label: '임대유치', icon: <Building2 size={20} /> },
-    { key: 'asset', label: '자산운용', icon: <Landmark size={20} /> },
-    { key: 'infra', label: '인프라조성', icon: <HardHat size={20} /> },
+  const menuSections = [
+    {
+      title: 'Navigation',
+      items: [
+        { key: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+        { key: 'safety', label: 'Safety Mgt', icon: <ShieldCheck size={18} /> },
+        { key: 'lease', label: 'Lease & Units', icon: <Building2 size={18} /> },
+        { key: 'asset', label: 'Asset Value', icon: <Landmark size={18} /> },
+        { key: 'infra', label: 'Infra Dev', icon: <HardHat size={18} /> },
+      ]
+    }
   ];
 
   return (
-    <div className="w-20 md:w-64 h-full bg-[#111111] flex flex-col py-8 px-4 transition-all duration-300 z-50">
-      <div className="mb-10 flex items-center gap-3 px-2">
-        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg shadow-blue-900/20">
-          <div className="w-6 h-6 border-2 border-white rounded-full flex items-center justify-center">
-            <div className="w-2 h-2 bg-white rounded-full"></div>
-          </div>
+    <div className="w-64 h-full flex flex-col py-6 px-4 transition-all duration-300 z-50 bg-[#F8F7F4] border-r border-gray-100">
+      <div className="mb-8 flex items-center gap-3 px-4">
+        <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center text-white text-xs font-black">
+          C
         </div>
-        <span className="hidden md:block font-bold text-xl text-white tracking-tight">DanjiPro</span>
+        <div className="flex items-center gap-1 cursor-pointer group">
+          <span className="font-bold text-sm tracking-tight">Codename.com</span>
+          <ChevronDown size={14} className="text-gray-400 group-hover:text-black transition-colors" />
+        </div>
       </div>
 
-      <div className="mb-8 px-2">
-        <button 
-          onClick={onAddTabOpen}
-          className="w-full flex items-center justify-center md:justify-start gap-3 bg-white text-black py-3 px-4 rounded-full font-bold text-sm shadow-lg hover:bg-gray-100 transition-all active:scale-95 group"
-        >
-          <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white group-hover:rotate-90 transition-transform">
-            <Plus size={16} strokeWidth={3} />
+      <div className="mb-6 px-2 space-y-1">
+        <div className="flex items-center gap-3 px-4 py-2 text-gray-400 hover:text-black cursor-pointer transition-colors">
+          <Star size={16} />
+          <span className="text-xs font-semibold">Starred</span>
+        </div>
+        <div className="flex items-center gap-3 px-4 py-2 text-gray-400 hover:text-black cursor-pointer transition-colors">
+          <Clock size={16} />
+          <span className="text-xs font-semibold">Recent</span>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto scrollbar-hide px-2 space-y-8">
+        {menuSections.map((section) => (
+          <div key={section.title}>
+            <div className="flex items-center justify-between px-4 mb-2">
+              <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">{section.title}</span>
+              <button onClick={onAddTabOpen} className="text-gray-300 hover:text-black transition-colors">
+                <Plus size={14} />
+              </button>
+            </div>
+            <div className="space-y-1">
+              {section.items.map((item) => {
+                const isActive = activeMenu === item.key;
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => onMenuChange(item.key)}
+                    className={`w-full flex items-center p-3 rounded-2xl transition-all group ${
+                      isActive 
+                        ? 'bg-white text-black font-bold shadow-sm ring-1 ring-gray-100' 
+                        : 'text-gray-500 hover:text-black hover:bg-white/50'
+                    }`}
+                  >
+                    <span className={`${isActive ? 'text-black' : 'text-gray-400 group-hover:text-black'}`}>
+                      {item.icon}
+                    </span>
+                    <span className="ml-3 text-xs">{item.label}</span>
+                    {isActive && <div className="ml-auto w-1 h-4 bg-pink-500 rounded-full"></div>}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <span className="hidden md:block">새 탭 추가</span>
-        </button>
-      </div>
-
-      <nav className="flex-1 space-y-1 overflow-y-auto scrollbar-hide">
-        <p className="hidden md:block text-[10px] text-gray-600 font-bold px-4 mb-2 uppercase tracking-widest">Main Menu</p>
-        {baseMenuItems.map((item) => {
-          const isActive = activeMenu === item.key;
-          return (
-            <button
-              key={item.key}
-              onClick={() => onMenuChange(item.key)}
-              className={`w-full flex items-center p-3.5 rounded-2xl transition-all group ${
-                isActive 
-                  ? 'bg-white text-black font-bold shadow-md' 
-                  : 'text-gray-500 hover:text-white'
-              }`}
-            >
-              <span className={`${isActive ? 'text-blue-600' : 'group-hover:text-white'}`}>
-                {item.icon}
-              </span>
-              <span className="hidden md:block ml-4 text-sm">{item.label}</span>
-            </button>
-          );
-        })}
+        ))}
 
         {customTabs.length > 0 && (
-          <div className="pt-6">
-            <p className="hidden md:block text-[10px] text-gray-600 font-bold px-4 mb-2 uppercase tracking-widest">Custom Tabs</p>
-            {customTabs.map((tab) => {
-              const isActive = activeMenu === tab.key;
-              const colorClass = 
-                tab.color === 'orange' ? 'text-orange-500' :
-                tab.color === 'blue' ? 'text-blue-500' :
-                tab.color === 'emerald' ? 'text-emerald-500' : 'text-purple-500';
-
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => onMenuChange(tab.key)}
-                  className={`w-full flex items-center p-3.5 rounded-2xl transition-all group ${
-                    isActive 
-                      ? 'bg-white text-black font-bold shadow-md' 
-                      : 'text-gray-500 hover:text-white'
-                  }`}
-                >
-                  <span className={`${isActive ? colorClass : 'group-hover:text-white'}`}>
-                    <Layers size={20} />
-                  </span>
-                  <span className="hidden md:block ml-4 text-sm">{tab.label}</span>
-                </button>
-              );
-            })}
+          <div>
+            <div className="flex items-center justify-between px-4 mb-2">
+              <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">Reports</span>
+              <button className="text-gray-300 hover:text-black transition-colors">
+                <ChevronDown size={14} />
+              </button>
+            </div>
+            <div className="space-y-1">
+              {customTabs.map((tab) => {
+                const isActive = activeMenu === tab.key;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => onMenuChange(tab.key)}
+                    className={`w-full flex items-center p-3 rounded-2xl transition-all group ${
+                      isActive 
+                        ? 'bg-white text-black font-bold shadow-sm' 
+                        : 'text-gray-500 hover:text-black'
+                    }`}
+                  >
+                    <span className="text-gray-400 group-hover:text-black">
+                      <FolderOpen size={18} />
+                    </span>
+                    <span className="ml-3 text-xs">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
-      </nav>
+      </div>
 
-      <div className="mt-auto space-y-1 pt-8 border-t border-white/5">
-        <button className="w-full flex items-center p-3.5 text-gray-500 hover:text-white transition-colors">
-          <Settings size={20} />
-          <span className="hidden md:block ml-4 text-sm">시스템 설정</span>
-        </button>
-        <button className="w-full flex items-center p-3.5 text-gray-500 hover:text-red-400 transition-colors">
-          <LogOut size={20} />
-          <span className="hidden md:block ml-4 text-sm">로그아웃</span>
-        </button>
+      <div className="mt-auto px-4 py-4">
+        <div className="flex items-center gap-3 text-gray-400 hover:text-black cursor-pointer transition-colors text-xs font-semibold">
+          <Layers size={16} />
+          <span>Manage folders</span>
+        </div>
       </div>
     </div>
   );

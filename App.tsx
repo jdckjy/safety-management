@@ -45,14 +45,11 @@ const BASELINE_KPIS: Record<string, KPI[]> = {
 };
 
 const BASELINE_TENANTS: Tenant[] = [
-  // 1F
   { id: '1f-1', name: 'KMI', usage: '건강검진센터1', area: 744.07, floor: 1, status: 'occupied' },
   { id: '1f-2', name: 'KMI', usage: '편의시설', area: 274.05, floor: 1, status: 'occupied' },
   { id: '1f-3', name: 'KMI', usage: '사무실', area: 70.47, floor: 1, status: 'occupied' },
   { id: '1f-4', name: '공용부', usage: '용역원실', area: 39.00, floor: 1, status: 'public' },
   { id: '1f-lobby', name: '메인 로비', usage: '공용공간', area: 150.00, floor: 1, status: 'public' },
-
-  // 2F
   { id: '2f-1', name: 'KMI', usage: '건강검진센터2', area: 783.04, floor: 2, status: 'occupied' },
   { id: '2f-2', name: 'KMI', usage: '의원1', area: 104.49, floor: 2, status: 'occupied' },
   { id: '2f-v1', name: '미임대', usage: '의원2', area: 104.49, floor: 2, status: 'vacant' },
@@ -60,8 +57,6 @@ const BASELINE_TENANTS: Tenant[] = [
   { id: '2f-v3', name: '미임대', usage: '의원4', area: 204.20, floor: 2, status: 'vacant' },
   { id: '2f-3', name: '치과의원', usage: '의원5', area: 104.49, floor: 2, status: 'occupied' },
   { id: '2f-core', name: 'EV홀', usage: '수직동선', area: 85.00, floor: 2, status: 'public' },
-
-  // 3F
   { id: '3f-1', name: '한국보건복지인재원', usage: '의원10', area: 104.49, floor: 3, status: 'occupied' },
   { id: '3f-v1', name: '미임대', usage: '의원8', area: 104.49, floor: 3, status: 'vacant' },
   { id: '3f-11', name: 'JDC', usage: '컨벤션', area: 499.66, floor: 3, status: 'occupied' },
@@ -74,38 +69,20 @@ const App: React.FC = () => {
   
   const [tasks, setTasks] = useState<TaskItem[]>(() => loadFromStorage(STORAGE_KEYS.TASKS, []));
   const [customTabs, setCustomTabs] = useState<CustomTab[]>(() => loadFromStorage(STORAGE_KEYS.CUSTOM_TABS, []));
-  const [safetyKPIs, setSafetyKPIs] = useState<KPI[]>(() => {
-    const data = loadFromStorage<KPI[] | null>(STORAGE_KEYS.SAFETY, null);
-    return data && data.length > 0 ? data : BASELINE_KPIS.safety;
-  });
-  const [leaseKPIs, setLeaseKPIs] = useState<KPI[]>(() => {
-    const data = loadFromStorage<KPI[] | null>(STORAGE_KEYS.LEASE, null);
-    return data && data.length > 0 ? data : BASELINE_KPIS.lease;
-  });
-  const [tenants, setTenants] = useState<Tenant[]>(() => {
-    const data = loadFromStorage<Tenant[] | null>(STORAGE_KEYS.TENANTS, null);
-    return data && data.length > 0 ? data : BASELINE_TENANTS;
-  });
-  const [assetKPIs, setAssetKPIs] = useState<KPI[]>(() => {
-    const data = loadFromStorage<KPI[] | null>(STORAGE_KEYS.ASSET, null);
-    return data && data.length > 0 ? data : BASELINE_KPIS.asset;
-  });
-  const [infraKPIs, setInfraKPIs] = useState<KPI[]>(() => {
-    const data = loadFromStorage<KPI[] | null>(STORAGE_KEYS.INFRA, null);
-    return data && data.length > 0 ? data : BASELINE_KPIS.infra;
-  });
+  const [safetyKPIs, setSafetyKPIs] = useState<KPI[]>(() => loadFromStorage(STORAGE_KEYS.SAFETY, BASELINE_KPIS.safety));
+  const [leaseKPIs, setLeaseKPIs] = useState<KPI[]>(() => loadFromStorage(STORAGE_KEYS.LEASE, BASELINE_KPIS.lease));
+  const [tenants, setTenants] = useState<Tenant[]>(() => loadFromStorage(STORAGE_KEYS.TENANTS, BASELINE_TENANTS));
+  const [assetKPIs, setAssetKPIs] = useState<KPI[]>(() => loadFromStorage(STORAGE_KEYS.ASSET, BASELINE_KPIS.asset));
+  const [infraKPIs, setInfraKPIs] = useState<KPI[]>(() => loadFromStorage(STORAGE_KEYS.INFRA, BASELINE_KPIS.infra));
   const [dynamicKpis, setDynamicKpis] = useState<Record<string, KPI[]>>(() => loadFromStorage(STORAGE_KEYS.DYNAMIC_DATA, {}));
 
-  // Tenants 변경 시 Lease KPI 자동 동기화 로직 추가
   useEffect(() => {
     const rentalTarget = tenants.filter(t => t.status !== 'public');
     const totalArea = rentalTarget.reduce((acc, t) => acc + (Number(t.area) || 0), 0);
     const occupiedArea = rentalTarget.filter(t => t.status === 'occupied').reduce((acc, t) => acc + (Number(t.area) || 0), 0);
     const newRate = totalArea > 0 ? Number(((occupiedArea / totalArea) * 100).toFixed(1)) : 0;
     
-    setLeaseKPIs(prev => prev.map(k => 
-      k.id === 'default-lease' ? { ...k, current: newRate } : k
-    ));
+    setLeaseKPIs(prev => prev.map(k => k.id === 'default-lease' ? { ...k, current: newRate } : k));
   }, [tenants]);
 
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(tasks)); }, [tasks]);
@@ -117,14 +94,12 @@ const App: React.FC = () => {
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.INFRA, JSON.stringify(infraKPIs)); }, [infraKPIs]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.DYNAMIC_DATA, JSON.stringify(dynamicKpis)); }, [dynamicKpis]);
 
-  const summaryStats: SummaryStats = useMemo(() => {
-    return {
-      safety: { days: safetyKPIs[0]?.current || 0, change: 0 },
-      lease: { rate: leaseKPIs[0]?.current || 0, change: 0 },
-      asset: { value: assetKPIs[0]?.current || 0, change: 0 },
-      infra: { progress: infraKPIs[0]?.current || 0, change: 0 }
-    };
-  }, [safetyKPIs, leaseKPIs, assetKPIs, infraKPIs]);
+  const summaryStats: SummaryStats = useMemo(() => ({
+    safety: { days: safetyKPIs[0]?.current || 0, change: 0 },
+    lease: { rate: leaseKPIs[0]?.current || 0, change: 0 },
+    asset: { value: assetKPIs[0]?.current || 0, change: 0 },
+    infra: { progress: infraKPIs[0]?.current || 0, change: 0 }
+  }), [safetyKPIs, leaseKPIs, assetKPIs, infraKPIs]);
 
   const handleAddTab = (newTab: CustomTab) => {
     setCustomTabs(prev => [...prev, newTab]);
@@ -154,13 +129,17 @@ const App: React.FC = () => {
     if (customTab) {
       return (
         <div className="animate-in fade-in duration-500">
-          <div className={`bg-gradient-to-r ${
-            customTab.color === 'orange' ? 'from-orange-500 to-red-500' :
-            customTab.color === 'blue' ? 'from-blue-600 to-indigo-600' :
-            customTab.color === 'emerald' ? 'from-emerald-600 to-teal-600' : 'from-purple-600 to-pink-600'
-          } rounded-[40px] p-8 text-white mb-8 shadow-lg`}>
-            <h2 className="text-4xl font-black">{customTab.label} 관리 시스템</h2>
-            <p className="text-white/70 mt-2 font-medium">데이터 무결성 보호 알고리즘 v5.0이 활성화되어 영속성이 보장됩니다.</p>
+          <div className="bg-white rounded-5xl p-10 shadow-sm border border-gray-50 mb-8">
+            <div className="flex items-center gap-4 mb-2">
+              <div className={`w-2 h-2 rounded-full ${
+                customTab.color === 'orange' ? 'bg-pink-500' :
+                customTab.color === 'blue' ? 'bg-blue-400' :
+                customTab.color === 'emerald' ? 'bg-black' : 'bg-gray-400'
+              } animate-pulse`}></div>
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Custom Folder Module</span>
+            </div>
+            <h2 className="text-4xl font-bold tracking-tight text-[#1A1D1F]">{customTab.label} Management</h2>
+            <p className="text-gray-400 mt-2 text-sm font-medium">Real-time data synchronization enabled for v5.0 core engine.</p>
           </div>
           <KPIManager 
             sectionTitle={customTab.label} 
@@ -175,9 +154,9 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#F2ECE4] text-[#111111]">
+    <div className="flex h-screen w-full bg-[#F8F7F4] text-[#1A1D1F] font-sans">
       <Sidebar activeMenu={activeMenu} onMenuChange={setActiveMenu} customTabs={customTabs} onAddTabOpen={() => setIsTabModalOpen(true)} />
-      <main className="flex-1 flex flex-col overflow-hidden p-6 md:px-12 md:py-8 space-y-6">
+      <main className="flex-1 flex flex-col overflow-hidden p-6 md:px-12 md:py-6 space-y-4">
         <Header activeMenu={activeMenu} />
         <div className="flex-1 overflow-y-auto scrollbar-hide">
           {renderContent()}
