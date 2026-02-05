@@ -9,6 +9,7 @@ import AssetManagement from './components/AssetManagement';
 import InfraDevelopment from './components/InfraDevelopment';
 import KPIManager from './components/KPIManager';
 import TabModal from './components/TabModal';
+import CustomPage from './components/CustomPage'; // Import CustomPage
 import { MenuKey, KPI, TaskItem, SummaryStats, CustomTab, Tenant } from './types';
 
 const STORAGE_KEYS = {
@@ -68,7 +69,12 @@ const App: React.FC = () => {
   const [isTabModalOpen, setIsTabModalOpen] = useState(false);
   
   const [tasks, setTasks] = useState<TaskItem[]>(() => loadFromStorage(STORAGE_KEYS.TASKS, []));
-  const [customTabs, setCustomTabs] = useState<CustomTab[]>(() => loadFromStorage(STORAGE_KEYS.CUSTOM_TABS, []));
+  const [customTabs, setCustomTabs] = useState<CustomTab[]>(() => {
+    const tabs = loadFromStorage<CustomTab[]>(STORAGE_KEYS.CUSTOM_TABS, []);
+    return tabs.map(tab => 
+      tab.label === '공통관리' ? { ...tab, label: '단지시설정보' } : tab
+    );
+  });
   const [safetyKPIs, setSafetyKPIs] = useState<KPI[]>(() => loadFromStorage(STORAGE_KEYS.SAFETY, BASELINE_KPIS.safety));
   const [leaseKPIs, setLeaseKPIs] = useState<KPI[]>(() => loadFromStorage(STORAGE_KEYS.LEASE, BASELINE_KPIS.lease));
   const [tenants, setTenants] = useState<Tenant[]>(() => loadFromStorage(STORAGE_KEYS.TENANTS, BASELINE_TENANTS));
@@ -117,40 +123,19 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
+    const customTab = customTabs.find(t => t.key === activeMenu);
+    if (customTab) {
+      return <CustomPage title={customTab.label} />;
+    }
+
     switch (activeMenu) {
       case 'dashboard': return <Dashboard tasks={tasks} onTasksUpdate={setTasks} summaryStats={summaryStats} />;
       case 'safety': return <SafetyManagement kpis={safetyKPIs} onUpdate={setSafetyKPIs} mainValue={summaryStats.safety} />;
       case 'lease': return <LeaseRecruitment kpis={leaseKPIs} onUpdate={setLeaseKPIs} tenants={tenants} onTenantsUpdate={setTenants} mainValue={summaryStats.lease} />;
       case 'asset': return <AssetManagement kpis={assetKPIs} onUpdate={setAssetKPIs} mainValue={summaryStats.asset} />;
       case 'infra': return <InfraDevelopment kpis={infraKPIs} onUpdate={setInfraKPIs} mainValue={summaryStats.infra} />;
+      default: return <Dashboard tasks={tasks} onTasksUpdate={setTasks} summaryStats={summaryStats} />;
     }
-
-    const customTab = customTabs.find(t => t.key === activeMenu);
-    if (customTab) {
-      return (
-        <div className="animate-in fade-in duration-500">
-          <div className="bg-white rounded-5xl p-10 shadow-sm border border-gray-50 mb-8">
-            <div className="flex items-center gap-4 mb-2">
-              <div className={`w-2 h-2 rounded-full ${
-                customTab.color === 'orange' ? 'bg-pink-500' :
-                customTab.color === 'blue' ? 'bg-blue-400' :
-                customTab.color === 'emerald' ? 'bg-black' : 'bg-gray-400'
-              } animate-pulse`}></div>
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Custom Folder Module</span>
-            </div>
-            <h2 className="text-4xl font-bold tracking-tight text-[#1A1D1F]">{customTab.label} Management</h2>
-            <p className="text-gray-400 mt-2 text-sm font-medium">Real-time data synchronization enabled for v5.0 core engine.</p>
-          </div>
-          <KPIManager 
-            sectionTitle={customTab.label} 
-            kpis={dynamicKpis[customTab.key] || []} 
-            onUpdate={(kpis) => updateDynamicKpi(customTab.key, kpis)} 
-            accentColor={customTab.color} 
-          />
-        </div>
-      );
-    }
-    return <Dashboard tasks={tasks} onTasksUpdate={setTasks} summaryStats={summaryStats} />;
   };
 
   return (

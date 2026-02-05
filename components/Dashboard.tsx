@@ -17,7 +17,7 @@ const Dashboard: React.FC<DashboardProps> = ({ tasks, onTasksUpdate, summaryStat
   return (
     <div className="flex flex-col gap-8 pb-10">
       <div className="flex items-center justify-between">
-        <h2 className="text-4xl font-bold text-gray-300">새 보고서</h2>
+        <h2 className="text-4xl font-bold text-gray-800">대시보드</h2>
         <div className="flex items-center gap-4">
            <div className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-full shadow-sm text-xs font-bold text-gray-500">
              <div className="w-2 h-2 bg-pink-500 rounded-full animate-pulse"></div>

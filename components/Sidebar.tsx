@@ -64,9 +64,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange, customTabs,
           <div key={section.title}>
             <div className="flex items-center justify-between px-4 mb-2">
               <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">{section.title}</span>
-              <button onClick={onAddTabOpen} className="text-gray-300 hover:text-black transition-colors">
-                <Plus size={14} />
-              </button>
             </div>
             <div className="space-y-1">
               {section.items.map((item) => {
@@ -93,37 +90,40 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange, customTabs,
           </div>
         ))}
 
-        {customTabs.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between px-4 mb-2">
-              <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">보고서</span>
-              <button className="text-gray-300 hover:text-black transition-colors">
-                <ChevronDown size={14} />
-              </button>
-            </div>
-            <div className="space-y-1">
-              {customTabs.map((tab) => {
-                const isActive = activeMenu === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    onClick={() => onMenuChange(tab.key)}
-                    className={`w-full flex items-center p-3 rounded-2xl transition-all group ${
-                      isActive 
-                        ? 'bg-white text-black font-bold shadow-sm' 
-                        : 'text-gray-500 hover:text-black'
-                    }`}
-                  >
-                    <span className="text-gray-400 group-hover:text-black">
-                      <FolderOpen size={18} />
-                    </span>
-                    <span className="ml-3 text-xs">{tab.label}</span>
-                  </button>
-                );
-              })}
+        <div>
+          <div className="flex items-center justify-between px-4 mb-2">
+            <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">공통관리</span>
+            <div className="flex items-center">
+                <button onClick={onAddTabOpen} className="text-gray-300 hover:text-black transition-colors">
+                  <Plus size={14} />
+                </button>
+                <button className="text-gray-300 hover:text-black transition-colors ml-1">
+                  <ChevronDown size={14} />
+                </button>
             </div>
           </div>
-        )}
+          <div className="space-y-1">
+            {customTabs.map((tab) => {
+              const isActive = activeMenu === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => onMenuChange(tab.key)}
+                  className={`w-full flex items-center p-3 rounded-2xl transition-all group ${
+                    isActive 
+                      ? 'bg-white text-black font-bold shadow-sm' 
+                      : 'text-gray-500 hover:text-black'
+                  }`}
+                >
+                  <span className="text-gray-400 group-hover:text-black">
+                    <FolderOpen size={18} />
+                  </span>
+                  <span className="ml-3 text-xs">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
       <div className="mt-auto px-4 py-4">
