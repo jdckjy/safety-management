@@ -1,117 +1,69 @@
 
-import React, { useState } from 'react';
-import { Search, Bell, ChevronDown, Database, Plus } from 'lucide-react';
-import { TeamMember } from '../types';
-import TeamMemberModal from './NewTeamMemberModal';
-
-const initialTeamMembers: TeamMember[] = [
-  {
-    id: '1',
-    name: 'Armin A.',
-    role: 'Project Manager',
-    avatarUrl: 'https://i.pravatar.cc/100?u=Armin A.',
-  },
-  {
-    id: '2',
-    name: 'Eren Y.',
-    role: 'Lead Engineer',
-    avatarUrl: 'https://i.pravatar.cc/100?u=Eren Y.',
-  },
-    {
-    id: '3',
-    name: 'Mikasa A.',
-    role: 'Designer',
-    avatarUrl: 'https://i.pravatar.cc/100?u=Mikasa A.',
-  },
-];
+import React, { useMemo } from 'react';
+import { Search, Bell, ChevronDown, Calendar, Menu } from 'lucide-react';
+import { useData } from '../contexts/DataContext'; // Import useData hook
 
 const Header: React.FC = () => {
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(initialTeamMembers);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  // All props are now gone, we get everything from the context
+  const { customTabs, selectedMonth, setSelectedMonth } = useData();
+  
+  // This state can be local to the Header or derived from a global state if needed
+  const [activeMenu, setActiveMenu] = React.useState('dashboard');
 
-  const handleSaveMember = (memberData: Omit<TeamMember, 'id'> & { id?: string }) => {
-    if (memberData.id) {
-      // Editing existing member
-      setTeamMembers(teamMembers.map(m => m.id === memberData.id ? { ...m, ...memberData } : m));
-    } else {
-      // Adding new member
-      const newId = (teamMembers.length + 1).toString();
-      setTeamMembers([...teamMembers, { ...memberData, id: newId, avatarUrl: memberData.avatarUrl || '' }]);
-    }
-    setIsModalOpen(false);
-    setSelectedMember(null);
+  const getTitle = () => {
+    if (activeMenu === 'dashboard') return '대시보드';
+    if (activeMenu === 'safety') return '안전 관리';
+    if (activeMenu === 'lease') return '임대 및 세대 관리';
+    if (activeMenu === 'asset') return '자산 가치 관리';
+    if (activeMenu === 'infra') return '인프라 개발';
+    
+    const custom = customTabs.find(t => t.key === activeMenu);
+    return custom ? custom.label : '대시보드';
   };
 
-  const handleDeleteMember = (memberId: string) => {
-    setTeamMembers(teamMembers.filter(m => m.id !== memberId));
-    setIsModalOpen(false);
-    setSelectedMember(null);
-  };
-
-  const openModalForEdit = (member: TeamMember) => {
-    setSelectedMember(member);
-    setIsModalOpen(true);
-  };
-
-  const openModalForAdd = () => {
-    setSelectedMember(null);
-    setIsModalOpen(true);
-  };
+  const months = useMemo(() => 
+    Array.from({length: 12}, (_, i) => new Date(0, i).toLocaleString('ko-KR', {month: 'long'}))
+  , []);
 
   return (
-    <header className="flex items-center justify-between py-4 px-2">
-      <div className="flex items-center gap-6">
-        <div className="relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-black transition-colors" size={18} />
-          <input 
-            type="text" 
-            placeholder='"인사이트"를 검색해 보세요' 
-            className="pl-12 pr-6 py-2.5 bg-white border border-transparent rounded-full text-sm w-96 outline-none shadow-sm focus:border-gray-200 transition-all font-medium text-gray-600"
-          />
-        </div>
-      </div>
-
+    <header className="flex items-center justify-between w-full">
       <div className="flex items-center gap-4">
-        <div className="flex -space-x-2">
-          {teamMembers.map((member) => (
-            <div key={member.id} onClick={() => openModalForEdit(member)} className="w-8 h-8 rounded-full border-2 border-[#F8F7F4] bg-white flex items-center justify-center overflow-hidden shadow-sm hover:z-10 transition-all cursor-pointer">
-              <img src={member.avatarUrl} alt={member.name} title={`${member.name} (${member.role})`} className="w-full h-full object-cover" />
-            </div>
-          ))}
-          <div 
-            onClick={openModalForAdd}
-            className="w-8 h-8 rounded-full border-2 border-[#F8F7F4] bg-white flex items-center justify-center text-gray-400 shadow-sm cursor-pointer hover:bg-gray-50">
-            <Plus size={14} />
-          </div>
+        <button className="p-2.5 bg-white rounded-2xl shadow-sm border border-gray-100 lg:hidden">
+            <Menu size={20}/>
+        </button>
+        <h1 className="text-3xl font-black text-[#1A1D1F] tracking-tighter">{getTitle()}</h1>
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="relative hidden md:block">
+          <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" placeholder="Search..." className="w-full max-w-xs pl-12 pr-4 py-3 bg-white rounded-2xl text-sm font-bold border border-gray-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-black" />
         </div>
-
-        <div className="h-6 w-px bg-gray-200 mx-2"></div>
         
-        <button className="p-2.5 bg-white text-gray-500 rounded-full shadow-sm hover:shadow-md transition-all relative">
-          <Database size={18} />
-          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-pink-500 rounded-full border-2 border-white"></span>
+        <div className="flex items-center gap-2 bg-white pl-5 pr-3 py-2 rounded-2xl shadow-sm border border-gray-100">
+          <Calendar size={18} className="text-gray-400"/>
+          <select 
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+              className="bg-transparent text-sm font-bold text-gray-800 outline-none appearance-none pr-6"
+          >
+            {months.map((m, i) => (
+              <option key={i} value={i}>{m}</option>
+            ))}
+          </select>
+           <ChevronDown size={16} className="text-gray-400 -ml-5 pointer-events-none"/>
+        </div>
+        
+        <button className="p-3.5 bg-white rounded-2xl shadow-sm border border-gray-100">
+          <Bell size={20} />
         </button>
-
-        <button className="p-2.5 bg-white text-gray-500 rounded-full shadow-sm hover:shadow-md transition-all">
-          <Bell size={18} />
-        </button>
-
-        <div className="flex items-center gap-2 cursor-pointer group">
-          <div className="w-8 h-8 rounded-full bg-black text-white flex items-center justify-center text-[10px] font-bold">
-            C
-          </div>
-          <ChevronDown size={14} className="text-gray-400 group-hover:text-black transition-colors" />
+        <div className="flex items-center gap-3">
+            <img src="https://i.pravatar.cc/40?u=a042581f4e29026704d" alt="user" className="w-10 h-10 rounded-full border-2 border-white shadow-md" />
+            <div>
+                <p className="text-sm font-bold">김프로</p>
+                <p className="text-xs text-gray-400 font-bold">Project Manager</p>
+            </div>
         </div>
       </div>
-      {isModalOpen && (
-        <TeamMemberModal
-          onClose={() => { setIsModalOpen(false); setSelectedMember(null); }}
-          onSave={handleSaveMember}
-          onDelete={handleDeleteMember}
-          member={selectedMember}
-        />
-      )}
     </header>
   );
 };

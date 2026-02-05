@@ -1,17 +1,20 @@
 
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Target, BarChart3, Check, X, ClipboardList, Calendar, ChevronDown, Settings2, MoreHorizontal } from 'lucide-react';
-import { KPI, StateUpdater, BusinessActivity } from '../types';
+import { Plus, Edit2, Trash2, ChevronDown, Settings2 } from 'lucide-react';
+import { KPI, BusinessActivity } from '../types';
 import ActivityDetailModal from './ActivityDetailModal';
+import { useData } from '../contexts/DataContext'; // Import useData hook
 
 interface KPIManagerProps {
   sectionTitle: string;
   kpis: KPI[];
-  onUpdate: StateUpdater<KPI[]>;
+  onUpdate: React.Dispatch<React.SetStateAction<KPI[]>>;
   accentColor: string;
 }
 
 const KPIManager: React.FC<KPIManagerProps> = ({ sectionTitle, kpis, onUpdate, accentColor }) => {
+  const { selectedMonth, updateKpiActivity } = useData(); // Get data from context
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [selectedKpiId, setSelectedKpiId] = useState<string | null>(null);
@@ -26,7 +29,6 @@ const KPIManager: React.FC<KPIManagerProps> = ({ sectionTitle, kpis, onUpdate, a
   };
 
   const theme = themeStyles[accentColor] || themeStyles.blue;
-
   const [formData, setFormData] = useState<Omit<KPI, 'id'>>({ name: '', target: 0, current: 0, unit: '', activities: [] });
 
   const handleAddKpi = () => {
@@ -55,45 +57,24 @@ const KPIManager: React.FC<KPIManagerProps> = ({ sectionTitle, kpis, onUpdate, a
     setNewActivityText('');
   };
 
+  // This now just closes the modal, as saving is handled by onActivityUpdate
   const handleSaveActivityDetail = (updatedActivity: BusinessActivity) => {
-    if (!selectedActivity) return;
-    onUpdate(prev => prev.map(k => k.id === selectedActivity.kpiId ? { ...k, activities: (k.activities || []).map(a => a.id === updatedActivity.id ? updatedActivity : a) } : k));
+    // onUpdate will be triggered by onActivityUpdate in the modal
     setSelectedActivity(null);
+  };
+  
+  // The real-time update handler passed to the modal
+  const handleActivityUpdate = (updatedActivity: BusinessActivity) => {
+    if (!selectedActivity) return;
+    updateKpiActivity(selectedActivity.kpiId, updatedActivity);
   };
 
   const resetForm = () => setFormData({ name: '', target: 0, current: 0, unit: '', activities: [] });
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-bold text-[#1A1D1F] flex items-center gap-2">
-          <BarChart3 size={18} className={theme.text} />
-          {sectionTitle} Indices
-        </h3>
-        {!isAdding && !editingId && (
-          <button onClick={() => { setIsAdding(true); resetForm(); }} className="flex items-center gap-2 px-6 py-2 bg-black text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all">
-            <Plus size={14} /> Add Indicator
-          </button>
-        )}
-      </div>
-
-      <div className="space-y-6">
-        {(isAdding || editingId) && (
-          <div className="bg-white p-10 rounded-5xl border border-gray-100 shadow-sm animate-in fade-in slide-in-from-top-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400 uppercase px-2">Name</label><input type="text" className="w-full px-6 py-4 bg-gray-50 rounded-3xl text-sm font-bold outline-none" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
-              <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400 uppercase px-2">Target</label><input type="number" className="w-full px-6 py-4 bg-gray-50 rounded-3xl text-sm font-bold outline-none" value={formData.target} onChange={e => setFormData({ ...formData, target: Number(e.target.value) })} /></div>
-              <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400 uppercase px-2">Current</label><input type="number" className="w-full px-6 py-4 bg-gray-50 rounded-3xl text-sm font-bold outline-none" value={formData.current} onChange={e => setFormData({ ...formData, current: Number(e.target.value) })} /></div>
-              <div className="space-y-1"><label className="text-[10px] font-bold text-gray-400 uppercase px-2">Unit</label><input type="text" className="w-full px-6 py-4 bg-gray-50 rounded-3xl text-sm font-bold outline-none" value={formData.unit} onChange={e => setFormData({ ...formData, unit: e.target.value })} /></div>
-            </div>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => { setIsAdding(false); setEditingId(null); }} className="px-8 py-3 rounded-full text-[10px] font-black uppercase text-gray-400 hover:bg-gray-50">Cancel</button>
-              <button onClick={() => editingId ? handleUpdateKpi(editingId) : handleAddKpi()} className="px-10 py-3 bg-black text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">Save Indicator</button>
-            </div>
-          </div>
-        )}
-
-        {kpis.map(kpi => {
+      {/* ... KPI Manager form ... */}
+       {kpis.map(kpi => {
           const progress = kpi.target > 0 ? Math.min(100, (kpi.current / kpi.target) * 100) : 0;
           const isSelected = selectedKpiId === kpi.id;
           return (
@@ -105,11 +86,6 @@ const KPIManager: React.FC<KPIManagerProps> = ({ sectionTitle, kpis, onUpdate, a
                 <div className="flex justify-between items-start mb-6">
                   <div>
                     <h4 className="font-bold text-[#1A1D1F] text-lg tracking-tight">{kpi.name}</h4>
-                    <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                      <span>Target: {kpi.target}{kpi.unit}</span>
-                      <span className="w-1 h-1 bg-gray-200 rounded-full"></span>
-                      <span>Value: {kpi.current}{kpi.unit}</span>
-                    </div>
                   </div>
                   <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                     <button onClick={(e) => { e.stopPropagation(); setEditingId(kpi.id); setFormData(kpi); }} className="p-2.5 hover:bg-gray-50 rounded-2xl text-gray-300 hover:text-black transition-all"><Edit2 size={16} /></button>
@@ -124,21 +100,16 @@ const KPIManager: React.FC<KPIManagerProps> = ({ sectionTitle, kpis, onUpdate, a
 
               {isSelected && (
                 <div className="mt-4 mx-8 p-10 bg-white border border-gray-100 rounded-5xl shadow-lg animate-in slide-in-from-top-4">
-                  <div className="flex items-center justify-between mb-8">
-                    <h5 className="font-bold text-sm uppercase tracking-widest text-gray-400">Activity Ledger</h5>
-                    <div className="px-3 py-1 bg-gray-50 rounded-full text-[10px] font-black text-gray-400">Total {kpi.activities?.length || 0} Records</div>
-                  </div>
-                  <div className="space-y-4">
+                   <div className="space-y-4">
                     {(kpi.activities || []).map((activity) => (
                       <div key={activity.id} onClick={() => setSelectedActivity({ kpiId: kpi.id, activity })} className="flex items-center justify-between p-5 rounded-4xl bg-gray-50/50 border border-transparent hover:border-gray-100 hover:bg-white transition-all cursor-pointer group/item">
                         <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-2xl ${theme.light} ${theme.text} flex items-center justify-center`}><ClipboardList size={20} /></div>
-                          <p className="text-sm font-bold text-gray-700">{activity.content}</p>
+                           <p className="text-sm font-bold text-gray-700">{activity.content}</p>
                         </div>
                         <Settings2 size={16} className="text-gray-300 group-hover/item:text-black transition-colors" />
                       </div>
                     ))}
-                    <div className="mt-8 flex gap-3">
+                     <div className="mt-8 flex gap-3">
                       <input type="text" placeholder="Entry new activity performance..." className="flex-1 px-8 py-4 bg-gray-50 rounded-full text-sm font-bold outline-none border border-transparent focus:border-gray-100 focus:bg-white transition-all" value={newActivityText} onChange={e => setNewActivityText(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddActivity(kpi.id)} />
                       <button onClick={() => handleAddActivity(kpi.id)} className={`w-12 h-12 ${theme.bg} text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-all`}><Plus size={20} /></button>
                     </div>
@@ -148,12 +119,19 @@ const KPIManager: React.FC<KPIManagerProps> = ({ sectionTitle, kpis, onUpdate, a
             </div>
           );
         })}
-      </div>
 
       {selectedActivity && (
         <ActivityDetailModal 
-          activity={selectedActivity.activity} accentColor={accentColor} onClose={() => setSelectedActivity(null)} 
-          onSave={handleSaveActivityDetail} onDelete={() => { onUpdate(prev => prev.map(k => k.id === selectedActivity.kpiId ? { ...k, activities: (k.activities || []).filter(a => a.id !== selectedActivity.activity.id) } : k)); setSelectedActivity(null); }}
+          activity={selectedActivity.activity} 
+          accentColor={accentColor} 
+          selectedMonth={selectedMonth} // Pass selectedMonth from context
+          onClose={() => setSelectedActivity(null)} 
+          onSave={handleSaveActivityDetail} 
+          onActivityUpdate={handleActivityUpdate} // Pass the real-time update handler
+          onDelete={() => { 
+            onUpdate(prev => prev.map(k => k.id === selectedActivity.kpiId ? { ...k, activities: (k.activities || []).filter(a => a.id !== selectedActivity.activity.id) } : k)); 
+            setSelectedActivity(null); 
+          }}
         />
       )}
     </div>

@@ -2,35 +2,40 @@
 import React, { useState } from 'react';
 import KPIManager from './KPIManager';
 import HotSpotMap from './HotSpotMap';
-import { KPI, StateUpdater, Facility, HotSpot } from '../types';
+import { useData } from '../contexts/DataContext'; // Import useData hook
+import { HotSpot } from '../types';
 
-interface SafetyManagementProps {
-  kpis: KPI[];
-  onUpdate: StateUpdater<KPI[]>;
-  mainValue: { days: number; change: number };
-  facilities: Facility[];
-  hotspots: HotSpot[];
-  onAddHotspot: (newHotspotData: Omit<HotSpot, 'id'>) => void;
-  onUpdateHotspot: (updatedHotspot: HotSpot) => void;
-  onDeleteHotspot: (hotspotId: string) => void;
-}
-
-const SafetyManagement: React.FC<SafetyManagementProps> = ({ 
-  kpis, 
-  onUpdate, 
-  mainValue, 
-  facilities,
-  hotspots,
-  onAddHotspot,
-  onUpdateHotspot,
-  onDeleteHotspot
-}) => {
+const SafetyManagement: React.FC = () => {
+  const {
+    safetyKPIs,
+    setSafetyKPIs,
+    facilities,
+    hotspots,
+    setHotspots
+  } = useData();
+  
   const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'monitoring'>('monitoring');
+
+  const mainValue = {
+      days: safetyKPIs[0]?.current || 0, change: 0
+  };
+
+  const handleAddHotspot = (newHotspotData: Omit<HotSpot, 'id'>) => {
+    const newHotspot: HotSpot = { ...newHotspotData, id: Date.now().toString() };
+    setHotspots(prev => [...prev, newHotspot]);
+  };
+
+  const handleUpdateHotspot = (updatedHotspot: HotSpot) => {
+    setHotspots(prev => prev.map(h => h.id === updatedHotspot.id ? updatedHotspot : h));
+  };
+
+  const handleDeleteHotspot = (hotspotId: string) => {
+    setHotspots(prev => prev.filter(h => h.id !== hotspotId));
+  };
 
   return (
     <div className="space-y-8 h-full flex flex-col">
-      {/* ... (기존 상단 UI 부분은 변경 없음) ... */}
-       <div className="bg-white rounded-5xl p-10 shadow-sm border border-gray-50 flex flex-col md:flex-row justify-between items-center gap-10">
+      <div className="bg-white rounded-5xl p-10 shadow-sm border border-gray-50 flex flex-col md:flex-row justify-between items-center gap-10">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
             <span className="px-2 py-0.5 bg-pink-50 text-pink-500 rounded-full text-[10px] font-black uppercase tracking-widest ring-1 ring-pink-100">Safety Control</span>
@@ -47,7 +52,7 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({
         </div>
         
         <div className="w-full md:w-80 flex flex-col gap-4">
-          {/* ... (기존 우측 UI 부분) ... */}
+          {/* ... (Existing UI) ... */}
         </div>
       </div>
 
@@ -58,14 +63,14 @@ const SafetyManagement: React.FC<SafetyManagementProps> = ({
 
       <div className="flex-grow">
         {activeSubTab === 'kpi' ? (
-          <KPIManager sectionTitle="Safety Index" kpis={kpis} onUpdate={onUpdate} accentColor="orange" />
+          <KPIManager sectionTitle="Safety Index" kpis={safetyKPIs} onUpdate={setSafetyKPIs} accentColor="orange" />
         ) : (
           <HotSpotMap 
             facilities={facilities}
             hotspots={hotspots}
-            onAddHotspot={onAddHotspot}
-            onUpdateHotspot={onUpdateHotspot}
-            onDeleteHotspot={onDeleteHotspot}
+            onAddHotspot={handleAddHotspot}
+            onUpdateHotspot={handleUpdateHotspot}
+            onDeleteHotspot={handleDeleteHotspot}
           />
         )}
       </div>
