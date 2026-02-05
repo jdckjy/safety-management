@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { LatLngExpression } from 'leaflet';
 
 export type MenuKey = 'dashboard' | 'safety' | 'lease' | 'asset' | 'infra' | string;
 
@@ -54,7 +55,7 @@ export interface BusinessActivity {
 }
 
 export interface KPI {
-  id: string;
+  id:string;
   name: string;
   target: number;
   current: number;
@@ -65,10 +66,10 @@ export interface KPI {
 export interface Tenant {
   id: string;
   name: string;
-  usage: string; // 용도
-  area: number;  // 면적 (m2)
-  floor: number; // 층
-  status: 'occupied' | 'vacant' | 'public'; // 임대/미임대/비임대 상태
+  usage: string; 
+  area: number;  
+  floor: number; 
+  status: 'occupied' | 'vacant' | 'public';
 }
 
 export interface Facility {
@@ -79,13 +80,23 @@ export interface Facility {
   ratio?: number;
   content?: string;
   buildingArea?: number;
-  bcr?: number; // 건폐율
-  gfa?: number; // 지상총면적
-  far?: number; // 용적률
+  bcr?: number;
+  gfa?: number;
+  far?: number;
   usage?: string;
   height?: string;
   notes?: string;
 }
 
+// 지도에 표시될 새로운 노드(마커)를 위한 타입 정의 (id를 string으로 변경)
+export interface HotSpot {
+  id: string;
+  position: LatLngExpression;
+  facilityId: string;
+  facilityName: string;
+  responseType: '정기' | '긴급';
+  riskLevel: 'Level 1 (낮음)' | 'Level 2 (중간)' | 'Level 3 (높음)';
+  details: string;
+}
 
 export type StateUpdater<T> = React.Dispatch<React.SetStateAction<T>>;

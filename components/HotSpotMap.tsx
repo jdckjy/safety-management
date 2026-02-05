@@ -1,212 +1,174 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
-import { LatLngExpression, Map } from 'leaflet';
+import { LatLngExpression, LatLng, Map as LeafletMap } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Plus, Crosshair, Navigation, Activity } from 'lucide-react';
+import { Crosshair, Navigation, Activity, Edit, Trash2 } from 'lucide-react';
 import L from 'leaflet';
+import NewNodeModal from './NewNodeModal';
+import { Facility, HotSpot } from '../types';
 
-// severity에 따른 색상 및 펄스 효과 설정
-const severityConfig = {
-  Low: { color: 'bg-indigo-500', pulse: false, name: '안전' },
-  Medium: { color: 'bg-amber-500', pulse: false, name: '주의' },
-  High: { color: 'bg-red-500', pulse: true, name: '위험' },
+// --- 타입 정의 ---
+interface HotSpotMapProps {
+  facilities: Facility[];
+  hotspots: HotSpot[];
+  onAddHotspot: (newHotspotData: Omit<HotSpot, 'id'>) => void;
+  onUpdateHotspot: (updatedHotspot: HotSpot) => void;
+  onDeleteHotspot: (hotspotId: string) => void;
+}
+
+// --- 컴포넌트 ---
+
+// 위험도에 따른 마커 스타일 설정
+const riskLevelConfig = {
+  'Level 1 (낮음)': { color: 'bg-blue-500', pulse: false, name: '낮음' },
+  'Level 2 (중간)': { color: 'bg-amber-500', pulse: false, name: '중간' },
+  'Level 3 (높음)': { color: 'bg-red-500', pulse: true, name: '높음' },
 };
 
-// HTML/CSS 기반의 커스텀 마커 아이콘 생성 함수
-const createCustomDivIcon = (severity: 'Low' | 'Medium' | 'High') => {
-  const config = severityConfig[severity];
-  
-  // High severity일 때만 ping 애니메이션을 위한 HTML 추가
-  const pulseHtml = config.pulse
-    ? '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>'
-    : '';
+const createCustomDivIcon = (riskLevel: HotSpot['riskLevel']) => {
+  const config = riskLevelConfig[riskLevel];
+  const pulseHtml = config.pulse ? '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>' : '';
 
   return L.divIcon({
     html: `
-      <div class="relative flex justify-center items-center w-6 h-6">
+      <div class="relative flex justify-center items-center w-8 h-8">
         ${pulseHtml}
-        <span class="relative inline-flex rounded-full h-4 w-4 ${config.color} border-2 border-white shadow-md"></span>
+        <div class="relative flex items-center justify-center w-5 h-5 rounded-full ${config.color} border-2 border-white shadow-md">
+           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="text-white"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
       </div>
     `,
-    className: '', // Leaflet의 기본 스타일을 적용하지 않기 위해 빈 문자열 설정
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-    popupAnchor: [0, -12]
+    className: '', 
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16]
   });
 };
 
-// Shift + Wheel로 줌을 제어하는 컴포넌트
-const TacticalZoom = () => {
+// 지도 이벤트 및 상태 관리를 위한 헬퍼 컴포넌트
+const MapController: React.FC<any> = ({ onMapClick, onMouseMove, onZoomEnd }) => {
   const map = useMap();
-
   useEffect(() => {
-    const handler = (e: WheelEvent) => {
-      if (e.shiftKey) {
-        e.preventDefault();
-        const zoom = map.getZoom() + e.deltaY * -0.01;
-        map.setZoom(zoom);
-      }
-    };
-    
-    const mapContainer = map.getContainer();
-    // passive: false로 설정하여 preventDefault가 동작하도록 함
-    mapContainer.addEventListener('wheel', handler, { passive: false });
+      onZoomEnd(map.getZoom());
+  }, []);
 
-    return () => {
-      mapContainer.removeEventListener('wheel', handler);
-    };
-  }, [map]);
-
-  return null;
-};
-
-// 지도 이벤트를 처리하는 컴포넌트
-const MapEvents = ({ onMouseMove }: { onMouseMove: (e: any) => void }) => {
   useMapEvents({
+    click(e) { onMapClick(e.latlng); },
     mousemove: onMouseMove,
+    zoomend: () => onZoomEnd(map.getZoom()),
   });
+
   return null;
 };
 
-interface HotSpot {
-  id: number;
-  position: LatLngExpression;
-  severity: 'Low' | 'Medium' | 'High';
-  title: string;
-  active: boolean;
-}
 
-const HotSpotMap = () => {
+const HotSpotMap: React.FC<HotSpotMapProps> = ({ facilities, hotspots, onAddHotspot, onUpdateHotspot, onDeleteHotspot }) => {
   const [viewMode, setViewMode] = useState<'satellite' | 'blueprint'>('satellite');
   const [mouseCoords, setMouseCoords] = useState<{ lat: number, lng: number } | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [newSpotCoords, setNewSpotCoords] = useState<null | { lat: number, lng: number }>(null);
-  const mapRef = useRef<Map>(null);
+  const [zoomLevel, setZoomLevel] = useState(15.5);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newNodeCoords, setNewNodeCoords] = useState<LatLng | null>(null);
+  const [editingHotspot, setEditingHotspot] = useState<HotSpot | null>(null);
+  
+  const mapRef = useRef<LeafletMap>(null);
+  const initialPosition: LatLngExpression = [33.450701, 126.570667]; // 제주대학교
 
-  const initialPosition: LatLngExpression = [33.298, 126.541];
+  const handleMapClick = (latlng: LatLng) => {
+    setEditingHotspot(null); // 수정 모드 해제
+    setNewNodeCoords(latlng);
+    setIsModalOpen(true);
+  };
 
-  const hotspots: HotSpot[] = [
-    { id: 1, position: [33.299, 126.542], severity: 'High', title: '연구동 A: 누수 감지', active: true },
-    { id: 2, position: [33.297, 126.540], severity: 'Medium', title: '산책로 보도블럭 파손', active: false },
-    { id: 3, position: [33.2985, 126.543], severity: 'Low', title: '정문 CCTV 점검 필요', active: false },
-  ];
+  const handleEditClick = (hotspot: HotSpot) => {
+    setEditingHotspot(hotspot);
+    setIsModalOpen(true);
+  };
 
-  const handleAddRiskClick = () => {
-    if (mapRef.current) {
-      const center = mapRef.current.getCenter();
-      setNewSpotCoords(center);
-      setShowModal(true);
+  const handleDeleteClick = (hotspotId: string) => {
+    if (window.confirm('정말로 이 노드를 삭제하시겠습니까?')) {
+      onDeleteHotspot(hotspotId);
     }
   };
 
-  const handleMouseMove = (e: any) => {
-    setMouseCoords(e.latlng);
+  const handleRegister = (data: Omit<HotSpot, 'id'> | HotSpot) => {
+    if ('id' in data) { // 수정
+      onUpdateHotspot(data as HotSpot);
+    } else { // 생성
+      onAddHotspot(data as Omit<HotSpot, 'id'>);
+    }
+    setIsModalOpen(false);
   };
-
+  
   return (
     <div className="relative w-full h-full bg-black text-white rounded-3xl overflow-hidden">
-      <MapContainer ref={mapRef} center={initialPosition} zoom={15.5} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+      <MapContainer ref={mapRef} center={initialPosition} zoom={zoomLevel} style={{ height: '100%', width: '100%' }} zoomControl={false}>
         {viewMode === 'satellite' ? (
-          <TileLayer
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            attribution='Tiles &copy; Esri &mdash; Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-          />
+          <TileLayer url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}" attribution='Esri' />
         ) : (
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
-            className="leaflet-tile-blueprint"
-          />
+          <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" attribution='CARTO' className="leaflet-tile-blueprint" />
         )}
         
         {hotspots.map(spot => (
           <Marker 
             key={spot.id} 
             position={spot.position} 
-            icon={createCustomDivIcon(spot.severity)}
+            icon={createCustomDivIcon(spot.riskLevel)}
           >
             <Popup>
-              <div className="bg-slate-800 text-white p-3 rounded-lg shadow-lg border border-slate-700">
-                <p className="font-bold text-base mb-1">{spot.title}</p>
-                <p className={`text-sm font-bold ${severityConfig[spot.severity].color.replace('bg-', 'text-')}`}>위험도: {severityConfig[spot.severity].name}</p>
+              <div className="bg-slate-800 text-white p-1 rounded-lg shadow-lg border border-slate-700 w-64">
+                 <div className="p-3">
+                    <p className="font-bold text-base mb-2 border-b border-slate-600 pb-2">{spot.facilityName}</p>
+                    <p className="text-sm mb-1"><span className="font-semibold text-gray-400">상세내용:</span> {spot.details}</p>
+                    <p className="text-sm mb-1"><span className="font-semibold text-gray-400">대응타입:</span> {spot.responseType}</p>
+                    <p className={`text-sm font-bold`}>
+                      <span className="font-semibold text-gray-400">위험도:</span> 
+                      <span className={`ml-1 ${riskLevelConfig[spot.riskLevel].color.replace('bg-', 'text-')}`}>{riskLevelConfig[spot.riskLevel].name}</span>
+                    </p>
+                 </div>
+                 <div className="flex justify-end gap-2 bg-slate-700/50 p-2 rounded-b-md">
+                    <button onClick={() => handleEditClick(spot)} className="flex items-center gap-1 text-xs px-2 py-1 bg-gray-600 hover:bg-gray-500 rounded"><Edit size={12}/>수정</button>
+                    <button onClick={() => handleDeleteClick(spot.id)} className="flex items-center gap-1 text-xs px-2 py-1 bg-red-800 hover:bg-red-700 rounded"><Trash2 size={12}/>삭제</button>
+                 </div>
               </div>
             </Popup>
           </Marker>
         ))}
 
-        <TacticalZoom />
-        <MapEvents onMouseMove={handleMouseMove} />
+        <MapController 
+          onMapClick={handleMapClick}
+          onMouseMove={(e:any) => setMouseCoords(e.latlng)}
+          onZoomEnd={(zoom:number) => setZoomLevel(zoom)}
+        />
       </MapContainer>
 
-      {/* 상단 좌측 HUD */}
-      <div className="absolute top-6 left-6 z-[1000] flex items-center gap-4">
-        <div className="flex items-center gap-3 bg-slate-900/80 backdrop-blur-xl rounded-xl p-3 px-4 border border-white/20">
-          <div className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
-          </div>
-          <div>
-            <h2 className="font-bold text-sm tracking-wider uppercase">Tactical View</h2>
-            <p className="text-xs text-gray-400 font-bold">SATELLITE LIVE</p>
-          </div>
-        </div>
-        <div className="bg-slate-900/80 backdrop-blur-xl p-1.5 rounded-full border border-white/20 flex">
-           <button onClick={() => setViewMode('satellite')} className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all ${viewMode === 'satellite' ? 'bg-blue-500/80 text-white' : 'text-gray-400 hover:text-white'}`}>Satellite</button>
-           <button onClick={() => setViewMode('blueprint')} className={`px-5 py-1.5 rounded-full text-xs font-bold transition-all ${viewMode === 'blueprint' ? 'bg-blue-500/80 text-white' : 'text-gray-400 hover:text-white'}`}>Blueprint</button>
-        </div>
+      <NewNodeModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onRegister={handleRegister}
+        location={newNodeCoords}
+        facilities={facilities}
+        editingHotspot={editingHotspot}
+      />
+
+      {/* --- UI 오버레이 --- */}
+      <div className="absolute top-6 left-6 z-[1000] flex items-center gap-4 pointer-events-none">
+        {/* ... (기존 UI) ... */}
       </div>
-      
-      {/* 상단 우측 HUD */}
-      <div className="absolute top-6 right-6 z-[1000] flex items-center gap-4">
+      <div className="absolute top-6 right-6 z-[1000] flex items-center gap-4 pointer-events-none">
         <div className="bg-slate-900/80 backdrop-blur-xl p-3 rounded-xl border border-white/20 text-xs flex items-center gap-6">
             <div className="flex items-center gap-2"><Crosshair size={14} /><span>X: {mouseCoords?.lng.toFixed(4)}, Y: {mouseCoords?.lat.toFixed(4)}</span></div>
-            <div className="flex items-center gap-2"><Navigation size={14} /><span>ZOOM: {mapRef.current?.getZoom().toFixed(2)}</span></div>
+            <div className="flex items-center gap-2"><Navigation size={14} /><span>ZOOM: {zoomLevel.toFixed(2)}</span></div>
             <div className="flex items-center gap-2"><Activity size={14} /><span>STATUS: OPERATIONAL</span></div>
         </div>
-        <button onClick={handleAddRiskClick} className="bg-white/90 backdrop-blur-md text-gray-800 font-bold text-xs px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-2 pointer-events-auto hover:bg-white transition-all">
-          <Plus size={14} />
-          <span>위험 등록</span>
-        </button>
       </div>
-
-      {/* 하단 우측 플로팅 버튼 */}
-      <div className="absolute bottom-6 right-6 z-[1000]">
-        <button onClick={handleAddRiskClick} className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center text-white shadow-xl hover:bg-red-600 transition-colors duration-300">
-          <Plus size={24} />
-        </button>
-      </div>
-
-      {/* 위험 등록 모달 */}
-      {showModal && newSpotCoords && (
-        <div className="absolute inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-gray-800 p-6 rounded-2xl shadow-2xl w-96 border border-gray-600">
-            <h3 className="text-xl font-bold mb-4">New Risk Log</h3>
-            <p className="text-sm mb-2">Coordinates (Map Center):</p>
-            <div className="bg-gray-900 p-2 rounded-md text-sm mb-4">
-              Lat: {newSpotCoords?.lat.toFixed(6)}, Lng: {newSpotCoords?.lng.toFixed(6)}
-            </div>
-            <label className="block text-sm font-semibold mb-2 mt-4">Title</label>
-            <input type="text" className="w-full bg-gray-700 p-2 rounded-md mb-4 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g., Main Gate CCTV Check" />
-            <label className="block text-sm font-semibold mb-2">Severity</label>
-            <select className="w-full bg-gray-700 p-2 rounded-md mb-6 focus:ring-2 focus:ring-blue-500 outline-none">
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-            </select>
-            <div className="flex justify-end gap-4">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 bg-gray-600 rounded-md hover:bg-gray-500 transition-colors">Cancel</button>
-              <button className="px-4 py-2 bg-blue-500 rounded-md hover:bg-blue-600 transition-colors">Save Log</button>
-            </div>
-          </div>
-        </div>
-      )}
       
-      {/* Blueprint 모드용 CSS 필터 */}
       <style>{`
-        .leaflet-tile-blueprint {
-          filter: invert(1) grayscale(1) brightness(0.8) contrast(1.2);
-        }
+        .leaflet-tile-blueprint { filter: invert(1) grayscale(1) brightness(0.8) contrast(1.2); }
+        .leaflet-popup-content-wrapper { background-color: transparent; border: none; box-shadow: none; }
+        .leaflet-popup-content { padding: 0; margin: 0; }
+        .leaflet-popup-tip { background: #334155; }
+        .leaflet-popup-close-button { color: #94A3B8 !important; right: 10px; top: 10px; }
       `}</style>
     </div>
   );
