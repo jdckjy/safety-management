@@ -1,17 +1,21 @@
+
 import { KPI, Tenant, Facility, HotSpot } from '../types';
+import { createKpi } from '../data/factories'; // Import the factory
 
 const generateMonthlyRecords = () => Array.from({ length: 12 }, (_, i) => ({
     month: i + 1,
-    plans: Math.random() > 0.5 ? [{ content: `Monthly check for task ${i+1}`, completed: Math.random() > 0.3 }] : []
+    plans: Math.random() > 0.5 ? [{ id: `plan-${i}`, content: `Monthly check for task ${i+1}`, completed: Math.random() > 0.3 }] : []
 }));
 
+// Use createKpi factory for all mock KPI data
 export const mockSafetyKPIs: KPI[] = [
-    {
+    createKpi({
         id: 'kpi-safety-1',
         name: '무재해 일수',
         current: 730,
         target: 1000,
         unit: 'days',
+        pulse: { value: 2, trend: 'up' },
         activities: [
             { 
                 id: 'act-safety-1', 
@@ -28,13 +32,14 @@ export const mockSafetyKPIs: KPI[] = [
                 monthlyRecords: generateMonthlyRecords()
             },
         ],
-    },
-    {
+    }),
+    createKpi({
         id: 'kpi-safety-2',
         name: '안전 교육 이수율',
         current: 98,
         target: 100,
         unit: '%',
+        pulse: { value: -0.5, trend: 'down' },
         activities: [
              { 
                 id: 'act-safety-3', 
@@ -44,11 +49,11 @@ export const mockSafetyKPIs: KPI[] = [
                 monthlyRecords: generateMonthlyRecords()
             },
         ],
-    },
+    }),
 ];
 
 export const mockLeaseKPIs: KPI[] = [
-    {
+    createKpi({
         id: 'kpi-lease-1',
         name: '공실률',
         current: 3.5,
@@ -63,19 +68,19 @@ export const mockLeaseKPIs: KPI[] = [
                 monthlyRecords: generateMonthlyRecords() 
             }
         ],
-    },
-     {
+    }),
+     createKpi({
         id: 'kpi-lease-2',
         name: '임대료 수금률',
         current: 99.1,
         target: 99.5,
         unit: '%',
         activities: [],
-    },
+    }),
 ];
 
 export const mockAssetKPIs: KPI[] = [
-    {
+    createKpi({
         id: 'kpi-asset-1',
         name: '자산 가치 총액',
         current: 12.5,
@@ -90,11 +95,11 @@ export const mockAssetKPIs: KPI[] = [
                 monthlyRecords: generateMonthlyRecords()
             }
         ],
-    },
+    }),
 ];
 
 export const mockInfraKPIs: KPI[] = [
-    {
+    createKpi({
         id: 'kpi-infra-1',
         name: '인프라 확장 진행률',
         current: 68,
@@ -116,7 +121,7 @@ export const mockInfraKPIs: KPI[] = [
                 monthlyRecords: generateMonthlyRecords() 
             },
         ],
-    },
+    }),
 ];
 
 export const mockTenants: Tenant[] = [
@@ -130,6 +135,22 @@ export const mockFacilities: Facility[] = [
 ];
 
 export const mockHotspots: HotSpot[] = [
-    { id: 'h1', lat: 37.5665, lng: 126.9780, type: 'Safety Concern', description: '지게차 이동 경로와 보행자 동선 겹침' },
-    { id: 'h2', lat: 37.5650, lng: 126.9790, type: 'High Traffic', description: '출퇴근 시간 주차장 입구 정체 심각' },
+    { 
+        id: 'h1', 
+        name: '지게차-보행자 동선 충돌', 
+        location: 'A동 하역장', 
+        type: 'Safety Concern', 
+        riskLevel: 'high', 
+        lastInspection: '2024-07-15',
+        position: { lat: 33.285186, lng: 126.560624 } // 올바른 위치 정보
+    },
+    { 
+        id: 'h2', 
+        name: '주차장 입구 정체', 
+        location: '정문 주차장', 
+        type: 'High Traffic', 
+        riskLevel: 'medium', 
+        lastInspection: '2024-07-20',
+        position: { lat: 33.284186, lng: 126.561624 } // 올바른 위치 정보
+    },
 ];

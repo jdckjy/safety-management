@@ -21,9 +21,9 @@ interface HotSpotMapProps {
 
 // 위험도에 따른 마커 스타일 설정
 const riskLevelConfig = {
-  'Level 1 (낮음)': { color: 'bg-blue-500', pulse: false, name: '낮음' },
-  'Level 2 (중간)': { color: 'bg-amber-500', pulse: false, name: '중간' },
-  'Level 3 (높음)': { color: 'bg-red-500', pulse: true, name: '높음' },
+  low: { color: 'bg-blue-500', pulse: false, name: '낮음' },
+  medium: { color: 'bg-amber-500', pulse: false, name: '중간' },
+  high: { color: 'bg-red-500', pulse: true, name: '높음' },
 };
 
 const createCustomDivIcon = (riskLevel: HotSpot['riskLevel']) => {

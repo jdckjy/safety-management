@@ -1,137 +1,161 @@
 
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, ChevronDown, Settings2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, ChevronDown, FileText, Share2, CirclePlus } from 'lucide-react';
 import { KPI, BusinessActivity } from '../types';
-import ActivityDetailModal from './ActivityDetailModal';
-import { useUnifiedData } from '../contexts/UnifiedDataContext'; // Import useUnifiedData hook
+import WeeklyPerformanceModal from './WeeklyPerformanceModal';
+import { useUnifiedData } from '../contexts/UnifiedDataContext';
+import { createBusinessActivity } from '../data/factories';
 
 interface KPIManagerProps {
   sectionTitle: string;
   kpis: KPI[];
   onUpdate: React.Dispatch<React.SetStateAction<KPI[]>>;
-  accentColor: string;
 }
 
-const KPIManager: React.FC<KPIManagerProps> = ({ sectionTitle, kpis, onUpdate, accentColor }) => {
-  const { selectedMonth, updateKpiActivity } = useUnifiedData(); // Get data from context
+const KPICard: React.FC<{ 
+  kpi: KPI;
+  onDeleteKpi: (id: string) => void;
+  onActivitySelect: (kpiId: string, activity: BusinessActivity) => void;
+  onActivityAdd: (kpiId: string, content: string) => void;
+}> = ({ kpi, onDeleteKpi, onActivitySelect, onActivityAdd }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [newActivityContent, setNewActivityContent] = useState('');
+  const progress = kpi.target > 0 ? Math.min(100, (kpi.current / kpi.target) * 100) : 0;
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [isAdding, setIsAdding] = useState(false);
-  const [selectedKpiId, setSelectedKpiId] = useState<string | null>(null);
-  const [newActivityText, setNewActivityText] = useState('');
-  const [selectedActivity, setSelectedActivity] = useState<{kpiId: string, activity: BusinessActivity} | null>(null);
-
-  const themeStyles: Record<string, { bg: string, text: string, light: string, ring: string }> = {
-    orange: { bg: 'bg-pink-500', text: 'text-pink-500', light: 'bg-pink-50', ring: 'ring-pink-100' },
-    blue: { bg: 'bg-blue-400', text: 'text-blue-400', light: 'bg-blue-50', ring: 'ring-blue-100' },
-    emerald: { bg: 'bg-black', text: 'text-black', light: 'bg-gray-50', ring: 'ring-gray-200' },
-    purple: { bg: 'bg-gray-400', text: 'text-gray-400', light: 'bg-gray-100', ring: 'ring-gray-200' },
+  const handleAddActivity = () => {
+    if (newActivityContent.trim()) {
+      onActivityAdd(kpi.id, newActivityContent);
+      setNewActivityContent('');
+    }
   };
 
-  const theme = themeStyles[accentColor] || themeStyles.blue;
-  const [formData, setFormData] = useState<Omit<KPI, 'id'>>({ name: '', target: 0, current: 0, unit: '', activities: [] });
+  return (
+    <div className="bg-white rounded-3xl shadow-sm border border-gray-100/80 transition-all duration-300">
+      {/* KPI Main Info */}
+      <div className="p-6 cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+        <div className="flex justify-between items-center">
+          <h3 className="text-gray-800 font-semibold text-lg">{kpi.name}</h3>
+          <div className="flex items-center gap-2 text-gray-400">
+            {/* TODO: Implement Edit KPI functionality */}
+            <button className="p-1.5 hover:bg-gray-100 rounded-lg"><Edit2 size={16} /></button>
+            <button onClick={(e) => { e.stopPropagation(); onDeleteKpi(kpi.id); }} className="p-1.5 hover:bg-red-50 text-red-400 rounded-lg"><Trash2 size={16} /></button>
+            <ChevronDown size={20} className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+          </div>
+        </div>
+        <div className="mt-2 text-xs text-gray-500 font-medium">
+          <span>TARGET: {kpi.target}{kpi.unit}</span>
+          <span className="mx-2">•</span>
+          <span>VALUE: {kpi.current}{kpi.unit}</span>
+        </div>
+        <div className="mt-4 w-full bg-gray-100 rounded-full h-2.5">
+          <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progress}%` }}></div>
+        </div>
+      </div>
+
+      {/* Expanded Activity Ledger */}
+      {isExpanded && (
+        <div className="px-6 pb-6 border-t border-gray-100">
+          <div className="flex justify-between items-center mt-4">
+            <h4 className="text-xs font-bold text-gray-400 tracking-wider">ACTIVITY LEDGER</h4>
+            <span className="text-xs font-semibold text-gray-500">Total {kpi.activities?.length || 0} Records</span>
+          </div>
+          <div className="mt-4 space-y-3">
+            {kpi.activities?.map(activity => (
+              <div 
+                key={activity.id} 
+                className="flex items-center justify-between bg-gray-50/80 hover:bg-gray-100 p-4 rounded-xl cursor-pointer transition-colors" 
+                onClick={() => onActivitySelect(kpi.id, activity)}>
+                <div className="flex items-center gap-3">
+                    <FileText size={16} className="text-gray-500" />
+                    <span className="text-sm font-medium text-gray-800">{activity.content}</span>
+                </div>
+                <Share2 size={16} className="text-gray-400" />
+              </div>
+            ))}
+            <div className="flex items-center gap-3 pt-2">
+              <input 
+                type="text"
+                value={newActivityContent}
+                onChange={(e) => setNewActivityContent(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddActivity()}
+                placeholder="Entry new activity performance..."
+                className="w-full bg-transparent text-sm focus:outline-none"
+              />
+              <button onClick={handleAddActivity}>
+                <CirclePlus size={36} className="text-blue-600 hover:text-blue-700 transition-colors" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const KPIManager: React.FC<KPIManagerProps> = ({ sectionTitle, kpis, onUpdate }) => {
+  const { updateKpiActivity } = useUnifiedData();
+  const [selectedActivity, setSelectedActivity] = useState<{ kpiId: string, activity: BusinessActivity } | null>(null);
 
   const handleAddKpi = () => {
-    if (!formData.name) return;
-    onUpdate((prev) => [...prev, { ...formData, id: `kpi-${Date.now()}`, activities: [] }]);
-    resetForm();
-    setIsAdding(false);
+    // Placeholder for Add Indicator button
+    console.log("Add new indicator clicked");
   };
 
-  const handleUpdateKpi = (id: string) => {
-    onUpdate((prev) => prev.map(k => k.id === id ? { ...k, ...formData } : k));
-    setEditingId(null);
-    resetForm();
+  const handleDeleteKpi = (kpiId: string) => {
+    onUpdate(prev => prev.filter(k => k.id !== kpiId));
   };
 
-  const handleAddActivity = (kpiId: string) => {
-    if (!newActivityText.trim()) return;
-    const newActivity: BusinessActivity = {
-      id: `act-${Date.now()}`,
-      content: newActivityText,
-      status: 'ongoing',
-      date: new Date().toISOString().split('T')[0],
-      monthlyRecords: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, plans: [] }))
-    };
+  const handleAddActivity = (kpiId: string, content: string) => {
+    const newActivity = createBusinessActivity({ content });
     onUpdate(prev => prev.map(k => k.id === kpiId ? { ...k, activities: [...(k.activities || []), newActivity] } : k));
-    setNewActivityText('');
   };
 
-  // This now just closes the modal, as saving is handled by onActivityUpdate
-  const handleSaveActivityDetail = (updatedActivity: BusinessActivity) => {
-    // onUpdate will be triggered by onActivityUpdate in the modal
-    setSelectedActivity(null);
-  };
-  
-  // The real-time update handler passed to the modal
   const handleActivityUpdate = (updatedActivity: BusinessActivity) => {
     if (!selectedActivity) return;
     updateKpiActivity(selectedActivity.kpiId, updatedActivity);
   };
 
-  const resetForm = () => setFormData({ name: '', target: 0, current: 0, unit: '', activities: [] });
+  const handleActivityDelete = (activityId: string) => {
+    if (!selectedActivity) return;
+    onUpdate(prev => prev.map(k => 
+      k.id === selectedActivity.kpiId 
+        ? { ...k, activities: (k.activities || []).filter(a => a.id !== activityId) } 
+        : k
+    ));
+  };
 
   return (
     <div className="space-y-6">
-      {/* ... KPI Manager form ... */}
-       {kpis.map(kpi => {
-          const progress = kpi.target > 0 ? Math.min(100, (kpi.current / kpi.target) * 100) : 0;
-          const isSelected = selectedKpiId === kpi.id;
-          return (
-            <div key={kpi.id} className="group">
-              <div 
-                onClick={() => setSelectedKpiId(isSelected ? null : kpi.id)}
-                className={`bg-white p-8 rounded-5xl border shadow-sm transition-all cursor-pointer relative ${isSelected ? 'border-gray-200 ring-4 ring-gray-50' : 'border-gray-50 hover:border-gray-100 hover:shadow-md'}`}
-              >
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h4 className="font-bold text-[#1A1D1F] text-lg tracking-tight">{kpi.name}</h4>
-                  </div>
-                  <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                    <button onClick={(e) => { e.stopPropagation(); setEditingId(kpi.id); setFormData(kpi); }} className="p-2.5 hover:bg-gray-50 rounded-2xl text-gray-300 hover:text-black transition-all"><Edit2 size={16} /></button>
-                    <button onClick={() => onUpdate(prev => prev.filter(k => k.id !== kpi.id))} className="p-2.5 hover:bg-pink-50 rounded-2xl text-gray-300 hover:text-pink-500 transition-all"><Trash2 size={16} /></button>
-                    <ChevronDown size={20} className={`text-gray-200 ml-2 transition-transform ${isSelected ? 'rotate-180 text-black' : ''}`} />
-                  </div>
-                </div>
-                <div className="w-full h-1.5 bg-gray-50 rounded-full overflow-hidden">
-                  <div className={`h-full ${theme.bg} transition-all duration-1000`} style={{ width: `${progress}%` }} />
-                </div>
-              </div>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3">
+          <FileText className="text-blue-500"/> 
+          {sectionTitle}
+        </h2>
+        <button onClick={handleAddKpi} className="bg-gray-900 text-white font-semibold text-sm px-4 py-2.5 rounded-lg flex items-center gap-2 hover:bg-gray-800 transition-colors">
+            <Plus size={16}/>
+            ADD INDICATOR
+        </button>
+      </div>
 
-              {isSelected && (
-                <div className="mt-4 mx-8 p-10 bg-white border border-gray-100 rounded-5xl shadow-lg animate-in slide-in-from-top-4">
-                   <div className="space-y-4">
-                    {(kpi.activities || []).map((activity) => (
-                      <div key={activity.id} onClick={() => setSelectedActivity({ kpiId: kpi.id, activity })} className="flex items-center justify-between p-5 rounded-4xl bg-gray-50/50 border border-transparent hover:border-gray-100 hover:bg-white transition-all cursor-pointer group/item">
-                        <div className="flex items-center gap-4">
-                           <p className="text-sm font-bold text-gray-700">{activity.content}</p>
-                        </div>
-                        <Settings2 size={16} className="text-gray-300 group-hover/item:text-black transition-colors" />
-                      </div>
-                    ))}
-                     <div className="mt-8 flex gap-3">
-                      <input type="text" placeholder="Entry new activity performance..." className="flex-1 px-8 py-4 bg-gray-50 rounded-full text-sm font-bold outline-none border border-transparent focus:border-gray-100 focus:bg-white transition-all" value={newActivityText} onChange={e => setNewActivityText(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddActivity(kpi.id)} />
-                      <button onClick={() => handleAddActivity(kpi.id)} className={`w-12 h-12 ${theme.bg} text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 active:scale-95 transition-all`}><Plus size={20} /></button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <div className="space-y-4">
+        {(kpis || []).map(kpi => (
+          <KPICard 
+            key={kpi.id} 
+            kpi={kpi}
+            onDeleteKpi={handleDeleteKpi}
+            onActivitySelect={(kpiId, activity) => setSelectedActivity({ kpiId, activity })}
+            onActivityAdd={handleAddActivity}
+          />
+        ))}
+      </div>
 
       {selectedActivity && (
-        <ActivityDetailModal 
-          activity={selectedActivity.activity} 
-          accentColor={accentColor} 
-          selectedMonth={selectedMonth} // Pass selectedMonth from context
+        <WeeklyPerformanceModal 
+          isOpen={!!selectedActivity}
           onClose={() => setSelectedActivity(null)} 
-          onSave={handleSaveActivityDetail} 
-          onActivityUpdate={handleActivityUpdate} // Pass the real-time update handler
-          onDelete={() => { 
-            onUpdate(prev => prev.map(k => k.id === selectedActivity.kpiId ? { ...k, activities: (k.activities || []).filter(a => a.id !== selectedActivity.activity.id) } : k)); 
-            setSelectedActivity(null); 
-          }}
+          activity={selectedActivity.activity}
+          onSave={handleActivityUpdate}
+          onDelete={handleActivityDelete}
         />
       )}
     </div>

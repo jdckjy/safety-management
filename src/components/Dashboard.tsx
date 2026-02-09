@@ -1,9 +1,9 @@
 
 import React from 'react';
-import { Building2, ArrowUpRight, TrendingUp } from 'lucide-react';
-import { useUnifiedData } from '../contexts/UnifiedDataContext'; // Import useUnifiedData hook
+import { Building2, ArrowUpRight, TrendingUp, Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
+import { useUnifiedData } from '../contexts/UnifiedDataContext';
+import { KPI } from '../types';
 
-// ProjectStatCard remains the same as it is a presentational component.
 const ProjectStatCard: React.FC<{
   title: string;
   value: string;
@@ -33,17 +33,29 @@ const ProjectStatCard: React.FC<{
 };
 
 const Dashboard: React.FC = () => {
-  // All data is now coming directly from our global context
-  const { selectedMonth, totalMonthlyPlans } = useUnifiedData();
+  const { 
+    selectedMonth, 
+    totalMonthlyPlans,
+    safetyKPIs,
+    leaseKPIs,
+    assetKPIs,
+    infraKPIs,
+  } = useUnifiedData();
   
   const selectedMonthName = new Date(0, selectedMonth).toLocaleString('ko-KR', { month: 'long' });
 
-  // The projectStats array now uses the live data from the context
   const projectStats = [
     { title: `${selectedMonthName} 수행업무`, value: totalMonthlyPlans.toString(), status: 'Updated in real-time', isPrimary: true },
     { title: 'Ended Projects', value: '10', status: 'Increased from last month' },
     { title: 'Running Projects', value: '12', status: 'Increased from last month' },
     { title: 'Pending Project', value: '2', status: 'On Discuss' },
+  ];
+
+  const allKpis = [
+    ...(safetyKPIs || []).map(k => ({ ...k, type: '안전 관리', icon: <Shield size={16}/>, color: 'text-pink-500' })),
+    ...(leaseKPIs || []).map(k => ({ ...k, type: '임대 및 세대', icon: <Handshake size={16}/>, color: 'text-black' })),
+    ...(assetKPIs || []).map(k => ({ ...k, type: '자산 가치', icon: <DollarSign size={16}/>, color: 'text-blue-500' })),
+    ...(infraKPIs || []).map(k => ({ ...k, type: '인프라 개발', icon: <DraftingCompass size={16}/>, color: 'text-gray-400' })),
   ];
 
   return (
@@ -64,25 +76,34 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           <div className="space-y-6">
-            {[
-              { name: '안전 관리', val: '$227,459', pct: 43, color: 'text-pink-500' },
-              { name: '임대 및 세대', val: '$89,935', pct: 11, color: 'text-black' },
-              { name: '자산 가치', val: '$142,823', pct: 27, color: 'text-blue-500' },
-              { name: '인프라 개발', val: '$37,028', pct: 7, color: 'text-gray-400' }
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between group cursor-pointer">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center ${item.color}`}>
-                    <Building2 size={16} />
+            {allKpis.length > 0 ? (
+              allKpis.slice(0, 4).map((kpi) => {
+                if (!kpi) return null; // Add a null check for kpi object
+                const pulse = kpi.pulse || { value: 0, trend: 'stable' };
+                const isPositive = pulse.trend === 'up';
+                const change = Math.abs(pulse.value);
+
+                return (
+                  <div key={kpi.id} className="flex items-center justify-between group cursor-pointer">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center ${kpi.color}`}>
+                        {kpi.icon}
+                      </div>
+                      <span className="text-xs font-bold text-gray-500 group-hover:text-black transition-colors">{kpi.name}</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-black tracking-tight">{`${kpi.current}${kpi.unit}`}</p>
+                      <div className={`flex items-center justify-end gap-1 text-[10px] font-bold ${isPositive ? 'text-pink-500' : 'text-blue-500'}`}>
+                        {isPositive ? '↗' : '↘'}
+                        <span>{change}%</span>
+                      </div>
+                    </div>
                   </div>
-                  <span className="text-xs font-bold text-gray-500 group-hover:text-black transition-colors">{item.name}</span>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-black tracking-tight">{item.val}</p>
-                  <p className="text-[10px] font-bold text-gray-300">{item.pct}%</p>
-                </div>
-              </div>
-            ))}
+                );
+              })
+            ) : (
+              <div className="text-center text-gray-400 font-bold">KPI 데이터가 없습니다.</div>
+            )}
           </div>
         </div>
 

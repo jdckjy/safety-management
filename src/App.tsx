@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -11,12 +11,29 @@ import CustomPage from './components/CustomPage';
 import TabModal from './components/TabModal';
 import { MenuKey, CustomTab } from './types';
 import { useUnifiedData } from './contexts/UnifiedDataContext';
+import { mockSafetyKPIs, mockLeaseKPIs, mockAssetKPIs, mockInfraKPIs, mockHotspots, mockFacilities } from './contexts/mockData';
 
 const App: React.FC = () => {
     const [activeMenu, setActiveMenu] = useState<MenuKey>('dashboard');
     const [isTabModalOpen, setIsTabModalOpen] = useState(false);
 
-    const { customTabs, setCustomTabs } = useUnifiedData();
+    const { 
+        customTabs, setCustomTabs, 
+        setSafetyKPIs, setLeaseKPIs, 
+        setAssetKPIs, setInfraKPIs,
+        setHotspots,
+        setFacilities
+    } = useUnifiedData();
+
+    useEffect(() => {
+        // Load mock data into the context when the app starts
+        setSafetyKPIs(mockSafetyKPIs);
+        setLeaseKPIs(mockLeaseKPIs);
+        setAssetKPIs(mockAssetKPIs);
+        setInfraKPIs(mockInfraKPIs);
+        setHotspots(mockHotspots);
+        setFacilities(mockFacilities);
+    }, []); // Empty dependency array ensures this runs only once on mount
 
     const handleAddTab = (newTab: CustomTab) => {
         setCustomTabs((prev: CustomTab[]) => [...prev, newTab]);

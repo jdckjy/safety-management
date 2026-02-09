@@ -25,7 +25,7 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [responseType, setResponseType] = useState<'정기' | '긴급'>('정기');
-  const [riskLevel, setRiskLevel] = useState<'Level 1 (낮음)' | 'Level 2 (중간)' | 'Level 3 (높음)'>('Level 1 (낮음)');
+  const [riskLevel, setRiskLevel] = useState<HotSpot['riskLevel']>('low');
   const [details, setDetails] = useState('');
 
   const isEditing = !!editingHotspot;
@@ -40,7 +40,7 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
     } else {
       setSelectedFacility(null);
       setResponseType('정기');
-      setRiskLevel('Level 1 (낮음)');
+      setRiskLevel('low');
       setDetails('');
     }
   }, [editingHotspot, facilities, isOpen]);
@@ -127,10 +127,10 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-500">위험도</label>
-                <select value={riskLevel} onChange={(e) => setRiskLevel(e.target.value as any)} className="w-full mt-2 bg-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200 text-gray-900">
-                  <option>Level 1 (낮음)</option>
-                  <option>Level 2 (중간)</option>
-                  <option>Level 3 (높음)</option>
+                <select value={riskLevel} onChange={(e) => setRiskLevel(e.target.value as HotSpot['riskLevel'])} className="w-full mt-2 bg-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200 text-gray-900">
+                  <option value="low">Level 1 (낮음)</option>
+                  <option value="medium">Level 2 (중간)</option>
+                  <option value="high">Level 3 (높음)</option>
                 </select>
               </div>
             </div>
