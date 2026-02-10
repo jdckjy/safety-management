@@ -5,7 +5,7 @@ import { KPI, BusinessActivity } from '../types';
 import WeeklyPerformanceModal from './WeeklyPerformanceModal';
 import AddKpiModal from './AddKpiModal';
 import EditKpiModal from './EditKpiModal'; // Import the new edit modal
-import { useUnifiedData } from '../contexts/UnifiedDataContext';
+import { useAppData } from '../providers/AppDataContext';
 import { createBusinessActivity, createKpi } from '../data/factories';
 
 interface KPIManagerProps {
@@ -34,7 +34,7 @@ const KPICard: React.FC<{
 
   const confirmAndDelete = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent card from expanding
-    if (window.confirm(`'${kpi.name}' 지표를 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
+    if (window.confirm(`\'${kpi.name}\' 지표를 정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) {
       onDeleteKpi(kpi.id);
     }
   };
@@ -104,7 +104,7 @@ const KPICard: React.FC<{
 }
 
 const KPIManager: React.FC<KPIManagerProps> = ({ sectionTitle, kpis, onUpdate }) => {
-  const { updateKpiActivity } = useUnifiedData();
+  const { updateKpiActivity } = useAppData();
   const [selectedActivity, setSelectedActivity] = useState<{ kpiId: string, activity: BusinessActivity } | null>(null);
   const [isAddKpiModalOpen, setIsAddKpiModalOpen] = useState(false);
   const [editingKpi, setEditingKpi] = useState<KPI | null>(null); // State for the KPI being edited

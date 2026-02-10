@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ChevronRight, PlusCircle } from 'lucide-react';
-import { useUnifiedData } from '../contexts/UnifiedDataContext';
+import { useAppData } from '../providers/AppDataContext';
 import { KPI, Activity } from '../types';
 
 // 이 컴포넌트는 이제 전체 페이지가 아닌, 특정 KPI 아래에 확장되어 보이는 '패널' 역할을 합니다.
@@ -12,7 +12,7 @@ interface ActivityManagerProps {
 
 const ActivityManager: React.FC<ActivityManagerProps> = ({ kpi }) => {
   // 화면 이동이 필요할 때만 전역 상태의 navigateTo 함수를 직접 사용합니다.
-  const { navigateTo } = useUnifiedData();
+  const { navigateTo } = useAppData();
 
   // 상세 Task 화면으로 이동하는 핸들러
   const handleActivitySelect = (activityId: string) => {

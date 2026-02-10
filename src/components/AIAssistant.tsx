@@ -1,7 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, MessageSquare, ChevronRight, HelpCircle } from 'lucide-react';
+import { Sparkles, MessageSquare, ChevronRight, HelpCircle, LogOut } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
+import { auth } from '../firebaseConfig';
+import { signOut } from 'firebase/auth';
 
 const AIAssistant: React.FC = () => {
   const [suggestion, setSuggestion] = useState<string>("단지 조성 현황과 안전 등급을 분석하고 있습니다...");
@@ -33,6 +35,17 @@ const AIAssistant: React.FC = () => {
   useEffect(() => {
     fetchAIInsights();
   }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      // onAuthStateChanged가 리디렉션을 처리합니다.
+      console.log("로그아웃 성공");
+    } catch (error) {
+      console.error("로그아웃 실패:", error);
+      alert("로그아웃 중 오류가 발생했습니다.");
+    }
+  };
 
   return (
     <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col h-full min-h-[350px]">
@@ -83,6 +96,13 @@ const AIAssistant: React.FC = () => {
           <p className="text-xs font-bold text-[#1B2559]">관리 이슈 알림</p>
           <p className="text-[10px] text-red-500 font-medium uppercase mt-0.5">B구역 안전 점검 기한 만료 임박</p>
         </div>
+        <button 
+          onClick={handleLogout}
+          className="p-2 rounded-full hover:bg-red-100 text-gray-400 hover:text-red-500 transition-colors"
+          aria-label="로그아웃"
+        >
+          <LogOut size={18} />
+        </button>
       </div>
     </div>
   );

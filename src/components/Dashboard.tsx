@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { Building2, ArrowUpRight, TrendingUp, Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
-import { useUnifiedData } from '../contexts/UnifiedDataContext';
-import { useAuth } from '../contexts/AuthContext';
+import { useAppData } from '../providers/AppDataContext';
+import { useAuth } from '../features/auth/AuthContext';
 import { KPI } from '../types';
 import { Grid, Button } from '@mui/material';
 
@@ -42,7 +42,7 @@ const Dashboard: React.FC = () => {
     leaseKPIs,
     assetKPIs,
     infraKPIs,
-  } = useUnifiedData();
+  } = useAppData();
   const { logout } = useAuth();
   
   const selectedMonthName = new Date(0, selectedMonth).toLocaleString('ko-KR', { month: 'long' });

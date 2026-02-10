@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { X, Calendar } from 'lucide-react';
 import WeeklyPerformanceModal from './WeeklyPerformanceModal';
 import { BusinessActivity, KPI } from '../types';
-import { useUnifiedData } from '../contexts/UnifiedDataContext';
+import { useAppData } from '../providers/AppDataContext';
 
 interface SafetyInspectionModalProps {
   isOpen: boolean;
@@ -12,14 +12,14 @@ interface SafetyInspectionModalProps {
 }
 
 const SafetyInspectionModal: React.FC<SafetyInspectionModalProps> = ({ isOpen, onClose }) => {
-  const { unifiedData, setUnifiedData } = useUnifiedData();
+  const { safetyKPIs, setSafetyKPIs } = useAppData();
   const [activities, setActivities] = useState<BusinessActivity[]>([]);
 
   // Ultra-defensive data processing from global state
   useEffect(() => {
     if (isOpen) {
       try {
-        const kpis = (unifiedData && Array.isArray(unifiedData.kpis)) ? unifiedData.kpis : [];
+        const kpis = (safetyKPIs && Array.isArray(safetyKPIs)) ? safetyKPIs : [];
         const validKpis = kpis.filter(kpi => kpi && typeof kpi === 'object');
 
         const allActivities = validKpis.flatMap(kpi => {
@@ -35,7 +35,7 @@ const SafetyInspectionModal: React.FC<SafetyInspectionModalProps> = ({ isOpen, o
         setActivities([]);
       }
     }
-  }, [isOpen, unifiedData]);
+  }, [isOpen, safetyKPIs]);
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedWeek, setSelectedWeek] = useState(1);
@@ -62,13 +62,13 @@ const SafetyInspectionModal: React.FC<SafetyInspectionModalProps> = ({ isOpen, o
   };
 
   const handleSaveChanges = () => {
-    if (!unifiedData || !Array.isArray(unifiedData.kpis)) {
+    if (!safetyKPIs || !Array.isArray(safetyKPIs)) {
       console.error("Save Changes Error: Data structure is not as expected.");
       onClose();
       return;
     }
 
-    const originalKpis = unifiedData.kpis.filter(kpi => kpi && typeof kpi === 'object');
+    const originalKpis = safetyKPIs.filter(kpi => kpi && typeof kpi === 'object');
     const originalActivityToKpiMap = new Map<string, string>();
     
     originalKpis.forEach(kpi => {
@@ -96,7 +96,7 @@ const SafetyInspectionModal: React.FC<SafetyInspectionModalProps> = ({ isOpen, o
       }
     }
 
-    setUnifiedData({ ...unifiedData, kpis: updatedKpis });
+    setSafetyKPIs(updatedKpis);
     onClose();
   };
   

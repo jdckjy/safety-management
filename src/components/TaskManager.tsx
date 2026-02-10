@@ -1,14 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
 import { X, PlusCircle } from 'lucide-react';
-import { useUnifiedData } from '../contexts/UnifiedDataContext';
+import { useAppData } from '../providers/AppDataContext';
 import { KPI, Activity, Task, WeeklyRecord } from '../types';
 import TaskEditModal from './TaskEditModal';
 import WeeklyReportModal from './WeeklyReportModal';
 import { getWeekOfMonth } from '../utils/uiHelpers';
 
-// TaskManager는 이제 모달의 "내용" 역할만 담당합니다.
-// 닫기 동작을 부모(Modal)에게 전달하기 위해 onClose prop을 받습니다.
 interface TaskManagerProps {
   kpiId: string;
   activityId: string;
@@ -16,17 +14,23 @@ interface TaskManagerProps {
 }
 
 const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose }) => {
-  const { unifiedData, updateTaskRecords } = useUnifiedData();
+  const { safetyKPIs, leaseKPIs, assetKPIs, infraKPIs, updateTaskRecords } = useAppData();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const { kpi, activity } = useMemo(() => {
-    const kpi = unifiedData?.kpis.find((k: KPI) => k.id === kpiId);
+    const allKpis: KPI[] = [
+      ...(safetyKPIs || []),
+      ...(leaseKPIs || []),
+      ...(assetKPIs || []),
+      ...(infraKPIs || []),
+    ];
+    const kpi = allKpis.find((k: KPI) => k.id === kpiId);
     const activity = kpi?.activities.find((a: Activity) => a.id === activityId);
     return { kpi, activity };
-  }, [unifiedData, kpiId, activityId]);
+  }, [safetyKPIs, leaseKPIs, assetKPIs, infraKPIs, kpiId, activityId]);
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
@@ -34,8 +38,6 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
   };
 
   const handleSaveTask = (taskId: string, updatedRecords: WeeklyRecord[]) => {
-    // updateTaskRecords의 시그니처가 kpiId, activityId를 받도록 수정되었다고 가정합니다.
-    // (이전 단계에서 이 부분이 누락되었을 수 있으므로, 필요 시 UnifiedDataContext 수정 필요)
     updateTaskRecords(kpiId, activityId, taskId, updatedRecords);
     setIsEditModalOpen(false);
     setSelectedTask(null);
@@ -49,11 +51,8 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
   }
 
   return (
-    // 모달 UI(배경, 위치 등)는 부모인 Modal.tsx가 모두 처리합니다.
-    // 이 컴포넌트는 순수하게 내용만 렌더링합니다.
     <div className="flex flex-col h-full p-8">
       
-      {/* 헤더 및 닫기 버튼 */}
       <div className="flex justify-between items-start mb-6">
           <div>
               <p className="text-orange-500 font-bold text-sm tracking-wider">WEEKLY PERFORMANCE MONITORING</p>
@@ -64,7 +63,6 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
           </button>
       </div>
 
-      {/* 월/주차 선택 */}
       <div className="flex items-center justify-between mb-6">
             <div className="flex gap-1 p-1 bg-white rounded-lg border border-gray-200">
                 {Array.from({length: 12}, (_, i) => i + 1).map(m => (
@@ -82,7 +80,6 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
             </div>
       </div>
 
-      {/* 콘텐츠 영역 */}
       <div className="flex-grow bg-white rounded-2xl p-6 overflow-y-auto">
           <div className="flex justify-between items-center mb-4">
               <button className="flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-orange-500">
@@ -100,7 +97,6 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
           </div>
       </div>
 
-      {/* 푸터 버튼 */}
       <div className="flex justify-between items-center mt-6 pt-6 border-t border-gray-200">
           <button className="text-sm font-semibold text-red-500 hover:text-red-700">활동 삭제</button>
           <div>
@@ -109,7 +105,6 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
           </div>
       </div>
 
-      {/* TaskEditModal 등은 TaskManager 내부에 종속된 모달이므로 그대로 둡니다. */}
       {isEditModalOpen && <TaskEditModal task={selectedTask} onClose={() => setIsEditModalOpen(false)} onSave={handleSaveTask} />} 
       <WeeklyReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} />
     </div>

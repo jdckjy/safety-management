@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import KPIManager from './KPIManager';
 import HotSpotMap from './HotSpotMap';
-import { useUnifiedData } from '../contexts/UnifiedDataContext'; // Import useUnifiedData hook
+import { useAppData } from '../providers/AppDataContext'; // Import useAppData hook
 import { HotSpot } from '../types';
 
 const SafetyManagement: React.FC = () => {
@@ -12,7 +12,7 @@ const SafetyManagement: React.FC = () => {
     facilities,
     hotspots,
     setHotspots
-  } = useUnifiedData();
+  } = useAppData();
   
   const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'monitoring'>('monitoring');
 

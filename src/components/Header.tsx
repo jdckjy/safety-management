@@ -1,13 +1,13 @@
 
 import React, { useMemo } from 'react';
-import { Search, Bell, ChevronDown, Calendar, Menu } from 'lucide-react';
-import { useUnifiedData } from '../contexts/UnifiedDataContext'; // Import useUnifiedData hook
+import { Search, Bell, ChevronDown, Calendar, Menu, LogOut } from 'lucide-react';
+import { useAppData } from '../providers/AppDataContext';
+import { useAuth } from '../features/auth/AuthContext'; // 1. useAuth 훅 임포트
 
 const Header: React.FC = () => {
-  // All props are now gone, we get everything from the context
-  const { customTabs, selectedMonth, setSelectedMonth } = useUnifiedData();
+  const { customTabs, selectedMonth, setSelectedMonth } = useAppData();
+  const { currentUser, logout } = useAuth(); // 1. 인증 컨텍스트 사용
   
-  // This state can be local to the Header or derived from a global state if needed
   const [activeMenu, setActiveMenu] = React.useState('dashboard');
 
   const getTitle = () => {
@@ -19,6 +19,15 @@ const Header: React.FC = () => {
     
     const custom = customTabs.find(t => t.key === activeMenu);
     return custom ? custom.label : '대시보드';
+  };
+  
+  // 2. 동적 사용자 이름 표시 함수
+  const getDisplayName = () => {
+    if (currentUser) {
+      const emailName = currentUser.email?.split('@')[0];
+      return emailName ? emailName.charAt(0).toUpperCase() + emailName.slice(1) : "김프로";
+    }
+    return "김프로";
   };
 
   const months = useMemo(() => 
@@ -57,11 +66,19 @@ const Header: React.FC = () => {
           <Bell size={20} />
         </button>
         <div className="flex items-center gap-3">
-            <img src="https://i.pravatar.cc/40?u=a042581f4e29026704d" alt="user" className="w-10 h-10 rounded-full border-2 border-white shadow-md" />
+            <img src={`https://i.pravatar.cc/40?u=${currentUser?.uid || 'default'}`} alt="user" className="w-10 h-10 rounded-full border-2 border-white shadow-md" />
             <div>
-                <p className="text-sm font-bold">김프로</p>
+                <p className="text-sm font-bold">{getDisplayName()}</p> 
                 <p className="text-xs text-gray-400 font-bold">Project Manager</p>
             </div>
+            {/* 3. 로그아웃 아이콘 버튼 추가 */}
+            <button 
+              onClick={logout}
+              className="p-2 rounded-full hover:bg-red-100 text-gray-500 hover:text-red-600 transition-colors"
+              aria-label="로그아웃"
+            >
+              <LogOut size={20} />
+            </button>
         </div>
       </div>
     </header>

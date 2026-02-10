@@ -1,10 +1,10 @@
 
 import React from 'react';
 import KPIManager from './KPIManager';
-import { useUnifiedData } from '../contexts/UnifiedDataContext'; // Import useUnifiedData hook
+import { useAppData } from '../providers/AppDataContext'; // Import useAppData hook
 
 const InfraDevelopment: React.FC = () => {
-  const { infraKPIs, setInfraKPIs } = useUnifiedData();
+  const { infraKPIs, setInfraKPIs } = useAppData();
   
   const mainValue = {
     progress: infraKPIs[0]?.current || 0,

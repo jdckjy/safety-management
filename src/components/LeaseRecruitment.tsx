@@ -2,16 +2,15 @@
 import React, { useState } from 'react';
 import KPIManager from './KPIManager';
 import TenantManager from './TenantManager';
-import { useUnifiedData } from '../contexts/UnifiedDataContext';
+import { useAppData } from '../providers/AppDataContext';
 
 const LeaseRecruitment: React.FC = () => {
   const {
     leaseKPIs,
     setLeaseKPIs,
-    tenants,
-    setTenants,
-  } = useUnifiedData();
+  } = useAppData();
   
+  const [tenants, setTenants] = useState([]);
   const [activeTab, setActiveTab] = useState('performance');
 
   const mainValue = {

@@ -1,8 +1,8 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
-import { useUnifiedData } from '../contexts/UnifiedDataContext';
+import React, { useState, useMemo } from 'react';
+import { useAppData } from '../providers/AppDataContext';
 import { Search } from 'lucide-react';
-import { MenuKey } from '../types';
+import { MenuKey, KPI } from '../types';
 
 interface SearchResult {
   type: 'KPI' | 'Activity' | 'Task';
@@ -11,22 +11,30 @@ interface SearchResult {
   path: string;
   kpiId: string;
   activityId?: string;
-  menuKey: MenuKey; // 올바른 사이드바 메뉴를 활성화하기 위해 추가
+  menuKey: MenuKey;
 }
 
 const GlobalSearch: React.FC = () => {
-  const { unifiedData, navigateTo } = useUnifiedData();
+  const { navigateTo, safetyKPIs, leaseKPIs, assetKPIs, infraKPIs } = useAppData();
   const [query, setQuery] = useState('');
   const [isActive, setIsActive] = useState(false);
 
   const searchResults = useMemo<SearchResult[]>(() => {
-    if (!query || !unifiedData) return [];
+    if (!query) return [];
+
+    const allKpis: KPI[] = [
+      ...(safetyKPIs || []),
+      ...(leaseKPIs || []),
+      ...(assetKPIs || []),
+      ...(infraKPIs || []),
+    ];
+
     const lowerCaseQuery = query.toLowerCase();
     const results: SearchResult[] = [];
 
-    unifiedData.kpis.forEach(kpi => {
-      // kpi.category를 MenuKey로 캐스팅합니다.
-      // 실제로는 kpi.category 값이 MenuKey 타입에 속하는지 확인하는 로직이 더 안전합니다.
+    allKpis.forEach(kpi => {
+      if (!kpi || !kpi.name) return;
+      
       const menuKey = kpi.category as MenuKey;
 
       if (kpi.name.toLowerCase().includes(lowerCaseQuery)) {
@@ -40,7 +48,9 @@ const GlobalSearch: React.FC = () => {
         });
       }
 
-      kpi.activities.forEach(activity => {
+      (kpi.activities || []).forEach(activity => {
+        if (!activity || !activity.name) return;
+
         if (activity.name.toLowerCase().includes(lowerCaseQuery)) {
           results.push({
             type: 'Activity',
@@ -53,7 +63,9 @@ const GlobalSearch: React.FC = () => {
           });
         }
 
-        activity.tasks.forEach(task => {
+        (activity.tasks || []).forEach(task => {
+          if (!task || !task.name) return;
+          
           if (task.name.toLowerCase().includes(lowerCaseQuery)) {
             results.push({
               type: 'Task',
@@ -70,7 +82,7 @@ const GlobalSearch: React.FC = () => {
     });
 
     return results;
-  }, [query, unifiedData]);
+  }, [query, safetyKPIs, leaseKPIs, assetKPIs, infraKPIs]);
 
   const handleItemClick = (result: SearchResult) => {
     navigateTo({

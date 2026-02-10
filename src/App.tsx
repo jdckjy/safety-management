@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { UnifiedDataProvider } from './contexts/UnifiedDataContext';
-import LoginPage from './components/LoginPage';
+import { AuthProvider, useAuth } from './features/auth/AuthContext';
+import { AppDataProvider } from './providers/AppDataContext';
+import LoginPage from './features/auth/LoginPage';
 import MainLayout from './layouts/MainLayout';
 
 // AppContent will decide which main component to show based on auth status.
@@ -21,9 +21,9 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <UnifiedDataProvider>
+      <AppDataProvider>
         <AppContent />
-      </UnifiedDataProvider>
+      </AppDataProvider>
     </AuthProvider>
   );
 };

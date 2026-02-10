@@ -9,10 +9,11 @@ import AssetManagement from '../components/AssetManagement';
 import InfraDevelopment from '../components/InfraDevelopment';
 import CustomPage from '../components/CustomPage';
 import TabModal from '../components/TabModal';
-import { useUnifiedData } from '../contexts/UnifiedDataContext';
+import { useAppData } from '../providers/AppDataContext';
+import { CustomTab } from '../types';
 
 const MainLayout: React.FC = () => {
-    const { navigationState, navigateTo, customTabs, addTab } = useUnifiedData();
+    const { navigationState, navigateTo, customTabs, addTab } = useAppData();
     const [isTabModalOpen, setIsTabModalOpen] = useState(false);
 
     const handleAddTab = (newTab: Omit<CustomTab, 'key'>) => {
