@@ -4,7 +4,6 @@ import { Building2, ArrowUpRight, TrendingUp, Shield, Handshake, DollarSign, Dra
 import { useAppData } from '../providers/AppDataContext';
 import { useAuth } from '../features/auth/AuthContext';
 import { KPI } from '../types';
-import { Grid, Button } from '@mui/material';
 
 const ProjectStatCard: React.FC<{
   title: string;
@@ -63,9 +62,6 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-8 pb-10">
-      <Grid container justifyContent="flex-end">
-        <Button onClick={logout} color="inherit">Logout</Button>
-      </Grid>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {projectStats.map(stat => (
           <ProjectStatCard key={stat.title} {...stat} />
