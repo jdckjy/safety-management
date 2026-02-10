@@ -1,14 +1,13 @@
 
 import { KPI, Tenant, Facility, HotSpot } from '../types';
-import { createKpi } from '../data/factories'; // Import the factory
+import { createKpi } from '../data/factories';
 
 const generateMonthlyRecords = () => Array.from({ length: 12 }, (_, i) => ({
     month: i + 1,
     plans: Math.random() > 0.5 ? [{ id: `plan-${i}`, content: `Monthly check for task ${i+1}`, completed: Math.random() > 0.3 }] : []
 }));
 
-// Use createKpi factory for all mock KPI data
-export const mockSafetyKPIs: KPI[] = [
+export const initialSafetyKPIs: KPI[] = [
     createKpi({
         id: 'kpi-safety-1',
         name: '무재해 일수',
@@ -52,7 +51,7 @@ export const mockSafetyKPIs: KPI[] = [
     }),
 ];
 
-export const mockLeaseKPIs: KPI[] = [
+export const initialLeaseKPIs: KPI[] = [
     createKpi({
         id: 'kpi-lease-1',
         name: '공실률',
@@ -79,7 +78,7 @@ export const mockLeaseKPIs: KPI[] = [
     }),
 ];
 
-export const mockAssetKPIs: KPI[] = [
+export const initialAssetKPIs: KPI[] = [
     createKpi({
         id: 'kpi-asset-1',
         name: '자산 가치 총액',
@@ -98,7 +97,7 @@ export const mockAssetKPIs: KPI[] = [
     }),
 ];
 
-export const mockInfraKPIs: KPI[] = [
+export const initialInfraKPIs: KPI[] = [
     createKpi({
         id: 'kpi-infra-1',
         name: '인프라 확장 진행률',
@@ -124,17 +123,17 @@ export const mockInfraKPIs: KPI[] = [
     }),
 ];
 
-export const mockTenants: Tenant[] = [
+export const initialTenants: Tenant[] = [
     { id: 't1', name: '(주)테크이노', businessType: 'IT/소프트웨어', space: 'A-301, 500㎡', entryDate: '2022-01-15', contact: '02-1234-5678' },
     { id: 't2', name: '글로벌 물류', businessType: '물류/운송', space: 'B-101, 1500㎡', entryDate: '2021-03-20', contact: '031-876-5432' },
 ];
 
-export const mockFacilities: Facility[] = [
+export const initialFacilities: Facility[] = [
     { id: 'f1', name: '중앙 공조 시스템', type: 'HVAC', location: '통합관리실', status: 'Operational', lastInspection: '2024-07-01' },
     { id: 'f2', name: '비상 발전기 #2', type: 'Power', location: 'B동 지하 2층', status: 'Under Maintenance', lastInspection: '2024-06-20' },
 ];
 
-export const mockHotspots: HotSpot[] = [
+export const initialHotspots: HotSpot[] = [
     { 
         id: 'h1', 
         name: '지게차-보행자 동선 충돌', 
@@ -142,7 +141,7 @@ export const mockHotspots: HotSpot[] = [
         type: 'Safety Concern', 
         riskLevel: 'high', 
         lastInspection: '2024-07-15',
-        position: { lat: 33.285186, lng: 126.560624 } // 올바른 위치 정보
+        position: { lat: 33.285186, lng: 126.560624 } 
     },
     { 
         id: 'h2', 
@@ -151,6 +150,6 @@ export const mockHotspots: HotSpot[] = [
         type: 'High Traffic', 
         riskLevel: 'medium', 
         lastInspection: '2024-07-20',
-        position: { lat: 33.284186, lng: 126.561624 } // 올바른 위치 정보
+        position: { lat: 33.284186, lng: 126.561624 } 
     },
 ];

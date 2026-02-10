@@ -2,7 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './src/App';
-import { UnifiedDataProvider } from './src/contexts/UnifiedDataContext';
+import './src/firebase'; // Initialize Firebase
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -12,8 +12,6 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <UnifiedDataProvider>
-      <App />
-    </UnifiedDataProvider>
+    <App />
   </React.StrictMode>
 );
