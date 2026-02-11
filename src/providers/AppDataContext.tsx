@@ -24,7 +24,7 @@ interface IAppContext extends IAppData {
   updateKpiActivity: (kpiId: string, updatedActivity: BusinessActivity) => void;
   updateTaskStatus: (taskId: string, newStatus: TaskStatus) => void;
   addTask: (newTask: Omit<Task, 'id' | 'status'>) => void;
-  deleteTask: (taskId: string) => void; // Added for deleting tasks
+  deleteTask: (taskId: string) => void;
   addTab: (newTab: Omit<CustomTab, 'key'>) => void;
   navigateTo: (newState: Partial<NavigationState>) => void;
   setSafetyKPIs: React.Dispatch<React.SetStateAction<KPI[]>>;
@@ -174,7 +174,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     updateKpiActivity,
     updateTaskStatus,
     addTask,
-    deleteTask, // Exposing the new function
+    deleteTask, 
     addTab,
     navigateTo,
     setSafetyKPIs: (kpis) => setData(p => ({...p, safetyKPIs: typeof kpis === 'function' ? kpis(p.safetyKPIs) : kpis})),
