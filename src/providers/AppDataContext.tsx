@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { KPI, BusinessActivity, CustomTab, HotSpot, Facility, NavigationState, Task, WeeklyRecord } from '../types';
+import { KPI, BusinessActivity, CustomTab, HotSpot, Facility, NavigationState, Task, TaskStatus } from '../types';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../features/auth/AuthContext';
 
@@ -12,16 +12,19 @@ interface IAppData {
   hotspots: HotSpot[];
   facilities: Facility[];
   customTabs: CustomTab[];
+  monthlyTasks: Task[];
 }
 
 interface IAppContext extends IAppData {
   selectedMonth: number;
-  totalMonthlyPlans: number;
+  totalMonthlyTasks: number;
   navigationState: NavigationState;
   setData: React.Dispatch<React.SetStateAction<IAppData>>;
   setSelectedMonth: React.Dispatch<React.SetStateAction<number>>;
   updateKpiActivity: (kpiId: string, updatedActivity: BusinessActivity) => void;
-  updateTaskRecords: (kpiId: string, activityId: string, taskId: string, updatedRecords: WeeklyRecord[]) => void;
+  updateTaskStatus: (taskId: string, newStatus: TaskStatus) => void;
+  addTask: (newTask: Omit<Task, 'id' | 'status'>) => void;
+  deleteTask: (taskId: string) => void; // Added for deleting tasks
   addTab: (newTab: Omit<CustomTab, 'key'>) => void;
   navigateTo: (newState: Partial<NavigationState>) => void;
   setSafetyKPIs: React.Dispatch<React.SetStateAction<KPI[]>>;
@@ -42,6 +45,7 @@ const initialData: IAppData = {
   hotspots: [],
   facilities: [],
   customTabs: [],
+  monthlyTasks: [],
 };
 
 export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -51,7 +55,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const [data, setData] = useState<IAppData>(initialData);
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
-  const [totalMonthlyPlans, setTotalMonthlyPlans] = useState(0);
+  const [totalMonthlyTasks, setTotalMonthlyTasks] = useState(0);
   const [navigationState, setNavigationState] = useState<NavigationState>({ menuKey: 'dashboard' });
 
   useEffect(() => {
@@ -68,6 +72,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
           const firestoreData = userDocSnap.data() as IAppData;
+          firestoreData.monthlyTasks = firestoreData.monthlyTasks || [];
           setData({ ...initialData, ...firestoreData });
         } else {
           await setDoc(userDocRef, initialData);
@@ -117,33 +122,31 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   }, []);
 
-  const updateTaskRecords = useCallback((kpiId: string, activityId: string, taskId: string, updatedRecords: WeeklyRecord[]) => {
-    const kpiTypeKey = kpiId.split('-')[1] + 'KPIs' as keyof IAppData;
-
-    setData(prevData => {
-        const kpiArray = prevData[kpiTypeKey] as KPI[] | undefined;
-        if(!kpiArray) return prevData;
-
-        const newKpiData = kpiArray.map(kpi => {
-            if (kpi.id !== kpiId) return kpi;
-            return {
-                ...kpi,
-                activities: (kpi.activities || []).map(activity => {
-                    if (activity.id !== activityId) return activity;
-                    return {
-                        ...activity,
-                        tasks: (activity.tasks || []).map(task => {
-                            if (task.id !== taskId) return task;
-                            return { ...task, records: updatedRecords };
-                        })
-                    };
-                })
-            };
-        });
-        return { ...prevData, [kpiTypeKey]: newKpiData };
-    });
+  const addTask = useCallback((newTask: Omit<Task, 'id' | 'status'>) => {
+    setData(prev => ({
+      ...prev,
+      monthlyTasks: [
+        ...prev.monthlyTasks,
+        { ...newTask, id: `task-${Date.now()}`, status: 'not-started' }
+      ]
+    }));
   }, []);
 
+  const updateTaskStatus = useCallback((taskId: string, newStatus: TaskStatus) => {
+    setData(prev => ({
+      ...prev,
+      monthlyTasks: prev.monthlyTasks.map(task => 
+        task.id === taskId ? { ...task, status: newStatus } : task
+      )
+    }));
+  }, []);
+
+  const deleteTask = useCallback((taskId: string) => {
+    setData(prev => ({
+      ...prev,
+      monthlyTasks: prev.monthlyTasks.filter(task => task.id !== taskId)
+    }));
+  }, []);
 
   const navigateTo = useCallback((newState: Partial<NavigationState>) => {
     setNavigationState(prevState => ({ ...prevState, ...newState }));
@@ -157,26 +160,21 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   }, [navigateTo]);
 
   useEffect(() => {
-    const allKPIs = [ ...data.safetyKPIs, ...data.leaseKPIs, ...data.assetKPIs, ...data.infraKPIs ];
-    const count = allKPIs.reduce((acc, kpi) => {
-      if (!kpi || !kpi.activities) return acc;
-      return acc + (kpi.activities || []).reduce((activityAcc, activity) => {
-          const monthRecord = (activity.monthlyRecords || []).find(m => m.month === selectedMonth + 1);
-          return activityAcc + (monthRecord?.plans?.length || 0);
-      }, 0);
-    }, 0);
-    setTotalMonthlyPlans(count);
-  }, [selectedMonth, data]);
+    const count = data.monthlyTasks.filter(task => task.month === selectedMonth + 1).length;
+    setTotalMonthlyTasks(count);
+  }, [selectedMonth, data.monthlyTasks]);
 
   const value: IAppContext = {
     ...data,
     setData,
     selectedMonth,
     setSelectedMonth,
-    totalMonthlyPlans,
+    totalMonthlyTasks,
     navigationState,
     updateKpiActivity,
-    updateTaskRecords, // Added this
+    updateTaskStatus,
+    addTask,
+    deleteTask, // Exposing the new function
     addTab,
     navigateTo,
     setSafetyKPIs: (kpis) => setData(p => ({...p, safetyKPIs: typeof kpis === 'function' ? kpis(p.safetyKPIs) : kpis})),

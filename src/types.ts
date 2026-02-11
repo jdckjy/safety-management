@@ -8,16 +8,30 @@ export interface Pulse {
   trend: 'up' | 'down' | 'stable';
 }
 
-export interface Plan {
+// 'Plan' is deprecated and will be replaced by 'Task' for better consistency.
+// export interface Plan {
+//   id: string;
+//   content: string;
+//   completed: boolean;
+//   week: number; // 주차 정보 (1-5)
+// }
+
+export type TaskStatus = 'not-started' | 'in-progress' | 'pending' | 'completed';
+
+export interface Task {
   id: string;
-  content: string;
-  completed: boolean;
-  week: number; // 주차 정보 (1-5)
+  name: string;
+  month: number;
+  week: number;
+  status: TaskStatus;
+  kpiId?: string; // Optional: Link to a KPI
+  dueDate?: string; // Optional: for deadline-based tasks
 }
+
 
 export interface MonthlyRecord {
   month: number; // 1-12
-  plans: Plan[];
+  plans: Task[]; // Changed from Plan[] to Task[]
 }
 
 export interface BusinessActivity {

@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Building2, ArrowUpRight, TrendingUp, Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
 import { useAppData } from '../providers/AppDataContext';
 import { useAuth } from '../features/auth/AuthContext';
 import { KPI } from '../types';
-import DailyBriefing from './DailyBriefing'; // Import the new component
+import DailyBriefing from './DailyBriefing';
 
 const ProjectStatCard: React.FC<{
   title: string;
@@ -35,9 +35,10 @@ const ProjectStatCard: React.FC<{
 };
 
 const Dashboard: React.FC = () => {
-  const { 
-    selectedMonth, 
-    totalMonthlyPlans,
+  const {
+    selectedMonth,
+    monthlyTasks, // Get the full list of tasks
+    totalMonthlyTasks, // This is already calculated in context
     safetyKPIs,
     leaseKPIs,
     assetKPIs,
@@ -47,21 +48,29 @@ const Dashboard: React.FC = () => {
   const [isBriefingOpen, setBriefingOpen] = useState(false);
 
   useEffect(() => {
-    // Open the briefing modal only once per session
     const hasSeenBriefing = sessionStorage.getItem('hasSeenDailyBriefing');
     if (!hasSeenBriefing) {
       setBriefingOpen(true);
       sessionStorage.setItem('hasSeenDailyBriefing', 'true');
     }
   }, []);
-  
+
   const selectedMonthName = new Date(0, selectedMonth).toLocaleString('ko-KR', { month: 'long' });
 
+  // Calculate stats based on the new task structure
+  const taskStats = useMemo(() => {
+    const tasksForMonth = monthlyTasks.filter(task => task.month === selectedMonth + 1);
+    const completed = tasksForMonth.filter(t => t.status === 'completed').length;
+    const inProgress = tasksForMonth.filter(t => t.status === 'in-progress').length;
+    const pending = tasksForMonth.filter(t => t.status === 'pending').length;
+    return { completed, inProgress, pending };
+  }, [monthlyTasks, selectedMonth]);
+
   const projectStats = [
-    { title: `${selectedMonthName} 수행업무`, value: totalMonthlyPlans.toString(), status: 'Updated in real-time', isPrimary: true },
-    { title: 'Ended Projects', value: '10', status: 'Increased from last month' },
-    { title: 'Running Projects', value: '12', status: 'Increased from last month' },
-    { title: 'Pending Project', value: '2', status: 'On Discuss' },
+    { title: `${selectedMonthName} 총 업무`, value: totalMonthlyTasks.toString(), status: '실시간 업데이트', isPrimary: true },
+    { title: '완료된 업무', value: taskStats.completed.toString(), status: '지난 달 대비 증가' },
+    { title: '진행중인 업무', value: taskStats.inProgress.toString(), status: '지난 달 대비 증가' },
+    { title: '보류된 업무', value: taskStats.pending.toString(), status: '논의 중' },
   ];
 
   const allKpis = [
@@ -73,7 +82,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-8 pb-10">
-       <DailyBriefing isOpen={isBriefingOpen} onClose={() => setBriefingOpen(false)} />
+      <DailyBriefing isOpen={isBriefingOpen} onClose={() => setBriefingOpen(false)} />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {projectStats.map(stat => (
           <ProjectStatCard key={stat.title} {...stat} />
@@ -92,7 +101,7 @@ const Dashboard: React.FC = () => {
           <div className="space-y-6">
             {allKpis.length > 0 ? (
               allKpis.slice(0, 4).map((kpi) => {
-                if (!kpi) return null; // Add a null check for kpi object
+                if (!kpi) return null;
                 const pulse = kpi.pulse || { value: 0, trend: 'stable' };
                 const isPositive = pulse.trend === 'up';
                 const change = Math.abs(pulse.value);
