@@ -2,8 +2,14 @@
 import React, { useState } from 'react';
 import KPIManager from './KPIManager';
 import HotSpotMap from './HotSpotMap';
-import { useAppData } from '../providers/AppDataContext'; // Import useAppData hook
+import { useAppData } from '../providers/AppDataContext';
 import { HotSpot } from '../types';
+
+// Tab configuration
+const subTabs = [
+  { id: 'monitoring', label: 'Monitoring', component: HotSpotMap },
+  { id: 'kpi', label: 'KPI Reports', component: KPIManager },
+];
 
 const SafetyManagement: React.FC = () => {
   const {
@@ -14,7 +20,7 @@ const SafetyManagement: React.FC = () => {
     setHotspots
   } = useAppData();
   
-  const [activeSubTab, setActiveSubTab] = useState<'kpi' | 'monitoring'>('monitoring');
+  const [activeSubTab, setActiveSubTab] = useState(subTabs[0].id);
 
   const mainValue = {
       days: safetyKPIs[0]?.current || 0, change: 0
@@ -31,6 +37,26 @@ const SafetyManagement: React.FC = () => {
 
   const handleDeleteHotspot = (hotspotId: string) => {
     setHotspots(prev => prev.filter(h => h.id !== hotspotId));
+  };
+
+  const renderActiveComponent = () => {
+    const activeTabConfig = subTabs.find(tab => tab.id === activeSubTab);
+    if (!activeTabConfig) return null;
+
+    const ActiveComponent = activeTabConfig.component;
+
+    if (activeTabConfig.id === 'kpi') {
+      return <KPIManager sectionTitle="Safety Index" kpis={safetyKPIs} onUpdate={setSafetyKPIs} accentColor="orange" />;
+    } else if (activeTabConfig.id === 'monitoring') {
+      return <HotSpotMap 
+        facilities={facilities}
+        hotspots={hotspots}
+        onAddHotspot={handleAddHotspot}
+        onUpdateHotspot={handleUpdateHotspot}
+        onDeleteHotspot={handleDeleteHotspot}
+      />;
+    }
+    return null;
   };
 
   return (
@@ -57,22 +83,19 @@ const SafetyManagement: React.FC = () => {
       </div>
 
       <div className="flex bg-white p-1.5 rounded-full shadow-sm border border-gray-100 self-start">
-        <button onClick={() => setActiveSubTab('kpi')} className={`px-8 py-2.5 rounded-full text-xs font-bold transition-all ${activeSubTab === 'kpi' ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:text-black'}`}>KPI Reports</button>
-        <button onClick={() => setActiveSubTab('monitoring')} className={`px-8 py-2.5 rounded-full text-xs font-bold transition-all ${activeSubTab === 'monitoring' ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:text-black'}`}>Monitoring</button>
+        {subTabs.map(tab => (
+          <button 
+            key={tab.id}
+            onClick={() => setActiveSubTab(tab.id)} 
+            className={`px-8 py-2.5 rounded-full text-xs font-bold transition-all ${activeSubTab === tab.id ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:text-black'}`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       <div className="flex-grow">
-        {activeSubTab === 'kpi' ? (
-          <KPIManager sectionTitle="Safety Index" kpis={safetyKPIs} onUpdate={setSafetyKPIs} accentColor="orange" />
-        ) : (
-          <HotSpotMap 
-            facilities={facilities}
-            hotspots={hotspots}
-            onAddHotspot={handleAddHotspot}
-            onUpdateHotspot={handleUpdateHotspot}
-            onDeleteHotspot={handleDeleteHotspot}
-          />
-        )}
+        {renderActiveComponent()}
       </div>
     </div>
   );

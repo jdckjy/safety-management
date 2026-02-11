@@ -4,6 +4,12 @@ import KPIManager from './KPIManager';
 import TenantManager from './TenantManager';
 import { useAppData } from '../providers/AppDataContext';
 
+// Tab configuration
+const subTabs = [
+  { id: 'performance', label: 'KPI Reports', component: KPIManager },
+  { id: 'roster', label: 'Tenant Roster', component: TenantManager },
+];
+
 const LeaseRecruitment: React.FC = () => {
   const {
     leaseKPIs,
@@ -11,7 +17,7 @@ const LeaseRecruitment: React.FC = () => {
   } = useAppData();
   
   const [tenants, setTenants] = useState([]);
-  const [activeTab, setActiveTab] = useState('performance');
+  const [activeTab, setActiveTab] = useState(subTabs[0].id);
 
   const mainValue = {
     rate: leaseKPIs[0]?.current || 0,
@@ -20,6 +26,20 @@ const LeaseRecruitment: React.FC = () => {
   const tabBaseStyle = "px-6 py-3 font-bold text-sm rounded-full transition-all duration-300";
   const tabActiveStyle = "bg-blue-500 text-white shadow-lg";
   const tabInactiveStyle = "bg-transparent text-gray-500 hover:bg-blue-50";
+
+  const renderActiveComponent = () => {
+    const activeTabConfig = subTabs.find(tab => tab.id === activeTab);
+    if (!activeTabConfig) return null;
+
+    const ActiveComponent = activeTabConfig.component;
+
+    if (activeTabConfig.id === 'performance') {
+      return <KPIManager sectionTitle="KPI Reports" kpis={leaseKPIs} onUpdate={setLeaseKPIs} accentColor="blue" />;
+    } else if (activeTabConfig.id === 'roster') {
+      return <TenantManager tenants={tenants} onTenantsUpdate={setTenants} />;
+    }
+    return null;
+  };
 
   return (
     <div className="space-y-8">
@@ -34,22 +54,19 @@ const LeaseRecruitment: React.FC = () => {
 
       {/* Tab Navigation */}
       <div className="bg-white p-2 rounded-full shadow-sm border border-gray-50 inline-flex items-center">
-          <button onClick={() => setActiveTab('performance')} className={`${tabBaseStyle} ${activeTab === 'performance' ? tabActiveStyle : tabInactiveStyle}`}>
-            KPI Reports
+        {subTabs.map(tab => (
+          <button 
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)} 
+            className={`${tabBaseStyle} ${activeTab === tab.id ? tabActiveStyle : tabInactiveStyle}`}>
+            {tab.label}
           </button>
-          <button onClick={() => setActiveTab('roster')} className={`${tabBaseStyle} ${activeTab === 'roster' ? tabActiveStyle : tabInactiveStyle}`}>
-            Tenant Roster
-          </button>
+        ))}
       </div>
 
       {/* Tab Content */}
       <div>
-        {activeTab === 'performance' && (
-          <KPIManager sectionTitle="KPI Reports" kpis={leaseKPIs} onUpdate={setLeaseKPIs} accentColor="blue" />
-        )}
-        {activeTab === 'roster' && (
-          <TenantManager tenants={tenants} onTenantsUpdate={setTenants} />
-        )}
+        {renderActiveComponent()}
       </div>
     </div>
   );
