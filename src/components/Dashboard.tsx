@@ -1,9 +1,10 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Building2, ArrowUpRight, TrendingUp, Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
 import { useAppData } from '../providers/AppDataContext';
 import { useAuth } from '../features/auth/AuthContext';
 import { KPI } from '../types';
+import DailyBriefing from './DailyBriefing'; // Import the new component
 
 const ProjectStatCard: React.FC<{
   title: string;
@@ -43,6 +44,16 @@ const Dashboard: React.FC = () => {
     infraKPIs,
   } = useAppData();
   const { logout } = useAuth();
+  const [isBriefingOpen, setBriefingOpen] = useState(false);
+
+  useEffect(() => {
+    // Open the briefing modal only once per session
+    const hasSeenBriefing = sessionStorage.getItem('hasSeenDailyBriefing');
+    if (!hasSeenBriefing) {
+      setBriefingOpen(true);
+      sessionStorage.setItem('hasSeenDailyBriefing', 'true');
+    }
+  }, []);
   
   const selectedMonthName = new Date(0, selectedMonth).toLocaleString('ko-KR', { month: 'long' });
 
@@ -62,6 +73,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-8 pb-10">
+       <DailyBriefing isOpen={isBriefingOpen} onClose={() => setBriefingOpen(false)} />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {projectStats.map(stat => (
           <ProjectStatCard key={stat.title} {...stat} />
