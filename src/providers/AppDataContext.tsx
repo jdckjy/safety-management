@@ -1,11 +1,13 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-import { KPI, Activity, CustomTab, HotSpot, Facility, NavigationState, Task } from '../types';
+import { KPI, Activity, CustomTab, HotSpot, Facility, NavigationState, Task, TaskStatus } from '../types';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../features/auth/AuthContext';
 import { Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
+// 1. "Single Source of Truth"와 "마스터 상태 변환 맵"을 임포트합니다.
+import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '../constants';
 
-// 데이터 인터페이스 정의 (변경 없음)
+// ... (인터페이스 정의는 변경 없음)
 interface IAppData {
   safetyKPIs: KPI[];
   leaseKPIs: KPI[];
@@ -16,8 +18,7 @@ interface IAppData {
   customTabs: CustomTab[];
 }
 
-// 컨텍스트 인터페이스 정의 (변경 없음)
-interface IAppContext extends IAppData {
+interface IAppContext extends IAppData { 
   kpiData: (KPI & { type: string; icon: React.ReactNode; color: string; })[];
   navigationState: NavigationState;
   setData: React.Dispatch<React.SetStateAction<IAppData>>;
@@ -38,37 +39,46 @@ interface IAppContext extends IAppData {
 }
 
 const AppDataContext = createContext<IAppContext | undefined>(undefined);
-
 const initialData: IAppData = { safetyKPIs: [], leaseKPIs: [], assetKPIs: [], infraKPIs: [], hotspots: [], facilities: [], customTabs: [] };
 
-// 데이터 로딩 시 기본값을 보장하는 함수
+// *** 시스템의 심장: "마스터 상태 변환 맵"을 사용한 데이터 정제 시스템 ***
 const sanitizeKpi = (partialKpi: Partial<KPI>): KPI => {
-  const defaults: Omit<KPI, 'id'> = { title: 'Unnamed KPI', description: '', current: 0, target: 100, unit: '%', activities: [], previous: 0 };
+  const defaults: Omit<KPI, 'id'> = { title: '이름 없음 - 수정 필요', description: '', current: 0, target: 100, unit: '%', activities: [], previous: 0 };
   const id = partialKpi.id || `kpi-${Date.now()}-${Math.random()}`;
-  
-  const activities = (partialKpi.activities || []).map(act => ({
-    ...act,
-    id: act.id || `act-${Date.now()}-${Math.random()}`,
-    status: act.status || 'not-started',
-    tasks: (act.tasks || []).map(task => {
-        const newTask = { ...task } as any; 
+
+  const activities = (partialKpi.activities || []).map(act => {
+    // 2. 활동(Activity)의 상태를 "마스터 맵"을 통해 완벽하게 정제합니다.
+    const activityStatus = MASTER_STATUS_TRANSITION_MAP[act.status as any] || TASK_STATUS.NOT_STARTED;
+
+    return {
+      ...act,
+      id: act.id || `act-${Date.now()}-${Math.random()}`,
+      status: activityStatus, // 100% 보장된, 깨끗한 상태값만 사용됩니다.
+      tasks: (act.tasks || []).map(task => {
+        const newTask = { ...task } as any;
+
         if (newTask.dueDate && !newTask.startDate) {
-            newTask.startDate = newTask.dueDate;
-            newTask.endDate = newTask.dueDate;
-            delete newTask.dueDate;
+          newTask.startDate = newTask.dueDate;
+          newTask.endDate = newTask.dueDate;
+          delete newTask.dueDate;
         }
+
+        // 3. *** 핵심: 업무(Task)의 상태를 "마스터 맵"을 통해 완벽하게 정제합니다. ***
+        const taskStatus = MASTER_STATUS_TRANSITION_MAP[newTask.status as any] || TASK_STATUS.NOT_STARTED;
+
         return {
-            id: newTask.id || `task-${Date.now()}-${Math.random()}`,
-            name: newTask.name || 'Unnamed Task',
-            startDate: newTask.startDate || new Date().toISOString(),
-            endDate: newTask.endDate || new Date().toISOString(),
-            status: newTask.status || 'not-started',
-            records: newTask.records || []
+          id: newTask.id || `task-${Date.now()}-${Math.random()}`,
+          name: newTask.name || '이름 없는 업무',
+          startDate: newTask.startDate || new Date().toISOString(),
+          endDate: newTask.endDate || new Date().toISOString(),
+          status: taskStatus, // 100% 보장된, 깨끗한 상태값만 사용됩니다.
+          records: newTask.records || [],
         };
-    })
-  }));
-  
-  return { ...defaults, ...partialKpi, id, activities }; 
+      }),
+    };
+  });
+
+  return { ...defaults, ...partialKpi, id, activities };
 };
 
 
@@ -79,7 +89,6 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [data, setData] = useState<IAppData>(initialData);
   const [navigationState, setNavigationState] = useState<NavigationState>({ menuKey: 'dashboard' });
 
-  // 데이터 로딩 로직
   useEffect(() => {
     if (!currentUser) {
       setData(initialData);
@@ -94,9 +103,13 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (userDocSnap.exists()) {
           const firestoreData = userDocSnap.data() as Partial<IAppData>;
           const cleanData: IAppData = {
-            safetyKPIs: (firestoreData.safetyKPIs || []).map(sanitizeKpi), leaseKPIs: (firestoreData.leaseKPIs || []).map(sanitizeKpi),
-            assetKPIs: (firestoreData.assetKPIs || []).map(sanitizeKpi), infraKPIs: (firestoreData.infraKPIs || []).map(sanitizeKpi),
-            hotspots: firestoreData.hotspots || [], facilities: firestoreData.facilities || [], customTabs: firestoreData.customTabs || [],
+            safetyKPIs: (firestoreData.safetyKPIs || []).map(sanitizeKpi), 
+            leaseKPIs: (firestoreData.leaseKPIs || []).map(sanitizeKpi),
+            assetKPIs: (firestoreData.assetKPIs || []).map(sanitizeKpi), 
+            infraKPIs: (firestoreData.infraKPIs || []).map(sanitizeKpi),
+            hotspots: firestoreData.hotspots || [], 
+            facilities: firestoreData.facilities || [], 
+            customTabs: firestoreData.customTabs || [],
           };
           setData(cleanData);
         } else {
@@ -108,27 +121,19 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     fetchData();
   }, [currentUser, db]);
 
-  // *** BUG FIX: 데이터 저장 로직 수정 ***
   useEffect(() => {
     if (isInitialLoad.current || !currentUser) return;
     const saveData = async () => {
       try {
-        // *** TRACING: 최종 저장 직전 데이터 추적 ***
-        console.log('[Trace 3/3 - AppDataContext] Saving data to Firestore:', data);
-        
-        // 불필요한 데이터 재구성을 제거하고, 'data' 객체 전체를 저장하여
-        // 'title'을 포함한 모든 속성이 보존되도록 합니다.
         await setDoc(doc(db, 'users', currentUser.uid), data, { merge: true });
       } catch (error) { 
         console.error("Error saving data:", error);
       }
     };
-    // 쓰기 작업을 디바운스하여 성능 최적화
     const debounceSave = setTimeout(saveData, 300);
     return () => clearTimeout(debounceSave);
   }, [data, currentUser, db]);
 
-  // 상태 업데이트 로직 (Stale Closure 문제 해결된 버전)
   const updateKpiArray = useCallback((kpiId: string, updateFn: (kpi: KPI) => KPI) => {
     setData(prevData => {
         const kpiTypeKey = Object.keys(prevData).find(key =>
@@ -147,8 +152,9 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   }, []);
   
+  // 4. 생성되는 모든 활동/업무는 이제 TASK_STATUS.NOT_STARTED를 기본값으로 가집니다.
   const addActivityToKpi = useCallback(async (kpiId: string, newActivityData: Omit<Activity, 'id' | 'status' | 'tasks'>): Promise<Activity> => {
-    const newActivity: Activity = { ...newActivityData, id: `activity-${Date.now()}-${Math.random()}`, status: 'not-started', tasks: [] };
+    const newActivity: Activity = { ...newActivityData, id: `activity-${Date.now()}-${Math.random()}`, status: TASK_STATUS.NOT_STARTED, tasks: [] };
     updateKpiArray(kpiId, kpi => ({ ...kpi, activities: [...(kpi.activities || []), newActivity] }));
     return newActivity;
   }, [updateKpiArray]);
@@ -162,7 +168,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   }, [updateKpiArray]);
 
   const addTask = useCallback((kpiId: string, activityId: string, newTaskData: Omit<Task, 'id' | 'status' | 'records'>) => {
-    const newTask: Task = { ...newTaskData, id: `task-${Date.now()}-${Math.random()}`, status: 'not-started', records: [] };
+    const newTask: Task = { ...newTaskData, id: `task-${Date.now()}-${Math.random()}`, status: TASK_STATUS.NOT_STARTED, records: [] };
     updateKpiArray(kpiId, kpi => ({
       ...kpi,
       activities: (kpi.activities || []).map(act => 
@@ -189,12 +195,15 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     navigateTo({ menuKey: tabWithKey.key });
   }, [navigateTo]);
 
-  const kpiData = useMemo(() => [
-    ...(data.safetyKPIs || []).map(k => ({ ...k, type: '안전 관리', icon: <Shield size={16}/>, color: 'text-pink-500' })),
-    ...(data.leaseKPIs || []).map(k => ({ ...k, type: '임대 및 세대', icon: <Handshake size={16}/>, color: 'text-black' })),
-    ...(data.assetKPIs || []).map(k => ({ ...k, type: '자산 가치', icon: <DollarSign size={16}/>, color: 'text-blue-500' })),
-    ...(data.infraKPIs || []).map(k => ({ ...k, type: '인프라 개발', icon: <DraftingCompass size={16}/>, color: 'text-gray-400' }))
-  ], [data.safetyKPIs, data.leaseKPIs, data.assetKPIs, data.infraKPIs]);
+  const kpiData = useMemo(() => {
+    const allKpis = [
+      ...(data.safetyKPIs || []).map(k => ({ ...k, type: '안전 관리', icon: <Shield size={16}/>, color: 'text-pink-500' })),
+      ...(data.leaseKPIs || []).map(k => ({ ...k, type: '임대 및 세대', icon: <Handshake size={16}/>, color: 'text-black' })),
+      ...(data.assetKPIs || []).map(k => ({ ...k, type: '자산 가치', icon: <DollarSign size={16}/>, color: 'text-blue-500' })),
+      ...(data.infraKPIs || []).map(k => ({ ...k, type: '인프라 개발', icon: <DraftingCompass size={16}/>, color: 'text-gray-400' }))
+    ];
+    return allKpis;
+  }, [data.safetyKPIs, data.leaseKPIs, data.assetKPIs, data.infraKPIs]);
 
   const value: IAppContext = {
     ...data, kpiData, navigationState, setData, addActivityToKpi, updateActivityInKpi, deleteActivityFromKpi, 

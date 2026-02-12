@@ -3,8 +3,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowUpRight, TrendingUp } from 'lucide-react';
 import { useAppData } from '../providers/AppDataContext';
 import DailyBriefing from './DailyBriefing';
+import { TASK_STATUS, TASK_STATUS_DISPLAY_NAMES } from '../constants';
+// 1. 정확한 날짜 계산을 위해 date-fns 라이브러리를 임포트합니다.
+import { startOfMonth, endOfMonth, parseISO } from 'date-fns';
 
-// 이 카드는 이제 완전히 독립적이며, 받은 데이터만으로 렌더링됩니다.
 const ProjectStatCard: React.FC<{
   title: string;
   value: string;
@@ -34,7 +36,6 @@ const ProjectStatCard: React.FC<{
 };
 
 const Dashboard: React.FC = () => {
-  // 1. 중앙 데이터 소스 사용: 타입이 수정되어 이제 selectedMonth가 정상적으로 인식됩니다.
   const { kpiData, navigationState } = useAppData();
   const [isBriefingOpen, setBriefingOpen] = useState(false);
 
@@ -46,22 +47,54 @@ const Dashboard: React.FC = () => {
     }
   }, []);
   
-  // 2. 월별 업무 통계 로직 (이제 `tasks` 속성이 Activity 타입에 정상적으로 존재합니다)
+  // 2. 시간축을 완벽하게 교정한 새로운 집계 로직입니다.
   const taskStats = useMemo(() => {
-    const selectedMonth = navigationState.selectedMonth ?? (new Date().getMonth());
+    // 현재 선택된 월(0-11)과 연도를 가져옵니다.
+    const viewDate = new Date();
+    viewDate.setMonth(navigationState.selectedMonth ?? viewDate.getMonth());
+    const monthStart = startOfMonth(viewDate);
+    const monthEnd = endOfMonth(viewDate);
+
+    const allTasks = kpiData.flatMap(kpi => kpi.activities ?? []).flatMap(activity => activity.tasks ?? []);
     
-    const tasksForMonth = kpiData
-      .flatMap(kpi => kpi.activities || [])
-      .flatMap(activity => activity.tasks || []) // 이제 오류 없음
-      .filter(task => new Date(task.dueDate).getMonth() === selectedMonth);
+    // 시간 왜곡을 수정합니다: 선택된 월의 시작과 끝에 걸쳐있는 모든 업무를 필터링합니다.
+    const tasksForMonth = allTasks.filter(task => {
+      try {
+        const taskStart = parseISO(task.startDate);
+        const taskEnd = parseISO(task.endDate);
+        // 업무 기간이 선택된 월의 기간과 겹치는지 확인합니다.
+        return taskStart <= monthEnd && taskEnd >= monthStart;
+      } catch (e) {
+        return false; // 날짜 파싱 오류 시 필터에서 제외
+      }
+    });
 
-    const completed = tasksForMonth.filter(t => t.status === 'completed').length;
-    const inProgress = tasksForMonth.filter(t => t.status === 'in-progress').length;
-    const pending = tasksForMonth.filter(t => t.status === 'not-started' || t.status === 'pending').length;
-    const total = tasksForMonth.length;
+    const stats = tasksForMonth.reduce(
+      (acc, task) => {
+        acc.total += 1;
+        // `task.status`는 이제 신뢰할 수 있는 "Single Source of Truth" 입니다.
+        switch (task.status) {
+          case TASK_STATUS.COMPLETED:
+            acc.completed += 1;
+            break;
+          case TASK_STATUS.IN_PROGRESS:
+            acc.inProgress += 1;
+            break;
+          case TASK_STATUS.NOT_STARTED:
+            acc.notStarted += 1;
+            break;
+          default:
+            // 정의되지 않은 상태나 `status`가 없는 경우, '시작전'으로 집계하여 누락을 방지합니다.
+            if (!task.status) acc.notStarted +=1;
+            break;
+        }
+        return acc;
+      },
+      { completed: 0, inProgress: 0, notStarted: 0, total: 0 }
+    );
 
-    return { completed, inProgress, pending, total };
-  }, [kpiData, navigationState.selectedMonth]);
+    return stats;
+  }, [kpiData, navigationState.selectedMonth]); // 이제 월이 변경될 때마다 재계산됩니다.
   
   const selectedMonthName = useMemo(() => {
       const month = navigationState.selectedMonth ?? (new Date().getMonth());
@@ -70,9 +103,9 @@ const Dashboard: React.FC = () => {
 
   const projectStats = [
     { title: `${selectedMonthName} 총 업무`, value: taskStats.total.toString(), status: '실시간 업데이트', isPrimary: true },
-    { title: '완료된 업무', value: taskStats.completed.toString(), status: '지난 달 대비 증가' },
-    { title: '진행중인 업무', value: taskStats.inProgress.toString(), status: '지난 달 대비 증가' },
-    { title: '보류된 업무', value: taskStats.pending.toString(), status: '논의 중' },
+    { title: TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.COMPLETED] + ' 업무', value: taskStats.completed.toString(), status: '지난 달 대비 증가' },
+    { title: TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.IN_PROGRESS] + ' 업무', value: taskStats.inProgress.toString(), status: '지난 달 대비 증가' },
+    { title: TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.NOT_STARTED] + ' 업무', value: taskStats.notStarted.toString(), status: '논의 중' },
   ];
 
   return (
@@ -96,7 +129,6 @@ const Dashboard: React.FC = () => {
           <div className="space-y-6">
             {kpiData.length > 0 ? (
               kpiData.slice(0, 4).map((kpi) => {
-                // 3. 'previous' 속성이 이제 KPI 타입에 존재하므로, 런타임 오류 방지만 추가합니다.
                 const isPositive = (kpi.current - (kpi.previous || 0)) >= 0;
                 const change = Math.abs(kpi.current - (kpi.previous || 0));
 

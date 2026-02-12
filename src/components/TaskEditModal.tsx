@@ -3,11 +3,38 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Task, WeeklyRecord, TaskStatus } from '../types';
 import { parseISO, eachWeekOfInterval, getYear, getMonth, startOfMonth, getDay, getDate } from 'date-fns';
+import { UI_STATUS_OPTIONS, TASK_STATUS } from '../constants';
+
+// 새로운 두뇌: 주간 실적(records)에 따라 업무(Task)의 상태를 결정하는 핵심 로직
+const deriveTaskStatus = (records: WeeklyRecord[]): TaskStatus => {
+  if (!records || records.length === 0) {
+    return TASK_STATUS.NOT_STARTED; // 레코드가 없으면 시작전
+  }
+
+  const hasInProgress = records.some(r => r.status === TASK_STATUS.IN_PROGRESS);
+  if (hasInProgress) {
+    return TASK_STATUS.IN_PROGRESS; // 하나라도 '진행중'이면 전체는 '진행중'
+  }
+
+  const allCompleted = records.every(r => r.status === TASK_STATUS.COMPLETED);
+  if (allCompleted) {
+    return TASK_STATUS.COMPLETED; // 모두 '완료'면 전체는 '완료'
+  }
+
+  const allNotStarted = records.every(r => r.status === TASK_STATUS.NOT_STARTED);
+  if (allNotStarted) {
+      return TASK_STATUS.NOT_STARTED; // 모두 '시작전'이면 전체는 '시작전'
+  }
+  
+  // '시작전'과 '완료'가 섞여있는 경우, '진행중'으로 간주합니다.
+  return TASK_STATUS.IN_PROGRESS;
+};
 
 interface TaskEditModalProps {
   task: Task | null;
   onClose: () => void;
-  onSave: (taskId: string, updatedRecords: WeeklyRecord[]) => void;
+  // onSave 콜백이 이제 업무의 새로운 상태(newStatus)도 함께 전달합니다.
+  onSave: (taskId: string, updatedRecords: WeeklyRecord[], newStatus: TaskStatus) => void;
 }
 
 // TaskManager와 동일한 주차 계산 로직을 사용하여 일관성 유지
@@ -18,14 +45,6 @@ const getWeekOfMonth = (date: Date) => {
     return Math.ceil((dayOfMonth + firstDayOfMonth) / 7);
 }
 
-const statusOptions: { value: TaskStatus; label: string }[] = [
-  { value: 'not-started', label: '시작전' },
-  { value: 'in-progress', label: '진행중' },
-  { value: 'pending', label: '대기' },
-  { value: 'completed', label: '완료' },
-  { value: 'deferred', label: '보류' },
-];
-
 const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, onClose, onSave }) => {
   const [records, setRecords] = useState<WeeklyRecord[]>([]);
 
@@ -34,7 +53,6 @@ const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, onClose, onSave }) 
       const startDate = parseISO(task.startDate);
       const endDate = parseISO(task.endDate);
 
-      // Task의 시작일부터 종료일까지 매주에 대한 레코드를 생성/업데이트합니다.
       const weeks = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 0 });
 
       const generatedRecords = weeks.map(weekStart => {
@@ -42,19 +60,14 @@ const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, onClose, onSave }) 
         const month = getMonth(weekStart) + 1;
         const week = getWeekOfMonth(weekStart);
 
-        // 기존에 저장된 레코드가 있는지 확인
         const existingRecord = task.records.find(r => r.year === year && r.month === month && r.week === week);
+        if (existingRecord) return existingRecord;
 
-        if (existingRecord) {
-          return existingRecord; // 있으면 기존 레코드 사용
-        }
-
-        // 없으면 새로운 기본 레코드 생성
         return {
           year,
           month,
           week,
-          status: 'not-started' as TaskStatus,
+          status: TASK_STATUS.NOT_STARTED,
         };
       });
 
@@ -71,7 +84,9 @@ const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, onClose, onSave }) 
   };
 
   const handleSave = () => {
-    onSave(task.id, records);
+    // 저장 시, deriveTaskStatus 함수를 호출하여 업무의 최종 상태를 결정합니다.
+    const newStatus = deriveTaskStatus(records);
+    onSave(task.id, records, newStatus);
   };
 
   return (
@@ -98,7 +113,7 @@ const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, onClose, onSave }) 
                 onChange={(e) => handleStatusChange(index, e.target.value as TaskStatus)}
                 className="border border-gray-300 rounded-md px-3 py-1 text-sm font-medium focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               >
-                {statusOptions.map(option => (
+                {UI_STATUS_OPTIONS.map(option => (
                   <option key={option.value} value={option.value}> {option.label} </option>
                 ))}
               </select>

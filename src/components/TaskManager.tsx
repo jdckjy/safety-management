@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { X, PlusCircle } from 'lucide-react';
 import { useAppData } from '../providers/AppDataContext';
-import { KPI, Activity, Task, WeeklyRecord } from '../types';
+import { KPI, Activity, Task, WeeklyRecord, TaskStatus } from '../types';
 import TaskEditModal from './TaskEditModal';
 import { 
     startOfWeek, 
@@ -13,30 +13,25 @@ import {
     parseISO,
     addDays,
     isSameDay,
-    getDate, // 날짜를 가져오기 위해
-    getDay, // 요일을 가져오기 위해
-    eachDayOfInterval // 기간 내 모든 날짜를 가져오기 위해
+    getDate, 
+    getDay, 
+    eachDayOfInterval
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
-// *** 당신의 설계를 완벽히 따르는 새로운 주차 계산 로직 ***
 const getWeeksForMonth = (date: Date) => {
     const monthStart = startOfMonth(date);
     const monthEnd = endOfMonth(date);
-    const firstDayOfMonth = getDay(monthStart); // 0: Sunday, 1: Monday...
+    const firstDayOfMonth = getDay(monthStart);
 
     const weeks = [];
     let currentDay = monthStart;
     let weekNumber = 1;
 
     while (currentDay <= monthEnd) {
-        // 주의 시작: 일요일(0) 기준
         const weekStart = startOfWeek(currentDay, { weekStartsOn: 0 });
-        // 주의 끝: 토요일(6) 기준
         const weekEnd = endOfWeek(currentDay, { weekStartsOn: 0 });
 
-        // 주차 번호 계산: (날짜 + 1일의 요일 인덱스 - 1) / 7 올림
-        // date-fns의 getDay는 일요일이 0이므로, 계산이 더 간단해집니다.
         const dayOfMonth = getDate(currentDay);
         const calculatedWeekNumber = Math.ceil((dayOfMonth + firstDayOfMonth) / 7);
 
@@ -46,12 +41,10 @@ const getWeeksForMonth = (date: Date) => {
             dateRange: `${format(weekStart, 'M/d')}~${format(weekEnd, 'M/d')}`
         });
 
-        // 다음 주로 이동
         currentDay = addDays(weekEnd, 1);
         weekNumber++;
     }
     
-    // 중복 제거 후 반환
     const uniqueWeeks = weeks.filter((week, index, self) =>
         index === self.findIndex((t) => t.weekNumber === week.weekNumber)
     );
@@ -79,7 +72,6 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [newTaskName, setNewTaskName] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date());
-  // 요일 선택: 0=일요일, 1=월요일, ... 6=토요일
   const [daySelection, setDaySelection] = useState<[number | null, number | null]>([null, null]);
 
   const selectedYear = currentDate.getFullYear();
@@ -95,7 +87,6 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
 
   const tasksForSelectedWeek = useMemo(() => {
     if (!activity?.tasks) return [];
-    // 주의 시작: 일요일 기준
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
     return activity.tasks.filter(task => {
@@ -126,7 +117,6 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
         alert("업무를 등록할 요일의 시작과 끝을 모두 선택해주세요.");
         return;
     }
-    // 주의 시작: 일요일 기준
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
     const startDate = addDays(weekStart, startDay);
     const endDate = addDays(weekStart, endDay);
@@ -165,19 +155,18 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
 
   const handleTaskClick = (task: Task) => { setSelectedTask(task); setIsEditModalOpen(true); };
   
-  // *** 당신의 설계에 맞춰, 저장 로직 수정 ***
-  const handleSaveTask = (taskId: string, updatedRecords: WeeklyRecord[]) => {
+  // handleSaveTask가 이제 TaskEditModal에서 결정된 최종 상태(newStatus)를 인자로 받습니다.
+  const handleSaveTask = (taskId: string, updatedRecords: WeeklyRecord[], newStatus: TaskStatus) => {
     if (!activity || !kpi) return;
     const taskToUpdate = activity.tasks.find(t => t.id === taskId);
     if (!taskToUpdate) return;
 
-    const recordsWithDateInfo = updatedRecords.map(rec => ({
-        ...rec,
-        year: rec.year || new Date().getFullYear(), // 기본값 추가
-        month: rec.month || new Date().getMonth() + 1, // 기본값 추가
-    }));
-
-    updateTask(kpi.id, activity.id, { ...taskToUpdate, records: recordsWithDateInfo });
+    // 업데이트된 실적과 함께, 새로 계산된 업무의 최종 상태(status)를 함께 저장합니다.
+    updateTask(kpi.id, activity.id, { 
+        ...taskToUpdate, 
+        records: updatedRecords, 
+        status: newStatus 
+    });
     setIsEditModalOpen(false);
   };
 
@@ -198,7 +187,6 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
   }
 
   const title = `${kpi.title || '성과지표 이름 없음'} - ${activity.name || '주요 활동'}`;
-  // *** UI 일관성을 위해 요일 순서 변경 (일 -> 토) ***
   const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
 
   return (
