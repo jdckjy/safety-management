@@ -5,17 +5,17 @@ import { useAppData } from '../providers/AppDataContext';
 import { useAuth } from '../features/auth/AuthContext';
 import { useDropdown } from '../hooks/useDropdown';
 import { useNotifications } from '../providers/NotificationProvider';
-import { useSearch } from '../providers/SearchProvider'; // 1. useSearch 훅 임포트
+import { useSearch } from '../providers/SearchProvider';
 import NotificationDropdown from './NotificationDropdown';
-import GlobalSearchResults from './GlobalSearchResults'; // 2. GlobalSearchResults 컴포넌트 임포트
+import GlobalSearchResults from './GlobalSearchResults';
 
 const Header: React.FC = () => {
-  const { customTabs, selectedMonth, setSelectedMonth } = useAppData();
+  // 1. 대시보드와 동일한 시간축(navigationState)을 바라보도록 수정합니다.
+  const { customTabs, navigationState, setSelectedMonth } = useAppData();
   const { currentUser, logout } = useAuth(); 
   const { isOpen: isNotificationOpen, toggle: toggleNotification, close: closeNotification, dropdownRef: notificationRef } = useDropdown();
   const { unreadCount } = useNotifications();
   
-  // 3. 검색 관련 훅과 상태 관리 추가
   const { query, search, clear } = useSearch();
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const { isOpen: isSearchResultsOpen, close: closeSearchResults, dropdownRef: searchRef } = useDropdown();
@@ -26,7 +26,6 @@ const Header: React.FC = () => {
       search(e.target.value);
   };
 
-  // 검색어가 있을 때만 검색 결과 창을 보여주도록 처리
   useEffect(() => {
     if (!query) {
       closeSearchResults();
@@ -65,7 +64,6 @@ const Header: React.FC = () => {
       </div>
       <div className="flex items-center gap-4">
         
-        {/* 4. 전역 검색 UI 및 로직 연결 */}
         <div className="relative hidden md:block" ref={searchRef}>
           <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           <input 
@@ -87,8 +85,9 @@ const Header: React.FC = () => {
         
         <div className="flex items-center gap-2 bg-white pl-5 pr-3 py-2 rounded-2xl shadow-sm border border-gray-100">
           <Calendar size={18} className="text-gray-400"/>
+          {/* 2. 드롭다운의 값(value)이 독립된 상태가 아닌, 공유되는 navigationState.selectedMonth를 가리키도록 수정합니다. */}
           <select 
-              value={selectedMonth}
+              value={navigationState.selectedMonth}
               onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
               className="bg-transparent text-sm font-bold text-gray-800 outline-none appearance-none pr-6"
           >
