@@ -6,22 +6,29 @@ import { KPI } from '../types';
 interface AddKpiModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (newKpi: Omit<KPI, 'id' | 'current' | 'activities' | 'pulse'>) => void;
+  onSave: (newKpi: Omit<KPI, 'id' | 'current' | 'activities' | 'pulse' | 'description' | 'previous'>) => void;
 }
 
 const AddKpiModal: React.FC<AddKpiModalProps> = ({ isOpen, onClose, onSave }) => {
-  const [name, setName] = useState('');
+  // *** BUG FIX: 데이터 모델과 일치시키기 위해 'name'을 'title'로 변경 ***
+  const [title, setTitle] = useState('');
   const [target, setTarget] = useState<number | ''>('');
   const [unit, setUnit] = useState('');
 
   const handleSubmit = () => {
-    if (!name || target === '' || !unit) {
+    if (!title || target === '' || !unit) {
       alert('모든 필드를 입력해주세요.');
       return;
     }
-    onSave({ name, target: Number(target), unit });
+    // *** BUG FIX: onSave에 'title' 속성으로 데이터를 전달 ***
+    const newKpiData = { title, target: Number(target), unit };
+    
+    // *** TRACING: 당신의 지시에 따라, 데이터 흐름 추적을 위한 console.log 추가 ***
+    console.log('[Trace 1/3 - AddKpiModal] Saving new KPI data:', newKpiData);
+
+    onSave(newKpiData);
     onClose();
-    setName('');
+    setTitle('');
     setTarget('');
     setUnit('');
   };
@@ -44,12 +51,12 @@ const AddKpiModal: React.FC<AddKpiModalProps> = ({ isOpen, onClose, onSave }) =>
         
         <main className="p-6 space-y-4">
           <div>
-            <label htmlFor="kpi-name" className="block text-sm font-bold text-gray-600 mb-1">지표명</label>
+            <label htmlFor="kpi-title" className="block text-sm font-bold text-gray-600 mb-1">지표명</label>
             <input
-              id="kpi-name"
+              id="kpi-title"
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               placeholder="예: 무재해 일수"
               className="w-full p-3 bg-gray-100 rounded-lg border-2 border-transparent focus:border-blue-500 focus:bg-white focus:outline-none transition"
             />

@@ -1,11 +1,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Building2, ArrowUpRight, TrendingUp, Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
+import { ArrowUpRight, TrendingUp } from 'lucide-react';
 import { useAppData } from '../providers/AppDataContext';
-import { useAuth } from '../features/auth/AuthContext';
-import { KPI } from '../types';
 import DailyBriefing from './DailyBriefing';
 
+// 이 카드는 이제 완전히 독립적이며, 받은 데이터만으로 렌더링됩니다.
 const ProjectStatCard: React.FC<{
   title: string;
   value: string;
@@ -35,16 +34,8 @@ const ProjectStatCard: React.FC<{
 };
 
 const Dashboard: React.FC = () => {
-  const {
-    selectedMonth,
-    monthlyTasks, // Get the full list of tasks
-    totalMonthlyTasks, // This is already calculated in context
-    safetyKPIs,
-    leaseKPIs,
-    assetKPIs,
-    infraKPIs,
-  } = useAppData();
-  const { logout } = useAuth();
+  // 1. 중앙 데이터 소스 사용: 타입이 수정되어 이제 selectedMonth가 정상적으로 인식됩니다.
+  const { kpiData, navigationState } = useAppData();
   const [isBriefingOpen, setBriefingOpen] = useState(false);
 
   useEffect(() => {
@@ -54,30 +45,34 @@ const Dashboard: React.FC = () => {
       sessionStorage.setItem('hasSeenDailyBriefing', 'true');
     }
   }, []);
-
-  const selectedMonthName = new Date(0, selectedMonth).toLocaleString('ko-KR', { month: 'long' });
-
-  // Calculate stats based on the new task structure
+  
+  // 2. 월별 업무 통계 로직 (이제 `tasks` 속성이 Activity 타입에 정상적으로 존재합니다)
   const taskStats = useMemo(() => {
-    const tasksForMonth = monthlyTasks.filter(task => task.month === selectedMonth + 1);
+    const selectedMonth = navigationState.selectedMonth ?? (new Date().getMonth());
+    
+    const tasksForMonth = kpiData
+      .flatMap(kpi => kpi.activities || [])
+      .flatMap(activity => activity.tasks || []) // 이제 오류 없음
+      .filter(task => new Date(task.dueDate).getMonth() === selectedMonth);
+
     const completed = tasksForMonth.filter(t => t.status === 'completed').length;
     const inProgress = tasksForMonth.filter(t => t.status === 'in-progress').length;
-    const pending = tasksForMonth.filter(t => t.status === 'pending').length;
-    return { completed, inProgress, pending };
-  }, [monthlyTasks, selectedMonth]);
+    const pending = tasksForMonth.filter(t => t.status === 'not-started' || t.status === 'pending').length;
+    const total = tasksForMonth.length;
+
+    return { completed, inProgress, pending, total };
+  }, [kpiData, navigationState.selectedMonth]);
+  
+  const selectedMonthName = useMemo(() => {
+      const month = navigationState.selectedMonth ?? (new Date().getMonth());
+      return new Date(0, month).toLocaleString('ko-KR', { month: 'long' });
+  }, [navigationState.selectedMonth]);
 
   const projectStats = [
-    { title: `${selectedMonthName} 총 업무`, value: totalMonthlyTasks.toString(), status: '실시간 업데이트', isPrimary: true },
+    { title: `${selectedMonthName} 총 업무`, value: taskStats.total.toString(), status: '실시간 업데이트', isPrimary: true },
     { title: '완료된 업무', value: taskStats.completed.toString(), status: '지난 달 대비 증가' },
     { title: '진행중인 업무', value: taskStats.inProgress.toString(), status: '지난 달 대비 증가' },
     { title: '보류된 업무', value: taskStats.pending.toString(), status: '논의 중' },
-  ];
-
-  const allKpis = [
-    ...(safetyKPIs || []).map(k => ({ ...k, type: '안전 관리', icon: <Shield size={16}/>, color: 'text-pink-500' })),
-    ...(leaseKPIs || []).map(k => ({ ...k, type: '임대 및 세대', icon: <Handshake size={16}/>, color: 'text-black' })),
-    ...(assetKPIs || []).map(k => ({ ...k, type: '자산 가치', icon: <DollarSign size={16}/>, color: 'text-blue-500' })),
-    ...(infraKPIs || []).map(k => ({ ...k, type: '인프라 개발', icon: <DraftingCompass size={16}/>, color: 'text-gray-400' })),
   ];
 
   return (
@@ -90,7 +85,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-12 gap-8">
-        <div className="col-span-12 lg:col-span-4 bg-white p-8 rounded-5xl shadow-sm border border-gray-50">
+        <div className="col-span-12 lg:col-span-4 bg-white p-8 rounded-3xl shadow-sm border border-gray-50">
           <div className="flex items-center justify-between mb-8">
             <h3 className="font-bold text-lg">플랫폼 가치</h3>
             <div className="flex gap-1">
@@ -99,12 +94,11 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           <div className="space-y-6">
-            {allKpis.length > 0 ? (
-              allKpis.slice(0, 4).map((kpi) => {
-                if (!kpi) return null;
-                const pulse = kpi.pulse || { value: 0, trend: 'stable' };
-                const isPositive = pulse.trend === 'up';
-                const change = Math.abs(pulse.value);
+            {kpiData.length > 0 ? (
+              kpiData.slice(0, 4).map((kpi) => {
+                // 3. 'previous' 속성이 이제 KPI 타입에 존재하므로, 런타임 오류 방지만 추가합니다.
+                const isPositive = (kpi.current - (kpi.previous || 0)) >= 0;
+                const change = Math.abs(kpi.current - (kpi.previous || 0));
 
                 return (
                   <div key={kpi.id} className="flex items-center justify-between group cursor-pointer">
@@ -112,13 +106,13 @@ const Dashboard: React.FC = () => {
                       <div className={`w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center ${kpi.color}`}>
                         {kpi.icon}
                       </div>
-                      <span className="text-xs font-bold text-gray-500 group-hover:text-black transition-colors">{kpi.name}</span>
+                      <span className="text-xs font-bold text-gray-500 group-hover:text-black transition-colors">{kpi.title}</span>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-black tracking-tight">{`${kpi.current}${kpi.unit}`}</p>
                       <div className={`flex items-center justify-end gap-1 text-[10px] font-bold ${isPositive ? 'text-pink-500' : 'text-blue-500'}`}>
                         {isPositive ? '↗' : '↘'}
-                        <span>{change}%</span>
+                        <span>{change}{kpi.unit}</span>
                       </div>
                     </div>
                   </div>
@@ -130,7 +124,7 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="col-span-12 lg:col-span-8 bg-white p-8 rounded-5xl shadow-sm border border-gray-50 flex flex-col min-h-[400px]">
+        <div className="col-span-12 lg:col-span-8 bg-white p-8 rounded-3xl shadow-sm border border-gray-50 flex flex-col min-h-[400px]">
            <div className="flex-1 flex items-center justify-center">
              <p className="text-gray-400 font-bold">선택된 월의 상세 작업 내용은 각 KPI 섹션에서 확인해주세요.</p>
            </div>

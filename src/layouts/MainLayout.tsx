@@ -24,9 +24,11 @@ const MainLayout: React.FC = () => {
     const renderContent = () => {
         const customTab = customTabs.find(t => t.key === navigationState.menuKey);
         if (customTab) {
-            return <CustomPage title={customTab.label} />;
+            // 2. 'label' 대신 올바른 속성인 'title'을 사용합니다.
+            return <CustomPage title={customTab.title} />;
         }
 
+        // 3. 더 이상 사용되지 않고 충돌을 일으키는 'kpiDetail' 케이스를 제거합니다.
         switch (navigationState.menuKey) {
             case 'dashboard': return <Dashboard />;
             case 'safety': return <SafetyManagement />;
