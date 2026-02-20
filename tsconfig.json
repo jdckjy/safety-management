@@ -13,16 +13,18 @@
     "types": [
       "node"
     ],
+    // [수정] baseUrl과 paths를 수정하여 경로 별칭 문제를 근본적으로 해결합니다.
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ]
+    },
     "moduleResolution": "bundler",
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    },
     "allowImportingTsExtensions": true,
     "noEmit": true
   }

@@ -1,55 +1,47 @@
 
 // src/types.ts
-import { TaskStatus } from './constants'; // "Single Source of Truth"를 임포트합니다.
+import { TaskStatus } from './constants';
 
-// 1. Task의 진행 상태 타입이 이제 constants.ts를 유일한 진실의 원천으로 삼습니다.
-// export type TaskStatus = 'not-started' | 'in-progress' | 'pending' | 'completed' | 'deferred'; // 이 라인은 제거됩니다.
+export type MenuKey = 'dashboard' | 'safety' | 'lease' | 'asset' | 'infra';
 
-// 2. 주간 보고서 레코드
+export type { TaskStatus };
+
 export interface WeeklyRecord {
   year: number;
-  month: number; // 1-12
-  week: number;  // 월 기준 주차 (e.g., 1, 2, 3, 4, 5)
-  status: TaskStatus; // 강화된 타입을 사용합니다.
+  month: number;
+  week: number;
+  status: TaskStatus;
   comment?: string;
 }
 
-// 3. 개별 업무(Task)
 export interface Task {
   id: string;
   name: string;
-  startDate: string; // ISO 8601 format string
-  endDate: string;   // ISO 8601 format string
-  status: TaskStatus; // 강화된 타입을 사용합니다.
+  startDate: string;
+  endDate: string;
+  status: TaskStatus;
   records: WeeklyRecord[];
 }
 
-// 4. 활동(Activity)
 export interface Activity {
   id: string;
   name: string;
-  status: TaskStatus; // 강화된 타입을 사용합니다.
-  tasks: Task[]; 
+  status: TaskStatus;
+  tasks: Task[];
 }
 
-// 5. 핵심 성과 지표(KPI)
 export interface KPI {
   id: string;
   title: string;
   description: string;
   target: number;
   current: number;
-  previous?: number; 
+  previous?: number;
   unit: string;
   activities: Activity[];
 }
 
-// 이하 다른 타입들 (변경 없음)
-export interface CustomTab {
-  key: string;
-  title: string;
-  content: string;
-}
+// [수정] 더 이상 사용하지 않는 CustomTab 인터페이스를 완전히 제거합니다.
 
 export interface HotSpot {
   id: string;
@@ -65,10 +57,38 @@ export interface Facility {
   status: string;
 }
 
-// 6. 네비게이션 상태
+export interface ComplexFacility {
+  id: string;
+  category: string;
+  name: string;
+  area: number | null;
+  compositionRatio: number | null;
+  details: string;
+  buildingArea: number | null;
+  buildingCoverageRatio: number | null;
+  grossFloorArea: number | null;
+  floorAreaRatio: number | null;
+  mainUse: string;
+  height: string;
+  remarks: string;
+}
+
 export interface NavigationState {
   menuKey: string;
   selectedKpiId?: string;
   activityId?: string;
-  selectedMonth?: number; 
+  selectedMonth?: number;
 }
+
+// [핵심 수정] IAppData 인터페이스에서 customTabs 속성을 제거하여 타입 정의를 일치시킵니다.
+export interface IAppData {
+  safetyKPIs: KPI[];
+  leaseKPIs: KPI[];
+  assetKPIs: KPI[];
+  infraKPIs: KPI[];
+  hotspots: HotSpot[];
+  facilities: Facility[];
+  complexFacilities: ComplexFacility[];
+}
+
+export type StateUpdater<T> = React.Dispatch<React.SetStateAction<T>>;
