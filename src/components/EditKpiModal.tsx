@@ -17,11 +17,10 @@ const EditKpiModal: React.FC<EditKpiModalProps> = ({ isOpen, onClose, onSave, kp
 
   useEffect(() => {
     if (kpi) {
-      setName(kpi.name);
+      setName(kpi.title);
       setTarget(kpi.target);
       setUnit(kpi.unit);
     } else {
-      // Reset when modal is closed or kpi is null
       setName('');
       setTarget('');
       setUnit('');
@@ -33,7 +32,7 @@ const EditKpiModal: React.FC<EditKpiModalProps> = ({ isOpen, onClose, onSave, kp
       alert('모든 필드를 입력해주세요.');
       return;
     }
-    onSave({ ...kpi, name, target: Number(target), unit });
+    onSave({ ...kpi, title: name, target: Number(target), unit });
     onClose();
   };
 
