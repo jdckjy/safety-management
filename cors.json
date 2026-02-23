@@ -1,0 +1,9 @@
+
+[
+  {
+    "origin": ["https://infra-management-3917802-4cc51.web.app", "http://localhost:3000", "http://localhost:5173"],
+    "method": ["GET", "POST", "HEAD", "PUT", "DELETE", "OPTIONS"],
+    "responseHeader": ["Content-Type", "access-control-allow-origin"],
+    "maxAgeSeconds": 3600
+  }
+]

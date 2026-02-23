@@ -1,14 +1,13 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-// [수정] 더 이상 사용하지 않는 CustomTab 타입을 임포트하지 않습니다.
-import { IAppData, KPI, Activity, HotSpot, Facility, NavigationState, Task, TaskStatus, ComplexFacility } from '../types';
+import { IAppData, KPI, Activity, HotSpot, Facility, NavigationState, Task, TaskStatus, ComplexFacility, TeamMember } from '../types';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../features/auth/AuthContext';
 import { Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
 import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '../constants';
 import { initialComplexFacilities } from '../data/initial-complex-facilities';
+import { initialTeamMembers } from '../data/initial-team-members';
 
-// [수정] IAppContext 인터페이스에서 customTabs 및 addTab 관련 정의를 제거합니다.
 interface IAppContext extends IAppData {
   kpiData: (KPI & { type: string; icon: React.ReactNode; color: string; })[];
   navigationState: NavigationState;
@@ -31,11 +30,14 @@ interface IAppContext extends IAppData {
   addComplexFacility: (newFacility: Omit<ComplexFacility, 'id'>) => void;
   updateComplexFacility: (updatedFacility: ComplexFacility) => void;
   deleteComplexFacility: (facilityId: string) => void;
+  setTeamMembers: React.Dispatch<React.SetStateAction<TeamMember[]>>;
+  addTeamMember: (newMember: Omit<TeamMember, 'id'>) => void;
+  updateTeamMember: (updatedMember: TeamMember) => void;
+  deleteTeamMember: (memberId: string) => void;
 }
 
 const AppDataContext = createContext<IAppContext | undefined>(undefined);
 
-// [수정] 초기 데이터에서 customTabs를 제거합니다.
 const initialData: IAppData = { 
   safetyKPIs: [], 
   leaseKPIs: [], 
@@ -43,12 +45,12 @@ const initialData: IAppData = {
   infraKPIs: [], 
   hotspots: [], 
   facilities: [], 
-  complexFacilities: initialComplexFacilities
+  complexFacilities: initialComplexFacilities,
+  teamMembers: initialTeamMembers,
 };
 
 
 const sanitizeKpi = (partialKpi: Partial<KPI>): KPI => {
-  // ... (이하 sanitizeKpi 함수는 변경 없음)
   const defaults: Omit<KPI, 'id'> = { title: '이름 없음 - 수정 필요', description: '', current: 0, target: 100, unit: '%', activities: [], previous: 0 };
   const id = partialKpi.id || `kpi-${Date.now()}-${Math.random()}`;
 
@@ -96,7 +98,6 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         if (userDocSnap.exists()) {
           const firestoreData = userDocSnap.data() as Partial<IAppData>;
           
-          // [수정] customTabs 관련 데이터 처리 로직을 완전히 제거합니다.
           const cleanData: IAppData = {
             safetyKPIs: (firestoreData.safetyKPIs || []).map(sanitizeKpi),
             leaseKPIs: (firestoreData.leaseKPIs || []).map(sanitizeKpi),
@@ -107,10 +108,12 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
             complexFacilities: (firestoreData.complexFacilities && firestoreData.complexFacilities.length > 0) 
               ? firestoreData.complexFacilities 
               : initialComplexFacilities,
+            teamMembers: (firestoreData.teamMembers && firestoreData.teamMembers.length > 0)
+              ? firestoreData.teamMembers
+              : initialTeamMembers,
           };
           setData(cleanData);
         } else {
-          // [수정] 신규 사용자 데이터 생성 시 customTabs 관련 로직을 제거합니다.
           await setDoc(userDocRef, initialData);
           setData(initialData);
         }
@@ -130,7 +133,6 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     return () => clearTimeout(debounceSave);
   }, [data, currentUser, db]);
 
-  // ... (이하 KPI, Activity, Task 관련 함수들은 변경 없음) ...
   const updateKpiArray = useCallback((kpiId: string, updateFn: (kpi: KPI) => KPI) => {
     setData(prevData => {
         const kpiTypeKey = Object.keys(prevData).find(key => (prevData[key as keyof IAppData] as any[])?.some((item: any) => item.id === kpiId)) as keyof IAppData | undefined;
@@ -162,8 +164,6 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     navigateTo({ selectedMonth: month });
   }, [navigateTo]);
 
-  // [수정] 불필요한 addTab 함수를 완전히 제거합니다.
-
   const addComplexFacility = useCallback((newFacility: Omit<ComplexFacility, 'id'>) => {
     const facilityWithId = { ...newFacility, id: `complex-${Date.now()}-${Math.random()}` };
     setData(prev => ({ ...prev, complexFacilities: [...prev.complexFacilities, facilityWithId] }));
@@ -177,8 +177,20 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     setData(prev => ({ ...prev, complexFacilities: prev.complexFacilities.filter(f => f.id !== facilityId) }));
   }, []);
 
+  const addTeamMember = useCallback((newMember: Omit<TeamMember, 'id'>) => {
+    const memberWithId = { ...newMember, id: `member-${Date.now()}-${Math.random()}` };
+    setData(prev => ({ ...prev, teamMembers: [...prev.teamMembers, memberWithId] }));
+  }, []);
+
+  const updateTeamMember = useCallback((updatedMember: TeamMember) => {
+    setData(prev => ({ ...prev, teamMembers: prev.teamMembers.map(m => m.id === updatedMember.id ? updatedMember : m) }));
+  }, []);
+
+  const deleteTeamMember = useCallback((memberId: string) => {
+    setData(prev => ({ ...prev, teamMembers: prev.teamMembers.filter(m => m.id !== memberId) }));
+  }, []);
+
   const kpiData = useMemo(() => {
-    // ... (kpiData 생성 로직은 변경 없음)
     return [
       ...(data.safetyKPIs || []).map(k => ({ ...k, type: '안전 관리', icon: <Shield size={16}/>, color: 'text-pink-500' })),
       ...(data.leaseKPIs || []).map(k => ({ ...k, type: '임대 및 세대', icon: <Handshake size={16}/>, color: 'text-black' })),
@@ -187,7 +199,6 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     ];
   }, [data.safetyKPIs, data.leaseKPIs, data.assetKPIs, data.infraKPIs]);
 
-  // [수정] 컨텍스트 value에서 customTabs와 addTab을 제거합니다.
   const value: IAppContext = {
     ...data, kpiData, navigationState, setData, addActivityToKpi, updateActivityInKpi, deleteActivityFromKpi, 
     addTask, updateTask, deleteTask, navigateTo, setSelectedMonth,
@@ -201,6 +212,10 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     addComplexFacility,
     updateComplexFacility,
     deleteComplexFacility,
+    setTeamMembers: (members) => setData(p => ({...p, teamMembers: typeof members === 'function' ? members(p.teamMembers) : members})),
+    addTeamMember,
+    updateTeamMember,
+    deleteTeamMember,
   };
 
   return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;

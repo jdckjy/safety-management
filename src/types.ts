@@ -41,8 +41,6 @@ export interface KPI {
   activities: Activity[];
 }
 
-// [수정] 더 이상 사용하지 않는 CustomTab 인터페이스를 완전히 제거합니다.
-
 export interface HotSpot {
   id: string;
   name: string;
@@ -73,6 +71,14 @@ export interface ComplexFacility {
   remarks: string;
 }
 
+export interface TeamMember {
+  id: string;
+  name: string;
+  position: string;
+  phone: string;
+  photo: string;
+}
+
 export interface NavigationState {
   menuKey: string;
   selectedKpiId?: string;
@@ -80,7 +86,6 @@ export interface NavigationState {
   selectedMonth?: number;
 }
 
-// [핵심 수정] IAppData 인터페이스에서 customTabs 속성을 제거하여 타입 정의를 일치시킵니다.
 export interface IAppData {
   safetyKPIs: KPI[];
   leaseKPIs: KPI[];
@@ -89,6 +94,7 @@ export interface IAppData {
   hotspots: HotSpot[];
   facilities: Facility[];
   complexFacilities: ComplexFacility[];
+  teamMembers: TeamMember[];
 }
 
 export type StateUpdater<T> = React.Dispatch<React.SetStateAction<T>>;
