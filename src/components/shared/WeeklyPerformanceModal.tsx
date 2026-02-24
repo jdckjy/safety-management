@@ -1,9 +1,9 @@
 
-import React, { useState, useMemo } from 'react';
-import { X, PlusCircle } from 'lucide-react';
-import { useAppData } from '../providers/AppDataContext';
-import { KPI, Activity, Task, WeeklyRecord, TaskStatus } from '../types';
-import TaskEditModal from './TaskEditModal';
+import React, { useState, useMemo, MouseEvent } from 'react';
+import { X, PlusCircle, Trash2 } from 'lucide-react';
+import { useAppData } from '../../providers/AppDataContext';
+import { KPI, Activity, Task, WeeklyRecord, TaskStatus } from '../../types';
+import TaskEditModal from '../TaskEditModal';
 import { 
     startOfWeek, 
     endOfWeek, 
@@ -14,59 +14,50 @@ import {
     addDays,
     isSameDay,
     getDate, 
-    getDay, 
-    eachDayOfInterval
+    getDay,
+    getMonth,
+    getWeekOfMonth
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import { getHolidaysForYear } from '../../data/holidays';
 
 const getWeeksForMonth = (date: Date) => {
     const monthStart = startOfMonth(date);
     const monthEnd = endOfMonth(date);
-    const firstDayOfMonth = getDay(monthStart);
-
     const weeks = [];
     let currentDay = monthStart;
-    let weekNumber = 1;
 
     while (currentDay <= monthEnd) {
-        const weekStart = startOfWeek(currentDay, { weekStartsOn: 0 });
-        const weekEnd = endOfWeek(currentDay, { weekStartsOn: 0 });
-
-        const dayOfMonth = getDate(currentDay);
-        const calculatedWeekNumber = Math.ceil((dayOfMonth + firstDayOfMonth) / 7);
-
+        const weekStart = startOfWeek(currentDay, { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(currentDay, { weekStartsOn: 1 });
+        const weekNumber = getWeekOfMonth(weekStart, { weekStartsOn: 1 });
+        
         weeks.push({
-            weekNumber: calculatedWeekNumber,
-            startDate: weekStart,
+            weekNumber: weekNumber,
+            startDate: weekStart, 
             dateRange: `${format(weekStart, 'M/d')}~${format(weekEnd, 'M/d')}`
         });
-
+        
         currentDay = addDays(weekEnd, 1);
-        weekNumber++;
     }
     
     const uniqueWeeks = weeks.filter((week, index, self) =>
-        index === self.findIndex((t) => t.weekNumber === week.weekNumber)
+        index === self.findIndex((t) => t.dateRange === week.dateRange)
     );
-
     return uniqueWeeks;
 };
 
-const getWeekOfMonth = (date: Date) => {
-    const monthStart = startOfMonth(date);
-    const firstDayOfMonth = getDay(monthStart);
-    const dayOfMonth = getDate(date);
-    return Math.ceil((dayOfMonth + firstDayOfMonth) / 7);
-}
-
-interface TaskManagerProps {
-  kpiId: string;
-  activityId: string;
+interface WeeklyPerformanceModalProps {
+  kpi: KPI;
+  activity: Activity;
   onClose: () => void;
 }
 
-const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose }) => {
-  const { kpiData, addTask, updateTask, deleteActivityFromKpi } = useAppData();
+export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ kpi, activity, onClose }) => {
+  // =========================================================================================
+  // [핵심 수정] 1. 실시간 데이터 반영을 위해 Context에서 직접 최신 데이터를 가져옵니다.
+  // =========================================================================================
+  const { addTask, updateTask, deleteTask, deleteActivityFromKpi, kpiData } = useAppData();
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -76,27 +67,33 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
 
   const selectedYear = currentDate.getFullYear();
   const selectedMonth = currentDate.getMonth() + 1;
-  const monthWeeks = useMemo(() => getWeeksForMonth(currentDate), [currentDate]);
-  const selectedWeekNumber = useMemo(() => getWeekOfMonth(currentDate), [currentDate]);
 
-  const { kpi, activity } = useMemo(() => {
-    const currentKpi = kpiData.find((k: KPI) => k.id === kpiId);
-    const currentActivity = currentKpi?.activities.find((a: Activity) => a.id === activityId);
-    return { kpi: currentKpi, activity: currentActivity };
-  }, [kpiData, kpiId, activityId]);
+  // props로 받은 activity는 상태 업데이트 시 실시간 반영이 안되므로, 항상 최신 kpiData에서 현재 activity를 찾습니다.
+  const liveActivity = useMemo(() => {
+    const liveKpi = kpiData.find(k => k.id === kpi.id);
+    return liveKpi?.activities.find(a => a.id === activity.id);
+  }, [kpiData, kpi.id, activity.id]);
+
+  const holidaysSet = useMemo(() => getHolidaysForYear(selectedYear), [selectedYear]);
+
+  const monthWeeks = useMemo(() => getWeeksForMonth(currentDate), [currentDate]);
+  const selectedWeekNumber = useMemo(() => getWeekOfMonth(currentDate, { weekStartsOn: 1 }), [currentDate]);
+
+  const weekStart = useMemo(() => startOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate]);
+  const daysInWeek = useMemo(() => Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i)), [weekStart]);
 
   const tasksForSelectedWeek = useMemo(() => {
-    if (!activity?.tasks) return [];
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
-    return activity.tasks.filter(task => {
+    if (!liveActivity?.tasks) return []; // 최신 activity 데이터 사용
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+    return liveActivity.tasks.filter(task => {
         try {
             const taskStart = parseISO(task.startDate);
             const taskEnd = parseISO(task.endDate);
             return taskStart <= weekEnd && taskEnd >= weekStart;
         } catch (e) { return false; }
     }).sort((a, b) => parseISO(a.startDate).getTime() - parseISO(b.startDate).getTime());
-  }, [activity?.tasks, currentDate]);
+  }, [liveActivity?.tasks, currentDate]); // 종속성 배열에 최신 데이터 추가
 
   const handleDayClick = (dayIndex: number) => {
     const [start, end] = daySelection;
@@ -112,12 +109,11 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
     e.preventDefault();
     const [startDay, endDay] = daySelection;
 
-    if (!newTaskName.trim() || !kpi || !activity) return;
-    if (startDay === null || endDay === null) {
+    if (!newTaskName.trim() || startDay === null || endDay === null) {
         alert("업무를 등록할 요일의 시작과 끝을 모두 선택해주세요.");
         return;
     }
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
     const startDate = addDays(weekStart, startDay);
     const endDate = addDays(weekStart, endDay);
 
@@ -131,14 +127,22 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
     setDaySelection([null, null]);
   };
   
+  // =========================================================================================
+  // [핵심 수정] 2. 개별 업무를 삭제하는 핸들러 함수를 추가합니다.
+  // =========================================================================================
+  const handleDeleteTask = (e: MouseEvent<HTMLButtonElement>, taskId: string) => {
+    e.stopPropagation(); // 부모의 onClick(수정 모달 열기) 이벤트가 실행되는 것을 방지
+    if (window.confirm('이 업무를 정말 삭제하시겠습니까?')) {
+      deleteTask(kpi.id, activity.id, taskId);
+    }
+  };
+
   const formatTaskDate = (task: Task): string => {
     try {
         const start = parseISO(task.startDate);
         const end = parseISO(task.endDate);
         const startFormat = format(start, 'M월 d일 (eee)', { locale: ko });
-
         if (isSameDay(start, end)) return startFormat;
-
         const endFormat = format(end, 'M월 d일 (eee)', { locale: ko });
         return `${startFormat} ~ ${endFormat}`;
     } catch (e) { return "날짜 형식 오류"; }
@@ -155,13 +159,10 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
 
   const handleTaskClick = (task: Task) => { setSelectedTask(task); setIsEditModalOpen(true); };
   
-  // handleSaveTask가 이제 TaskEditModal에서 결정된 최종 상태(newStatus)를 인자로 받습니다.
   const handleSaveTask = (taskId: string, updatedRecords: WeeklyRecord[], newStatus: TaskStatus) => {
-    if (!activity || !kpi) return;
-    const taskToUpdate = activity.tasks.find(t => t.id === taskId);
+    const taskToUpdate = liveActivity?.tasks.find(t => t.id === taskId); // 최신 activity 데이터 사용
     if (!taskToUpdate) return;
 
-    // 업데이트된 실적과 함께, 새로 계산된 업무의 최종 상태(status)를 함께 저장합니다.
     updateTask(kpi.id, activity.id, { 
         ...taskToUpdate, 
         records: updatedRecords, 
@@ -171,7 +172,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
   };
 
   const handleDeleteActivity = () => {
-      if (kpi && activity && window.confirm('이 활동과 모든 하위 업무를 삭제하시겠습니까?')) {
+      if (window.confirm('이 활동과 모든 하위 업무를 삭제하시겠습니까?')) {
           deleteActivityFromKpi(kpi.id, activity.id);
           onClose();
       }
@@ -182,12 +183,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
     setDaySelection([null, null]);
   };
 
-  if (!kpi || !activity) {
-    return <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center"><div className="bg-white p-8 rounded-lg shadow-xl">로딩 중...</div></div>;
-  }
-
-  const title = `${kpi.title || '성과지표 이름 없음'} - ${activity.name || '주요 활동'}`;
-  const daysOfWeek = ['일', '월', '화', '수', '목', '금', '토'];
+  const title = `${kpi.title} - ${activity.name}`;
 
   return (
     <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center animate-fade-in">
@@ -209,7 +205,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2 p-1 bg-white rounded-lg border border-gray-200 w-full">
                       {monthWeeks.map(({ weekNumber, startDate, dateRange }) => (
-                          <button key={weekNumber} onClick={() => handleWeekChange(startDate)} className={`px-3 py-1.5 text-xs text-center font-semibold rounded ${getWeekOfMonth(currentDate) === weekNumber ? 'bg-orange-100 text-orange-600' : 'text-gray-500 hover:bg-gray-100'}`}>
+                          <button key={dateRange} onClick={() => handleWeekChange(startDate)} className={`px-3 py-1.5 text-xs text-center font-semibold rounded ${getWeekOfMonth(currentDate, { weekStartsOn: 1 }) === weekNumber && getMonth(startDate) === getMonth(currentDate) ? 'bg-orange-100 text-orange-600' : 'text-gray-500 hover:bg-gray-100'}`}>
                               {weekNumber}주차 ({dateRange})
                           </button>
                       ))}
@@ -224,21 +220,56 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
                       <input type="text" value={newTaskName} onChange={(e) => setNewTaskName(e.target.value)} placeholder={`${selectedMonth}월 ${selectedWeekNumber}주차 업무 입력...`} className="w-full bg-transparent focus:outline-none placeholder-gray-400 font-semibold" />
                       <button type="submit" disabled={!newTaskName.trim() || daySelection[0] === null || daySelection[1] === null} className="px-6 py-2 bg-orange-500 text-white font-bold rounded-lg hover:bg-orange-600 disabled:bg-gray-400 transition-colors flex-shrink-0">등록</button>
                   </div>
-                  <div className="flex justify-center items-center gap-2 pt-2 border-t">
-                      <span className="text-sm font-semibold text-gray-500 mr-2">요일 범위 선택:</span>
-                      {daysOfWeek.map((day, index) => {
-                          const isSelected = selectedDayIndices.has(index);
-                          const isStartOrEnd = daySelection[0] === index || daySelection[1] === index;
-                          let buttonClass = 'bg-white text-gray-700 border hover:bg-blue-50';
-                          if (isSelected) buttonClass = 'bg-blue-200 text-blue-800';
-                          if (isStartOrEnd) buttonClass = 'bg-blue-500 text-white';
-                          
-                          return (
-                              <button key={index} type="button" onClick={() => handleDayClick(index)} className={`w-10 h-10 text-sm font-bold rounded-full transition-colors ${buttonClass}`}>
-                                  {day}
-                              </button>
-                          )
-                      })}
+                  
+                  <div className="border-t pt-4 mt-4">
+                      <div className="grid grid-cols-7 gap-2">
+                        {daysInWeek.map((day, index) => {
+                            const dayOfWeek = getDay(day);
+                            const formattedDate = format(day, 'yyyy-MM-dd');
+                            const isHoliday = holidaysSet.has(formattedDate);
+                            const isSaturday = dayOfWeek === 6;
+                            const isSunday = dayOfWeek === 0;
+
+                            let textColor = 'text-gray-700';
+                            if(isSunday || isHoliday) textColor = 'text-red-600';
+                            else if (isSaturday) textColor = 'text-orange-600';
+
+                            const isSelected = selectedDayIndices.has(index);
+                            const isStartOrEnd = daySelection[0] === index || daySelection[1] === index;
+                            const isToday = isSameDay(day, new Date());
+                            const isCurrentMonth = getMonth(day) === getMonth(currentDate);
+
+                            let buttonClass = 'transition-colors border';
+                            if (isStartOrEnd) {
+                                buttonClass += ' bg-blue-500 text-white border-blue-500'; 
+                            } else if (isSelected) {
+                                buttonClass += ' bg-blue-100 border-blue-200';
+                                if(isSunday || isHoliday) buttonClass += ' text-red-700';
+                                else if (isSaturday) buttonClass += ' text-orange-700';
+                                else buttonClass += ' text-blue-700';
+                            } else if (isToday) {
+                                buttonClass += ' bg-orange-50 border-orange-200';
+                            } else if (isCurrentMonth) {
+                                buttonClass += ' bg-white hover:bg-gray-50 border-gray-200';
+                            } else {
+                                buttonClass += ' bg-gray-50 hover:bg-gray-100 border-gray-200'; 
+                            }
+                            if (!isCurrentMonth && !isSelected) {
+                                textColor = 'text-gray-400';
+                            }
+                            
+                            return (
+                                <button 
+                                  key={index} 
+                                  type="button" 
+                                  onClick={() => handleDayClick(index)} 
+                                  className={`w-full h-16 flex flex-col items-center justify-center rounded-lg ${buttonClass}`}>
+                                    <span className={`text-xs font-bold ${textColor}`}>{format(day, 'eee', { locale: ko })}</span>
+                                    <span className={`text-lg font-bold mt-1 ${textColor}`}>{getDate(day)}</span>
+                                </button>
+                            )
+                        })}
+                      </div>
                   </div>
               </form>
               
@@ -251,8 +282,20 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
                       {tasksForSelectedWeek.length > 0 ? (
                           tasksForSelectedWeek.map(task => (
                               <div key={task.id} onClick={() => handleTaskClick(task)} className="p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-all group flex justify-between items-center">
-                                  <p className="font-medium text-gray-800 group-hover:text-orange-600">{task.name}</p>
-                                  <span className="text-sm font-semibold text-gray-500">{formatTaskDate(task)}</span>
+                                  <p className="font-medium text-gray-800 group-hover:text-orange-600 truncate">{task.name}</p>
+                                  <div className="flex items-center gap-4 flex-shrink-0">
+                                    <span className="text-sm font-semibold text-gray-500">{formatTaskDate(task)}</span>
+                                    {/* ========================================================================================= */}
+                                    {/* [핵심 수정] 3. 마우스를 올리면 나타나는 삭제 버튼을 추가합니다.                           */}
+                                    {/* ========================================================================================= */}
+                                    <button 
+                                      onClick={(e) => handleDeleteTask(e, task.id)} 
+                                      className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      aria-label="업무 삭제"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
                               </div>
                           ))
                       ) : (
@@ -270,10 +313,14 @@ const TaskManager: React.FC<TaskManagerProps> = ({ kpiId, activityId, onClose })
               <button onClick={onClose} className="px-6 py-3 text-sm font-bold text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">닫기</button>
           </footer>
 
-          {isEditModalOpen && selectedTask && <TaskEditModal task={selectedTask} onClose={() => setIsEditModalOpen(false)} onSave={handleSaveTask} />} 
+          {isEditModalOpen && selectedTask && 
+            <TaskEditModal 
+              task={selectedTask} 
+              onClose={() => setIsEditModalOpen(false)} 
+              onSave={handleSaveTask} 
+            />
+          } 
       </div>
     </div>
   );
 };
-
-export default TaskManager;

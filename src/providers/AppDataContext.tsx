@@ -133,30 +133,80 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     return () => clearTimeout(debounceSave);
   }, [data, currentUser, db]);
 
-  const updateKpiArray = useCallback((kpiId: string, updateFn: (kpi: KPI) => KPI) => {
-    setData(prevData => {
-        const kpiTypeKey = Object.keys(prevData).find(key => (prevData[key as keyof IAppData] as any[])?.some((item: any) => item.id === kpiId)) as keyof IAppData | undefined;
-        if (kpiTypeKey) {
-            const updatedKpis = (prevData[kpiTypeKey] as KPI[]).map(kpi => kpi.id === kpiId ? updateFn(kpi) : kpi);
-            return { ...prevData, [kpiTypeKey]: updatedKpis };
-        } else {
-            console.error(`[CRITICAL] KPI with id ${kpiId} not found. Update failed.`);
-            return prevData;
-        }
-    });
+  // =========================================================================================
+  // [핵심 수정] 복잡하고 오류 가능성이 있던 상태 업데이트 로직을 가독성 높고 안정적인 코드로 재작성합니다.
+  // =========================================================================================
+
+  const updateKpiArray = useCallback((updateFn: (data: IAppData) => IAppData) => {
+    setData(prevData => updateFn(prevData));
   }, []);
-  
+
+  const findAndUpdatKpi = useCallback((kpiId: string, data: IAppData, updateKpiFn: (kpi: KPI) => KPI): IAppData => {
+    const kpiArrays: (keyof IAppData)[] = ['safetyKPIs', 'leaseKPIs', 'assetKPIs', 'infraKPIs'];
+    for (const key of kpiArrays) {
+      const kpiArray = data[key] as KPI[];
+      if (kpiArray && kpiArray.some(kpi => kpi.id === kpiId)) {
+        const updatedKpis = kpiArray.map(kpi => kpi.id === kpiId ? updateKpiFn(kpi) : kpi);
+        return { ...data, [key]: updatedKpis };
+      }
+    }
+    console.error(`[CRITICAL] KPI with id ${kpiId} not found. Update failed.`);
+    return data;
+  }, []);
+
   const addActivityToKpi = useCallback(async (kpiId: string, newActivityData: Omit<Activity, 'id' | 'status' | 'tasks'>): Promise<Activity> => {
     const newActivity: Activity = { ...newActivityData, id: `activity-${Date.now()}-${Math.random()}`, status: TASK_STATUS.NOT_STARTED, tasks: [] };
-    updateKpiArray(kpiId, kpi => ({ ...kpi, activities: [...(kpi.activities || []), newActivity] }));
+    updateKpiArray(data => findAndUpdatKpi(kpiId, data, kpi => ({ ...kpi, activities: [...(kpi.activities || []), newActivity] })));
     return newActivity;
-  }, [updateKpiArray]);
+  }, [updateKpiArray, findAndUpdatKpi]);
 
-  const updateActivityInKpi = useCallback((kpiId: string, updatedActivity: Activity) => { updateKpiArray(kpiId, kpi => ({...kpi, activities: (kpi.activities || []).map(act => act.id === updatedActivity.id ? updatedActivity : act)})); }, [updateKpiArray]);
-  const deleteActivityFromKpi = useCallback((kpiId: string, activityId: string) => { updateKpiArray(kpiId, kpi => ({...kpi, activities: (kpi.activities || []).filter(act => act.id !== activityId)})); }, [updateKpiArray]);
-  const addTask = useCallback((kpiId: string, activityId: string, newTaskData: Omit<Task, 'id' | 'status' | 'records'>) => { const newTask: Task = { ...newTaskData, id: `task-${Date.now()}-${Math.random()}`, status: TASK_STATUS.NOT_STARTED, records: [] }; updateKpiArray(kpiId, kpi => ({ ...kpi, activities: (kpi.activities || []).map(act => act.id === activityId ? { ...act, tasks: [...(act.tasks || []), newTask] } : act) })); }, [updateKpiArray]);
-  const updateTask = useCallback((kpiId: string, activityId: string, updatedTask: Task) => { updateKpiArray(kpiId, kpi => ({ ...kpi, activities: (kpi.activities || []).map(act => act.id === activityId ? { ...act, tasks: (act.tasks || []).map(t => t.id === updatedTask.id ? updatedTask : t) } : act) })); }, [updateKpiArray]);
-  const deleteTask = useCallback((kpiId: string, activityId: string, taskId: string) => { updateKpiArray(kpiId, kpi => ({ ...kpi, activities: (kpi.activities || []).map(act => act.id === activityId ? { ...act, tasks: (act.tasks || []).filter(t => t.id !== taskId) } : act) })); }, [updateKpiArray]);
+  const updateActivityInKpi = useCallback((kpiId: string, updatedActivity: Activity) => {
+    updateKpiArray(data => findAndUpdatKpi(kpiId, data, kpi => ({ ...kpi, activities: (kpi.activities || []).map(act => act.id === updatedActivity.id ? updatedActivity : act) })));
+  }, [updateKpiArray, findAndUpdatKpi]);
+
+  const deleteActivityFromKpi = useCallback((kpiId: string, activityId: string) => {
+    updateKpiArray(data => findAndUpdatKpi(kpiId, data, kpi => ({ ...kpi, activities: (kpi.activities || []).filter(act => act.id !== activityId) })));
+  }, [updateKpiArray, findAndUpdatKpi]);
+
+  const addTask = useCallback((kpiId: string, activityId: string, newTaskData: Omit<Task, 'id' | 'status' | 'records'>) => {
+    const newTask: Task = { ...newTaskData, id: `task-${Date.now()}-${Math.random()}`, status: TASK_STATUS.NOT_STARTED, records: [] };
+    
+    const updateActivitiesFn = (kpi: KPI): KPI => ({
+      ...kpi,
+      activities: (kpi.activities || []).map(act => 
+        act.id === activityId 
+          ? { ...act, tasks: [...(act.tasks || []), newTask] } 
+          : act
+      )
+    });
+
+    updateKpiArray(data => findAndUpdatKpi(kpiId, data, updateActivitiesFn));
+  }, [updateKpiArray, findAndUpdatKpi]);
+
+  const updateTask = useCallback((kpiId: string, activityId: string, updatedTask: Task) => {
+    const updateActivitiesFn = (kpi: KPI): KPI => ({ 
+      ...kpi, 
+      activities: (kpi.activities || []).map(act => 
+        act.id === activityId 
+          ? { ...act, tasks: (act.tasks || []).map(t => t.id === updatedTask.id ? updatedTask : t) } 
+          : act
+      )
+    });
+    updateKpiArray(data => findAndUpdatKpi(kpiId, data, updateActivitiesFn));
+  }, [updateKpiArray, findAndUpdatKpi]);
+
+  const deleteTask = useCallback((kpiId: string, activityId: string, taskId: string) => {
+    const updateActivitiesFn = (kpi: KPI): KPI => ({
+      ...kpi, 
+      activities: (kpi.activities || []).map(act => 
+        act.id === activityId 
+          ? { ...act, tasks: (act.tasks || []).filter(t => t.id !== taskId) } 
+          : act
+      )
+    });
+    updateKpiArray(data => findAndUpdatKpi(kpiId, data, updateActivitiesFn));
+  }, [updateKpiArray, findAndUpdatKpi]);
+
 
   const navigateTo = useCallback((newState: Partial<NavigationState>) => { setNavigationState(prevState => ({ ...prevState, ...newState })); }, []);
 
