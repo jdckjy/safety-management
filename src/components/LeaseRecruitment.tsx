@@ -2,12 +2,14 @@
 import React, { useState } from 'react';
 import KPIManager from './KPIManager';
 import TenantManager from './TenantManager';
+import AITenantRecommender from './AITenantRecommender'; // 1. AI Recommender 컴포넌트 임포트
 import { useAppData } from '../providers/AppDataContext';
 
 // Tab configuration
 const subTabs = [
   { id: 'performance', label: 'KPI Reports', component: KPIManager },
   { id: 'roster', label: 'Tenant Roster', component: TenantManager },
+  { id: 'ai-recommender', label: 'AI Tenant Recommender', component: AITenantRecommender }, // 2. 새로운 탭 추가
 ];
 
 const LeaseRecruitment: React.FC = () => {
@@ -31,12 +33,13 @@ const LeaseRecruitment: React.FC = () => {
     const activeTabConfig = subTabs.find(tab => tab.id === activeTab);
     if (!activeTabConfig) return null;
 
-    const ActiveComponent = activeTabConfig.component;
-
+    // 3. 탭 ID에 따라 올바른 컴포넌트를 렌더링하도록 로직 간소화
     if (activeTabConfig.id === 'performance') {
       return <KPIManager sectionTitle="KPI Reports" kpis={leaseKPIs} onUpdate={setLeaseKPIs} accentColor="blue" />;
     } else if (activeTabConfig.id === 'roster') {
       return <TenantManager tenants={tenants} onTenantsUpdate={setTenants} />;
+    } else if (activeTabConfig.id === 'ai-recommender') {
+        return <AITenantRecommender />;
     }
     return null;
   };
