@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 import { TeamMember } from '../types';
 import { Button } from '../components/ui/button';
 import { MemberActionModal } from '../components/MemberActionModal';
@@ -24,7 +24,7 @@ import {
 import { Card, CardContent } from "../components/ui/card";
 
 export const TeamMembersTab: React.FC = () => {
-  const { teamMembers, addTeamMember, updateTeamMember, deleteTeamMember } = useAppData();
+  const { teamMembers, addTeamMember, updateTeamMember, deleteTeamMember } = useProjectData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);

@@ -1,13 +1,13 @@
 
 import React, { useState } from 'react';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 import { ComplexFacility } from '../types';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 
 // TODO: Add/Edit Modal Component
 
 const ComplexFacilityManager: React.FC = () => {
-  const { complexFacilities, addComplexFacility, updateComplexFacility, deleteComplexFacility } = useAppData();
+  const { complexFacilities, addComplexFacility, updateComplexFacility, deleteComplexFacility } = useProjectData();
 
   // Group facilities by category for rendering
   const groupedFacilities = complexFacilities.reduce((acc, facility) => {

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 import { getOptimalTenantRecommendations, Recommendation } from '../services/aiTenantRecommender';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Lightbulb, Zap, BarChart } from 'lucide-react';
 
 const AITenantRecommender: React.FC = () => {
-  const { complexFacilities } = useAppData();
+  const { complexFacilities } = useProjectData();
   const [selectedFacility, setSelectedFacility] = useState<string>("");
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(false);

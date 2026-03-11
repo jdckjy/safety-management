@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { X, Calendar } from 'lucide-react';
 import WeeklyPerformanceModal from './WeeklyPerformanceModal';
 import { BusinessActivity, KPI } from '../types';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 
 interface SafetyInspectionModalProps {
   isOpen: boolean;
@@ -12,7 +12,7 @@ interface SafetyInspectionModalProps {
 }
 
 const SafetyInspectionModal: React.FC<SafetyInspectionModalProps> = ({ isOpen, onClose }) => {
-  const { safetyKPIs, setSafetyKPIs } = useAppData();
+  const { safetyKPIs, setSafetyKPIs } = useProjectData();
   const [activities, setActivities] = useState<BusinessActivity[]>([]);
 
   // Ultra-defensive data processing from global state

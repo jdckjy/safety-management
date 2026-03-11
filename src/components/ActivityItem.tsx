@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Activity } from '../types';
 import { FileText, Edit, Trash2, Check, X } from 'lucide-react';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 import { TASK_STATUS } from '../constants'; // TASK_STATUS를 import합니다.
 
 interface ActivityItemProps {
@@ -23,7 +23,7 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({ kpiId, activity, onS
   const [name, setName] = useState(activity.name);
   const editInputRef = useRef<HTMLInputElement>(null);
 
-  const { updateActivityInKpi, deleteActivityFromKpi } = useAppData();
+  const { updateActivityInKpi, deleteActivityFromKpi } = useProjectData();
 
   useEffect(() => {
     if (isEditing && editInputRef.current) {

@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useMemo, useCallback } from 'react';
-import { useAppData } from './AppDataContext';
+import { useProjectData } from './ProjectDataProvider';
 // 1. BusinessActivity 대신 Activity를 임포트합니다.
 import { KPI, Activity, Task } from '../types'; 
 
@@ -22,7 +22,7 @@ interface SearchContextType {
 const SearchContext = createContext<SearchContextType | undefined>(undefined);
 
 export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { kpiData } = useAppData();
+  const { kpiData } = useProjectData();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);

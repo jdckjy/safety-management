@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 // [수정] 절대 경로로 변경
-import { useAppData } from '@/providers/AppDataContext';
+import { useProjectData } from '@/providers/ProjectDataProvider';
 import { getOptimalTenantRecommendations, Recommendation } from '@/services/aiTenantRecommender';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,7 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Lightbulb, Zap, BarChart } from 'lucide-react';
 
 const LeaseTenantPage: React.FC = () => {
-  const { complexFacilities } = useAppData();
+  const { complexFacilities } = useProjectData();
   const [activeTab, setActiveTab] = useState("aiRecommendation");
   const [selectedFacility, setSelectedFacility] = useState<string>("");
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);

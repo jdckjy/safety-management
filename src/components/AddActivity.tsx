@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { PlusCircle, Check, X } from 'lucide-react';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 
 interface AddActivityProps {
   kpiId: string;
@@ -13,7 +13,7 @@ export const AddActivity: React.FC<AddActivityProps> = ({ kpiId }) => {
   const addInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const { addActivityToKpi } = useAppData();
+  const { addActivityToKpi } = useProjectData();
 
   useEffect(() => {
     if (isAdding && addInputRef.current) {

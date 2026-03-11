@@ -1,5 +1,5 @@
 
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 import { Task, KPI } from '../types';
 import { isToday, isPast } from 'date-fns';
 
@@ -10,7 +10,7 @@ const findUrgentTasks = (kpis: KPI[] = [], monthlyTasks: Task[] = []) => {
 };
 
 export const useDailyBriefing = () => {
-  const { safetyKPIs, leaseKPIs, infraKPIs, monthlyTasks } = useAppData();
+  const { safetyKPIs, leaseKPIs, infraKPIs, monthlyTasks } = useProjectData();
 
   // 1. 신규 발생 및 시급한 이슈 (데이터가 없을 경우 빈 배열로 처리)
   const urgentSafetyTasks = findUrgentTasks(safetyKPIs || [], monthlyTasks || []);

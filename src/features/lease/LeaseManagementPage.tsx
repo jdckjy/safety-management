@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import TenantRoster from '../tenant-roster/TenantRoster';
 import FloorPlanBrowser from './FloorPlanBrowser';
-import { useAppData } from '../../providers/AppDataContext';
+import { useProjectData } from '../../providers/ProjectDataProvider';
 import { KPI } from '../../types';
 import { ActivityList } from '../../components/ActivityList';
 
@@ -13,7 +13,7 @@ interface LeaseManagementPageProps {
 
 const LeaseManagementPage: React.FC<LeaseManagementPageProps> = ({ kpi }) => {
   const [activeTab, setActiveTab] = useState('roster'); // 테스트를 위해 'roster' 탭을 기본으로 설정
-  const { buildings } = useAppData(); // 전역 컨텍스트에서 건물 데이터 가져오기
+  const { buildings } = useProjectData(); // 전역 컨텍스트에서 건물 데이터 가져오기
 
   return (
     <div className="space-y-6">

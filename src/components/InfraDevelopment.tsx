@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import KPIManager from './KPIManager';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 
 // Tab configuration
 const subTabs = [
@@ -9,7 +9,7 @@ const subTabs = [
 ];
 
 const InfraDevelopment: React.FC = () => {
-  const { infraKPIs, setInfraKPIs } = useAppData();
+  const { infraKPIs, setInfraKPIs } = useProjectData();
   const [activeTab, setActiveTab] = useState(subTabs[0].id);
   
   const mainValue = {

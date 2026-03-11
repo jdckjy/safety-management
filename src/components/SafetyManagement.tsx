@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import KPIManager from './KPIManager';
 import HotSpotMap from './HotSpotMap';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 import { HotSpot } from '../types';
 
 // Tab configuration
@@ -18,7 +18,7 @@ const SafetyManagement: React.FC = () => {
     facilities,
     hotspots,
     setHotspots
-  } = useAppData();
+  } = useProjectData();
   
   const [activeSubTab, setActiveSubTab] = useState(subTabs[0].id);
 

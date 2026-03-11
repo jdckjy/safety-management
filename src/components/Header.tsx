@@ -1,8 +1,8 @@
 
 import React, { useMemo, useEffect, useState } from 'react';
 import { Search, Bell, ChevronDown, Calendar, Menu, LogOut, X } from 'lucide-react';
-// [수정] 더 이상 전역 customTabs를 사용하지 않으므로, useAppData에서 해당 부분을 가져오지 않습니다.
-import { useAppData } from '../providers/AppDataContext';
+// [수정] 더 이상 전역 customTabs를 사용하지 않으므로, useProjectData에서 해당 부분을 가져오지 않습니다.
+import { useProjectData } from '../providers/ProjectDataProvider';
 import { useAuth } from '../features/auth/AuthContext';
 import { useDropdown } from '../hooks/useDropdown';
 import { useNotifications } from '../providers/NotificationProvider';
@@ -16,7 +16,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ activeMenu }) => {
   // [수정] customTabs를 제거합니다.
-  const { navigationState, setSelectedMonth } = useAppData();
+  const { navigationState, setSelectedMonth } = useProjectData();
   const { currentUser, logout } = useAuth();
   const { isOpen: isNotificationOpen, toggle: toggleNotification, close: closeNotification, dropdownRef: notificationRef } = useDropdown();
   const { unreadCount } = useNotifications();
@@ -137,4 +137,4 @@ const Header: React.FC<HeaderProps> = ({ activeMenu }) => {
   );
 };
 
-export default Header; 
+export default Header;

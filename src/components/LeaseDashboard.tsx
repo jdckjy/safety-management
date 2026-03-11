@@ -1,14 +1,14 @@
 
 // src/components/LeaseDashboard.tsx
 import React from 'react';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 
 /**
  * [전문 부서] 건물 전체의 임대 현황, 주요 KPI, 최근 활동 등을
  * 종합적으로 요약하여 보여주는 대시보드 컴포넌트입니다.
  */
 const LeaseDashboard: React.FC = () => {
-  const { buildings, leads } = useAppData();
+  const { buildings, leads } = useProjectData();
 
   // [✨ 최종 수정] 데이터 로딩 중 또는 데이터가 없을 때 발생하는 런타임 에러를 원천적으로 차단합니다.
   // optional chaining(?.)과 nullish coalescing(??)을 사용하여, mainBuilding이나 units가 undefined가 되더라도

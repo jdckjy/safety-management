@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useAppData } from '@/providers/AppDataContext';
+import { useProjectData } from '@/providers/ProjectDataProvider';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -12,7 +12,7 @@ const formatNumber = (num: number | null | undefined) => num?.toLocaleString() ?
 const formatRatio = (num: number | null | undefined) => num?.toFixed(2) ?? '-';
 
 const ComplexFacilitiesTab: React.FC = () => {
-  const { complexFacilities, deleteComplexFacility } = useAppData();
+  const { complexFacilities, deleteComplexFacility } = useProjectData();
 
   // 데이터를 카테고리별로 그룹화
   const groupedFacilities = (complexFacilities || []).reduce((acc, facility) => {

@@ -1,11 +1,11 @@
 
 import React, { useMemo } from 'react';
-import { useAppData } from '../../providers/AppDataContext';
+import { useProjectData } from '../../providers/ProjectDataProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 
 const TenantRoster: React.FC = () => {
-  const { buildings } = useAppData();
+  const { buildings } = useProjectData();
 
   const tenants = useMemo(() => {
     // [✅ 최종 수정] 어떤 경우에도 오류가 발생하지 않도록, buildings가 유효한 배열이 아닐 경우 항상 빈 배열을 반환하도록 방어 코드를 강화합니다.

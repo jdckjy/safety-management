@@ -1,7 +1,7 @@
 
 // src/components/LeadManager.tsx
 import React, { useState } from 'react';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 import { Unit, Lead, LeadStatus } from '../types';
 import { Plus, ChevronDown } from 'lucide-react';
 import { LEAD_STATUS, LEAD_STATUS_DISPLAY_NAMES } from '../constants';
@@ -87,7 +87,7 @@ const getStatusStyle = (status: LeadStatus) => {
 };
 
 const LeadManager: React.FC<LeadManagerProps> = ({ selectedUnit }) => {
-  const { leads, addLead, updateLead } = useAppData();
+  const { leads, addLead, updateLead } = useProjectData();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 

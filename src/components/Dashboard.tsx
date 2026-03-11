@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowUpRight, TrendingUp } from 'lucide-react';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 import DailyBriefing from './DailyBriefing';
 import { TASK_STATUS, TASK_STATUS_DISPLAY_NAMES } from '../constants';
 // 1. 정확한 날짜 계산을 위해 date-fns 라이브러리를 임포트합니다.
@@ -36,7 +36,7 @@ const ProjectStatCard: React.FC<{
 };
 
 const Dashboard: React.FC = () => {
-  const { kpiData, navigationState } = useAppData();
+  const { kpiData, navigationState } = useProjectData();
   const [isBriefingOpen, setBriefingOpen] = useState(false);
 
   useEffect(() => {

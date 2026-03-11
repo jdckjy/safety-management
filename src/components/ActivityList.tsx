@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Activity } from '../types';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 
 interface ActivityListProps {
   kpiId: string;
@@ -9,7 +9,7 @@ interface ActivityListProps {
 }
 
 export const ActivityList: React.FC<ActivityListProps> = ({ kpiId, activities }) => {
-  const { navigateTo } = useAppData();
+  const { navigateTo } = useProjectData();
 
   if (!activities || activities.length === 0) {
     return <p className="text-gray-500">이 KPI에 해당하는 활동이 아직 없습니다.</p>;

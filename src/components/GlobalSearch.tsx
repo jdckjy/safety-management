@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 import { Search } from 'lucide-react';
 import { MenuKey, KPI } from '../types';
 
@@ -15,7 +15,7 @@ interface SearchResult {
 }
 
 const GlobalSearch: React.FC = () => {
-  const { navigateTo, safetyKPIs, leaseKPIs, assetKPIs, infraKPIs } = useAppData();
+  const { navigateTo, safetyKPIs, leaseKPIs, assetKPIs, infraKPIs } = useProjectData();
   const [query, setQuery] = useState('');
   const [isActive, setIsActive] = useState(false);
 

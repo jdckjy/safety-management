@@ -8,12 +8,12 @@ import LeaseRecruitment from '../components/LeaseRecruitment';
 import AssetManagement from '../components/AssetManagement';
 import InfraDevelopment from '../components/InfraDevelopment';
 import BaseInfoPage from '../pages/BaseInfoPage';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 import { MenuKey } from '../types';
 
 const MainLayout: React.FC = () => {
     // [수정] 더 이상 사용하지 않는 customTabs, addTab 관련 로직을 모두 제거합니다.
-    const { navigationState, navigateTo } = useAppData();
+    const { navigationState, navigateTo } = useProjectData();
 
     const renderContent = () => {
         // [수정] 불필요해진 동적 탭 라우팅 로직을 제거하고, 고정된 메뉴에 따라서만 렌더링합니다.

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, MouseEvent } from 'react';
 import { X, PlusCircle, Trash2 } from 'lucide-react';
-import { useAppData } from '../../providers/AppDataContext';
+import { useProjectData } from '../../providers/ProjectDataProvider';
 import { KPI, Activity, Task, WeeklyRecord, TaskStatus } from '../../types';
 import TaskEditModal from '../TaskEditModal';
 import { 
@@ -57,7 +57,7 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
   // =========================================================================================
   // [핵심 수정] 1. 실시간 데이터 반영을 위해 Context에서 직접 최신 데이터를 가져옵니다.
   // =========================================================================================
-  const { addTask, updateTask, deleteTask, deleteActivityFromKpi, kpiData } = useAppData();
+  const { addTask, updateTask, deleteTask, deleteActivityFromKpi, kpiData } = useProjectData();
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);

@@ -14,10 +14,10 @@ import AssetManagement from '../components/AssetManagement';
 import InfraDevelopment from '../components/InfraDevelopment';
 import CustomPage from '../components/CustomPage';
 
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 
 export const MainLayout: React.FC = () => {
-  const { navigationState, customTabs, navigateTo } = useAppData();
+  const { navigationState, customTabs, navigateTo } = useProjectData();
   const { menuKey } = navigationState;
 
   const renderContent = () => {

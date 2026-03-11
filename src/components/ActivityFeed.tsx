@@ -1,7 +1,7 @@
 
 // src/components/ActivityFeed.tsx
 import React from 'react';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 import { Activity } from '../types';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -27,7 +27,7 @@ const ActivityItem: React.FC<{ activity: Activity }> = ({ activity }) => {
 
 
 const ActivityFeed: React.FC = () => {
-  const { activities } = useAppData();
+  const { activities } = useProjectData();
 
   // Sort by timestamp
   const sortedActivities = [...activities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());

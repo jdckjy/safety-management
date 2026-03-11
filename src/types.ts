@@ -86,7 +86,7 @@ export interface NavigationState {
   selectedMonth?: number;
 }
 
-export interface IAppData {
+export interface IProjectData {
   safetyKPIs: KPI[];
   leaseKPIs: KPI[];
   assetKPIs: KPI[];

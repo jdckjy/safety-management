@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-import { IAppData, KPI, Activity, HotSpot, Facility, NavigationState, Task, TaskStatus, ComplexFacility, TeamMember } from '../types';
+import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, TaskStatus, ComplexFacility, TeamMember } from '../types';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../features/auth/AuthContext';
 import { Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
@@ -8,10 +8,10 @@ import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '../constants';
 import { initialComplexFacilities } from '../data/initial-complex-facilities';
 import { initialTeamMembers } from '../data/initial-team-members';
 
-interface IAppContext extends IAppData {
+interface IProjectDataContext extends IProjectData {
   kpiData: (KPI & { type: string; icon: React.ReactNode; color: string; })[];
   navigationState: NavigationState;
-  setData: React.Dispatch<React.SetStateAction<IAppData>>;
+  setData: React.Dispatch<React.SetStateAction<IProjectData>>;
   addActivityToKpi: (kpiId: string, newActivity: Omit<Activity, 'id' | 'status' | 'tasks'>) => Promise<Activity>;
   updateActivityInKpi: (kpiId: string, updatedActivity: Activity) => void;
   deleteActivityFromKpi: (kpiId: string, activityId: string) => void;
@@ -36,9 +36,9 @@ interface IAppContext extends IAppData {
   deleteTeamMember: (memberId: string) => void;
 }
 
-const AppDataContext = createContext<IAppContext | undefined>(undefined);
+const ProjectDataContext = createContext<IProjectDataContext | undefined>(undefined);
 
-const initialData: IAppData = { 
+const initialData: IProjectData = { 
   safetyKPIs: [], 
   leaseKPIs: [], 
   assetKPIs: [], 
@@ -73,11 +73,11 @@ const sanitizeKpi = (partialKpi: Partial<KPI>): KPI => {
   return { ...defaults, ...partialKpi, id, activities };
 };
 
-export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
   const db = getFirestore();
   const isInitialLoad = React.useRef(true);
-  const [data, setData] = useState<IAppData>(initialData);
+  const [data, setData] = useState<IProjectData>(initialData);
   
   const [navigationState, setNavigationState] = useState<NavigationState>({
     menuKey: 'dashboard',
@@ -96,9 +96,9 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       try {
         const userDocSnap = await getDoc(userDocRef);
         if (userDocSnap.exists()) {
-          const firestoreData = userDocSnap.data() as Partial<IAppData>;
+          const firestoreData = userDocSnap.data() as Partial<IProjectData>;
           
-          const cleanData: IAppData = {
+          const cleanData: IProjectData = {
             safetyKPIs: (firestoreData.safetyKPIs || []).map(sanitizeKpi),
             leaseKPIs: (firestoreData.leaseKPIs || []).map(sanitizeKpi),
             assetKPIs: (firestoreData.assetKPIs || []).map(sanitizeKpi),
@@ -133,16 +133,12 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     return () => clearTimeout(debounceSave);
   }, [data, currentUser, db]);
 
-  // =========================================================================================
-  // [핵심 수정] 복잡하고 오류 가능성이 있던 상태 업데이트 로직을 가독성 높고 안정적인 코드로 재작성합니다.
-  // =========================================================================================
-
-  const updateKpiArray = useCallback((updateFn: (data: IAppData) => IAppData) => {
+  const updateKpiArray = useCallback((updateFn: (data: IProjectData) => IProjectData) => {
     setData(prevData => updateFn(prevData));
   }, []);
 
-  const findAndUpdatKpi = useCallback((kpiId: string, data: IAppData, updateKpiFn: (kpi: KPI) => KPI): IAppData => {
-    const kpiArrays: (keyof IAppData)[] = ['safetyKPIs', 'leaseKPIs', 'assetKPIs', 'infraKPIs'];
+  const findAndUpdatKpi = useCallback((kpiId: string, data: IProjectData, updateKpiFn: (kpi: KPI) => KPI): IProjectData => {
+    const kpiArrays: (keyof IProjectData)[] = ['safetyKPIs', 'leaseKPIs', 'assetKPIs', 'infraKPIs'];
     for (const key of kpiArrays) {
       const kpiArray = data[key] as KPI[];
       if (kpiArray && kpiArray.some(kpi => kpi.id === kpiId)) {
@@ -249,7 +245,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     ];
   }, [data.safetyKPIs, data.leaseKPIs, data.assetKPIs, data.infraKPIs]);
 
-  const value: IAppContext = {
+  const value: IProjectDataContext = {
     ...data, kpiData, navigationState, setData, addActivityToKpi, updateActivityInKpi, deleteActivityFromKpi, 
     addTask, updateTask, deleteTask, navigateTo, setSelectedMonth,
     setSafetyKPIs: (kpis) => setData(p => ({...p, safetyKPIs: typeof kpis === 'function' ? kpis(p.safetyKPIs) : kpis})),
@@ -268,11 +264,11 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     deleteTeamMember,
   };
 
-  return <AppDataContext.Provider value={value}>{children}</AppDataContext.Provider>;
+  return <ProjectDataContext.Provider value={value}>{children}</ProjectDataContext.Provider>;
 };
 
-export const useAppData = (): IAppContext => {
-  const context = useContext(AppDataContext);
-  if (context === undefined) { throw new Error('useAppData must be used within a AppDataProvider'); }
+export const useProjectData = (): IProjectDataContext => {
+  const context = useContext(ProjectDataContext);
+  if (context === undefined) { throw new Error('useProjectData must be used within a ProjectDataProvider'); }
   return context;
 };

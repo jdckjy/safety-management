@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import KPIManager from './KPIManager';
 import TenantManager from './TenantManager';
 import AITenantRecommender from './AITenantRecommender'; // 1. AI Recommender 컴포넌트 임포트
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 
 // Tab configuration
 const subTabs = [
@@ -16,7 +16,7 @@ const LeaseRecruitment: React.FC = () => {
   const {
     leaseKPIs,
     setLeaseKPIs,
-  } = useAppData();
+  } = useProjectData();
   
   const [tenants, setTenants] = useState([]);
   const [activeTab, setActiveTab] = useState(subTabs[0].id);

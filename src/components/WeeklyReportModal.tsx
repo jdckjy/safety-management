@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { X, Clipboard } from 'lucide-react';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 import { useWeeklyReport } from '../hooks/useWeeklyReport';
 
 interface WeeklyReportModalProps {
@@ -10,7 +10,7 @@ interface WeeklyReportModalProps {
 }
 
 const WeeklyReportModal: React.FC<WeeklyReportModalProps> = ({ isOpen, onClose }) => {
-  const { safetyKPIs, leaseKPIs, assetKPIs, infraKPIs, viewDate } = useAppData();
+  const { safetyKPIs, leaseKPIs, assetKPIs, infraKPIs, viewDate } = useProjectData();
   const { reportContent, handleCopy, year, weekNumber } = useWeeklyReport(
     { safetyKPIs, leaseKPIs, assetKPIs, infraKPIs }, 
     viewDate

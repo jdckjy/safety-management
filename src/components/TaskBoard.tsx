@@ -1,7 +1,7 @@
 
 // src/components/TaskBoard.tsx
 import React, { useState, useMemo } from 'react';
-import { useAppData } from '../providers/AppDataContext';
+import { useProjectData } from '../providers/ProjectDataProvider';
 import { Task } from '../types';
 import { TASK_STATUS } from '../constants';
 import { Plus } from 'lucide-react';
@@ -17,7 +17,7 @@ const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
 };
 
 const TaskBoard: React.FC = () => {
-  const { tasks, addTask, updateTask } = useAppData();
+  const { tasks, addTask, updateTask } = useProjectData();
 
   const columns = useMemo(() => ({
     [TASK_STATUS.TODO]: {

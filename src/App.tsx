@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { AuthProvider, useAuth } from './features/auth/AuthContext';
-import { AppDataProvider } from './providers/AppDataContext';
+import { ProjectDataProvider } from './providers/ProjectDataProvider';
 import { NotificationProvider } from './providers/NotificationProvider';
 import { SearchProvider } from './providers/SearchProvider'; // 1. SearchProvider 임포트
 import LoginPage from './features/auth/LoginPage';
@@ -21,11 +21,11 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <NotificationProvider>
-        <AppDataProvider>
+        <ProjectDataProvider>
           <SearchProvider> {/* 2. SearchProvider 추가 */}
             <AppContent />
           </SearchProvider>
-        </AppDataProvider>
+        </ProjectDataProvider>
       </NotificationProvider>
     </AuthProvider>
   );
