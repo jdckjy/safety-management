@@ -1,12 +1,13 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, TaskStatus, ComplexFacility, TeamMember } from '../types';
+import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, TaskStatus, ComplexFacility, TeamMember, TenantUnit } from '../types';
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../features/auth/AuthContext';
 import { Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
 import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '../constants';
 import { initialComplexFacilities } from '../data/initial-complex-facilities';
 import { initialTeamMembers } from '../data/initial-team-members';
+import { initialTenantUnits } from '../data/tenantUnits';
 
 interface IProjectDataContext extends IProjectData {
   kpiData: (KPI & { type: string; icon: React.ReactNode; color: string; })[];
@@ -34,6 +35,8 @@ interface IProjectDataContext extends IProjectData {
   addTeamMember: (newMember: Omit<TeamMember, 'id'>) => void;
   updateTeamMember: (updatedMember: TeamMember) => void;
   deleteTeamMember: (memberId: string) => void;
+  setTenantUnits: React.Dispatch<React.SetStateAction<TenantUnit[]>>;
+  updateTenantUnit: (updatedUnit: TenantUnit) => void;
 }
 
 const ProjectDataContext = createContext<IProjectDataContext | undefined>(undefined);
@@ -47,6 +50,7 @@ const initialData: IProjectData = {
   facilities: [], 
   complexFacilities: initialComplexFacilities,
   teamMembers: initialTeamMembers,
+  tenantUnits: initialTenantUnits,
 };
 
 
@@ -111,6 +115,10 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
             teamMembers: (firestoreData.teamMembers && firestoreData.teamMembers.length > 0)
               ? firestoreData.teamMembers
               : initialTeamMembers,
+            tenantUnits: (firestoreData.tenantUnits && firestoreData.tenantUnits.length > 0)
+              ? firestoreData.tenantUnits
+              : initialTenantUnits,
+
           };
           setData(cleanData);
         } else {
@@ -236,6 +244,10 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     setData(prev => ({ ...prev, teamMembers: prev.teamMembers.filter(m => m.id !== memberId) }));
   }, []);
 
+  const updateTenantUnit = useCallback((updatedUnit: TenantUnit) => {
+    setData(prev => ({ ...prev, tenantUnits: prev.tenantUnits.map(u => u.id === updatedUnit.id ? updatedUnit : u) }));
+  }, []);
+
   const kpiData = useMemo(() => {
     return [
       ...(data.safetyKPIs || []).map(k => ({ ...k, type: '안전 관리', icon: <Shield size={16}/>, color: 'text-pink-500' })),
@@ -262,6 +274,8 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     addTeamMember,
     updateTeamMember,
     deleteTeamMember,
+    setTenantUnits: (units) => setData(p => ({...p, tenantUnits: typeof units === 'function' ? units(p.tenantUnits) : units})),
+    updateTenantUnit,
   };
 
   return <ProjectDataContext.Provider value={value}>{children}</ProjectDataContext.Provider>;

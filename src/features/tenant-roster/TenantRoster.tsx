@@ -1,62 +1,76 @@
 
-import React, { useMemo } from 'react';
+import React, { useState } from 'react';
 import { useProjectData } from '../../providers/ProjectDataProvider';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
+import FloorPlan from './FloorPlan';
+import UnitDetailPanel from './UnitDetailPanel';
+import FloorPlanDrafter from '../floor-plan/FloorPlanDrafter';
+import { TenantUnit } from '../../types';
+import floor1F from '../../assets/1F.png';
+import floor2F from '../../assets/2F.png';
+import floor3F from '../../assets/3F.png';
 
 const TenantRoster: React.FC = () => {
-  const { buildings } = useProjectData();
+  const { tenantUnits, updateTenantUnit } = useProjectData();
+  const [selectedFloor, setSelectedFloor] = useState('1F');
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
+  const [isDrafterMode, setDrafterMode] = useState(false);
 
-  const tenants = useMemo(() => {
-    // [✅ 최종 수정] 어떤 경우에도 오류가 발생하지 않도록, buildings가 유효한 배열이 아닐 경우 항상 빈 배열을 반환하도록 방어 코드를 강화합니다.
-    if (!Array.isArray(buildings) || buildings.length === 0) {
-      return [];
-    }
-    
-    const allUnits = buildings.flatMap(b => b?.units ?? []);
+  const floorPlans: { [key: string]: string } = {
+    '1F': floor1F,
+    '2F': floor2F,
+    '3F': floor3F,
+  };
 
-    return allUnits.filter(unit => unit && unit.status === 'occupied' && unit.tenant_name);
-  }, [buildings]);
+  const handleUnitSelect = (unitId: string) => {
+    setSelectedUnitId(unitId);
+  };
 
-  const totalTenants = tenants.length;
+  const handleUnitUpdate = (updatedUnit: TenantUnit) => {
+    updateTenantUnit(updatedUnit);
+  };
+
+  const selectedUnit = tenantUnits.find(u => u.id === selectedUnitId) || null;
+
+  if (isDrafterMode) {
+    return <FloorPlanDrafter />;
+  }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>임차인 명단 (Tenant Roster)</CardTitle>
-        <p className="text-sm text-gray-500 mt-1">
-          현재 점유 중인 총 {totalTenants}개의 임차인이 있습니다.
-        </p>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>유닛 ID</TableHead>
-              <TableHead>임차인</TableHead>
-              <TableHead>면적 (sqm)</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tenants.length > 0 ? (
-              tenants.map(unit => (
-                <TableRow key={unit.id}>
-                  <TableCell className="font-medium">{unit.id}</TableCell>
-                  <TableCell>{unit.tenant_name}</TableCell> 
-                  <TableCell>{unit.area_sqm}</TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={3} className="text-center">
-                  표시할 임차인 정보가 없습니다.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+    <div className="p-4">
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex space-x-2">
+          {Object.keys(floorPlans).map(floor => (
+            <button 
+              key={floor} 
+              onClick={() => setSelectedFloor(floor)}
+              className={`px-4 py-2 rounded ${selectedFloor === floor ? 'bg-blue-500 text-white' : 'bg-gray-200'}`}>
+              {floor}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setDrafterMode(true)} className="px-4 py-2 rounded bg-green-500 text-white">
+          도면 편집
+        </button>
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        <div className="col-span-2">
+          <FloorPlan 
+            units={tenantUnits.filter(u => u.floor === selectedFloor)}
+            onUnitSelect={handleUnitSelect}
+            selectedUnitId={selectedUnitId}
+            floorPlanImage={floorPlans[selectedFloor]}
+          />
+        </div>
+        <div>
+          {selectedUnit && 
+            <UnitDetailPanel 
+              unit={selectedUnit} 
+              onUpdate={handleUnitUpdate} 
+            />
+          }
+        </div>
+      </div>
+    </div>
   );
 };
 

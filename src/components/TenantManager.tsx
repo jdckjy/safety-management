@@ -1,17 +1,11 @@
 
 import React from 'react';
-import { Tenant } from '../types';
+import TenantRoster from '../features/tenant-roster/TenantRoster';
 
-interface TenantManagerProps {
-  tenants: Tenant[];
-  onTenantsUpdate: (tenants: Tenant[]) => void;
-}
-
-const TenantManager: React.FC<TenantManagerProps> = ({ tenants, onTenantsUpdate }) => {
+const TenantManager: React.FC = () => {
   return (
     <div>
-      <h2>Tenant Roster</h2>
-      {/* Render tenants and manage them */}
+      <TenantRoster />
     </div>
   );
 };

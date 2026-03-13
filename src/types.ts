@@ -86,6 +86,23 @@ export interface NavigationState {
   selectedMonth?: number;
 }
 
+export interface Tenant {
+    id: string;
+    name: string;
+    // Add other tenant properties as needed
+}
+
+export interface TenantUnit {
+    id: string;
+    floor: string;
+    name: string; // 용도
+    area: number;
+    status: 'occupied' | 'vacant';
+    agency: string; // 입주기관
+    pathData?: string; // For SVG path
+}
+
+
 export interface IProjectData {
   safetyKPIs: KPI[];
   leaseKPIs: KPI[];
@@ -95,6 +112,7 @@ export interface IProjectData {
   facilities: Facility[];
   complexFacilities: ComplexFacility[];
   teamMembers: TeamMember[];
+  tenantUnits: TenantUnit[];
 }
 
 export type StateUpdater<T> = React.Dispatch<React.SetStateAction<T>>;
