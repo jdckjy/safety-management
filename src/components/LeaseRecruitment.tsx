@@ -18,16 +18,7 @@ const LeaseRecruitment: React.FC = () => {
     setLeaseKPIs,
   } = useProjectData();
   
-  const [tenants, setTenants] = useState([]);
   const [activeTab, setActiveTab] = useState(subTabs[0].id);
-
-  const mainValue = {
-    rate: leaseKPIs[0]?.current || 0,
-  };
-
-  const tabBaseStyle = "px-6 py-3 font-bold text-sm rounded-full transition-all duration-300";
-  const tabActiveStyle = "bg-blue-500 text-white shadow-lg";
-  const tabInactiveStyle = "bg-transparent text-gray-500 hover:bg-blue-50";
 
   const renderActiveComponent = () => {
     const activeTabConfig = subTabs.find(tab => tab.id === activeTab);
@@ -35,9 +26,9 @@ const LeaseRecruitment: React.FC = () => {
 
     // 3. 탭 ID에 따라 올바른 컴포넌트를 렌더링하도록 로직 간소화
     if (activeTabConfig.id === 'performance') {
-      return <KPIManager sectionTitle="KPI Reports" kpis={leaseKPIs} onUpdate={setLeaseKPIs} accentColor="blue" />;
+      return <KPIManager sectionTitle="KPI Reports" kpis={leaseKPIs} onUpdate={setLeaseKPIs} />;
     } else if (activeTabConfig.id === 'roster') {
-      return <TenantManager tenants={tenants} onTenantsUpdate={setTenants} />;
+      return <TenantManager />;
     } else if (activeTabConfig.id === 'ai-recommender') {
         return <AITenantRecommender />;
     }
@@ -45,23 +36,14 @@ const LeaseRecruitment: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8">
-      {/* Main Occupancy Rate Display */}
-      <div className="bg-white rounded-5xl p-10 shadow-sm border border-gray-50">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Lease & Tenant Management</p>
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-6xl font-black tracking-tighter text-[#1A1D1F]">{mainValue.rate}%</h2>
-          <span className="text-2xl font-bold text-gray-300 uppercase">Occupancy</span>
-        </div>
-      </div>
-
+    <div className="space-y-4">
       {/* Tab Navigation */}
-      <div className="bg-white p-2 rounded-full shadow-sm border border-gray-50 inline-flex items-center">
+      <div className="inline-flex bg-white p-1.5 rounded-full shadow-sm border border-gray-100 self-start">
         {subTabs.map(tab => (
           <button 
             key={tab.id}
             onClick={() => setActiveTab(tab.id)} 
-            className={`${tabBaseStyle} ${activeTab === tab.id ? tabActiveStyle : tabInactiveStyle}`}>
+            className={`px-6 py-2.5 rounded-full text-xs font-bold transition-all ${activeTab === tab.id ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-blue-500'}`}>
             {tab.label}
           </button>
         ))}

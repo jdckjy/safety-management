@@ -12,39 +12,22 @@ const AssetManagement: React.FC = () => {
   const { assetKPIs, setAssetKPIs } = useProjectData();
   const [activeTab, setActiveTab] = useState(subTabs[0].id);
 
-  const mainValue = {
-    value: assetKPIs[0]?.current || 0,
-    change: 0 // Placeholder
-  };
-
-  const tabBaseStyle = "px-6 py-3 font-bold text-sm rounded-full transition-all duration-300";
-  const tabActiveStyle = "bg-emerald-500 text-white shadow-lg";
-  const tabInactiveStyle = "bg-transparent text-gray-500 hover:bg-emerald-50";
-
   const renderActiveComponent = () => {
     const activeTabConfig = subTabs.find(tab => tab.id === activeTab);
     if (!activeTabConfig) return null;
 
-    return <KPIManager sectionTitle="Asset Value Indices" kpis={assetKPIs} onUpdate={setAssetKPIs} accentColor="emerald" />;
+    return <KPIManager sectionTitle="Asset Value Indices" kpis={assetKPIs} onUpdate={setAssetKPIs} />;
   };
 
   return (
-    <div className="space-y-8">
-      <div className="bg-white rounded-5xl p-10 shadow-sm border border-gray-50">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Asset Value Management</p>
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-6xl font-black tracking-tighter text-[#1A1D1F]">${mainValue.value}M</h2>
-          <span className="text-2xl font-bold text-gray-300 uppercase">Total Value</span>
-        </div>
-      </div>
-
+    <div className="space-y-4">
       {/* Tab Navigation */}
-      <div className="bg-white p-2 rounded-full shadow-sm border border-gray-50 inline-flex items-center">
+      <div className="inline-flex bg-white p-1.5 rounded-full shadow-sm border border-gray-100 self-start">
         {subTabs.map(tab => (
           <button 
             key={tab.id}
             onClick={() => setActiveTab(tab.id)} 
-            className={`${tabBaseStyle} ${activeTab === tab.id ? tabActiveStyle : tabInactiveStyle}`}>
+            className={`px-6 py-2.5 rounded-full text-xs font-bold transition-all ${activeTab === tab.id ? 'bg-emerald-500 text-white shadow-md' : 'text-gray-400 hover:text-emerald-500'}`}>
             {tab.label}
           </button>
         ))}
