@@ -20,6 +20,10 @@ import {
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { getHolidaysForYear } from '../../data/holidays';
+// 1. 필요한 유틸리티 함수와 상수를 임포트합니다.
+import { getComputedTaskStatus } from '../../utils/taskUtils';
+import { TASK_STATUS, TASK_STATUS_DISPLAY_NAMES } from '../../constants';
+
 
 const getWeeksForMonth = (date: Date) => {
     const monthStart = startOfMonth(date);
@@ -53,10 +57,23 @@ interface WeeklyPerformanceModalProps {
   onClose: () => void;
 }
 
+// 2. 업무 상태에 따라 적절한 색상 클래스를 반환하는 헬퍼 함수를 정의합니다.
+const getStatusBadgeClass = (status: TaskStatus): string => {
+  switch (status) {
+    case TASK_STATUS.OVERDUE:
+      return 'bg-rose-100 text-rose-800 border-rose-200';
+    case TASK_STATUS.COMPLETED:
+      return 'bg-green-100 text-green-800 border-green-200';
+    case TASK_STATUS.IN_PROGRESS:
+      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    case TASK_STATUS.NOT_STARTED:
+      return 'bg-gray-100 text-gray-800 border-gray-200';
+    default:
+      return 'bg-gray-100 text-gray-800 border-gray-200';
+  }
+};
+
 export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ kpi, activity, onClose }) => {
-  // =========================================================================================
-  // [핵심 수정] 1. 실시간 데이터 반영을 위해 Context에서 직접 최신 데이터를 가져옵니다.
-  // =========================================================================================
   const { addTask, updateTask, deleteTask, deleteActivityFromKpi, kpiData } = useProjectData();
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -68,7 +85,6 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
   const selectedYear = currentDate.getFullYear();
   const selectedMonth = currentDate.getMonth() + 1;
 
-  // props로 받은 activity는 상태 업데이트 시 실시간 반영이 안되므로, 항상 최신 kpiData에서 현재 activity를 찾습니다.
   const liveActivity = useMemo(() => {
     const liveKpi = kpiData.find(k => k.id === kpi.id);
     return liveKpi?.activities.find(a => a.id === activity.id);
@@ -83,7 +99,7 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
   const daysInWeek = useMemo(() => Array.from({ length: 7 }).map((_, i) => addDays(weekStart, i)), [weekStart]);
 
   const tasksForSelectedWeek = useMemo(() => {
-    if (!liveActivity?.tasks) return []; // 최신 activity 데이터 사용
+    if (!liveActivity?.tasks) return [];
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
     return liveActivity.tasks.filter(task => {
@@ -93,7 +109,7 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
             return taskStart <= weekEnd && taskEnd >= weekStart;
         } catch (e) { return false; }
     }).sort((a, b) => parseISO(a.startDate).getTime() - parseISO(b.startDate).getTime());
-  }, [liveActivity?.tasks, currentDate]); // 종속성 배열에 최신 데이터 추가
+  }, [liveActivity?.tasks, currentDate]);
 
   const handleDayClick = (dayIndex: number) => {
     const [start, end] = daySelection;
@@ -127,11 +143,8 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
     setDaySelection([null, null]);
   };
   
-  // =========================================================================================
-  // [핵심 수정] 2. 개별 업무를 삭제하는 핸들러 함수를 추가합니다.
-  // =========================================================================================
   const handleDeleteTask = (e: MouseEvent<HTMLButtonElement>, taskId: string) => {
-    e.stopPropagation(); // 부모의 onClick(수정 모달 열기) 이벤트가 실행되는 것을 방지
+    e.stopPropagation();
     if (window.confirm('이 업무를 정말 삭제하시겠습니까?')) {
       deleteTask(kpi.id, activity.id, taskId);
     }
@@ -160,7 +173,7 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
   const handleTaskClick = (task: Task) => { setSelectedTask(task); setIsEditModalOpen(true); };
   
   const handleSaveTask = (taskId: string, updatedRecords: WeeklyRecord[], newStatus: TaskStatus) => {
-    const taskToUpdate = liveActivity?.tasks.find(t => t.id === taskId); // 최신 activity 데이터 사용
+    const taskToUpdate = liveActivity?.tasks.find(t => t.id === taskId);
     if (!taskToUpdate) return;
 
     updateTask(kpi.id, activity.id, { 
@@ -280,14 +293,21 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
                   </div>
                   <div className="space-y-2 pt-2">
                       {tasksForSelectedWeek.length > 0 ? (
-                          tasksForSelectedWeek.map(task => (
-                              <div key={task.id} onClick={() => handleTaskClick(task)} className="p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-all group flex justify-between items-center">
-                                  <p className="font-medium text-gray-800 group-hover:text-orange-600 truncate">{task.name}</p>
+                          tasksForSelectedWeek.map(task => {
+                            // 3. getComputedTaskStatus를 호출하여 각 업무의 실시간 상태를 계산합니다.
+                            const computedStatus = getComputedTaskStatus(task);
+                            const statusBadgeClass = getStatusBadgeClass(computedStatus);
+                            const statusName = TASK_STATUS_DISPLAY_NAMES[computedStatus];
+
+                            return (
+                              <div key={task.id} onClick={() => handleTaskClick(task)} className="p-4 bg-white border rounded-lg cursor-pointer hover:bg-gray-50 transition-all group flex justify-between items-center shadow-sm hover:shadow-md">
+                                  <p className="font-semibold text-gray-800 group-hover:text-orange-600 truncate">{task.name}</p>
                                   <div className="flex items-center gap-4 flex-shrink-0">
-                                    <span className="text-sm font-semibold text-gray-500">{formatTaskDate(task)}</span>
-                                    {/* ========================================================================================= */}
-                                    {/* [핵심 수정] 3. 마우스를 올리면 나타나는 삭제 버튼을 추가합니다.                           */}
-                                    {/* ========================================================================================= */}
+                                    {/* 4. 계산된 상태와 색상을 사용하는 상태 배지를 추가합니다. */}
+                                    <span className={`px-3 py-1 text-xs font-bold rounded-full border ${statusBadgeClass}`}>
+                                        {statusName}
+                                    </span>
+                                    <span className="text-sm font-medium text-gray-600 w-48 text-right">{formatTaskDate(task)}</span>
                                     <button 
                                       onClick={(e) => handleDeleteTask(e, task.id)} 
                                       className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -297,7 +317,8 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
                                     </button>
                                   </div>
                               </div>
-                          ))
+                            )
+                          })
                       ) : (
                           <div className="text-center py-16 text-gray-400">
                               <p className="font-semibold">등록된 주간 계획이 없습니다.</p>
@@ -319,7 +340,7 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
               onClose={() => setIsEditModalOpen(false)} 
               onSave={handleSaveTask} 
             />
-          } 
+          }
       </div>
     </div>
   );
