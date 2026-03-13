@@ -92,13 +92,20 @@ export interface Tenant {
     // Add other tenant properties as needed
 }
 
+export type TenantUnitStatus = '공실' | '입주' | '협의중' | '비임대';
+
 export interface TenantUnit {
     id: string;
     floor: string;
-    name: string; // 용도
-    area: number;
-    status: 'occupied' | 'vacant';
-    agency: string; // 입주기관
+    name: string; // 호실명 (예: 101호)
+    area: number; // 면적 (m²)
+    status: TenantUnitStatus;
+    tenant?: string; // 임차인
+    rent?: number; // 월 임대료
+    deposit?: number; // 보증금
+    contractDate?: string;
+    moveInDate?: string;
+    moveOutDate?: string;
     pathData?: string; // For SVG path
 }
 

@@ -36,7 +36,10 @@ interface IProjectDataContext extends IProjectData {
   updateTeamMember: (updatedMember: TeamMember) => void;
   deleteTeamMember: (memberId: string) => void;
   setTenantUnits: React.Dispatch<React.SetStateAction<TenantUnit[]>>;
+  addTenantUnit: (newUnit: Omit<TenantUnit, 'id' | 'pathData'>) => void;
   updateTenantUnit: (updatedUnit: TenantUnit) => void;
+  deleteTenantUnit: (unitId: string) => void;
+
 }
 
 const ProjectDataContext = createContext<IProjectDataContext | undefined>(undefined);
@@ -244,8 +247,17 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     setData(prev => ({ ...prev, teamMembers: prev.teamMembers.filter(m => m.id !== memberId) }));
   }, []);
 
+  const addTenantUnit = useCallback((newUnit: Omit<TenantUnit, 'id' | 'pathData'>) => {
+    const unitWithId: TenantUnit = { ...newUnit, id: `unit-${Date.now()}-${Math.random()}`, pathData: '' };
+    setData(prev => ({ ...prev, tenantUnits: [...prev.tenantUnits, unitWithId] }));
+  }, []);
+
   const updateTenantUnit = useCallback((updatedUnit: TenantUnit) => {
     setData(prev => ({ ...prev, tenantUnits: prev.tenantUnits.map(u => u.id === updatedUnit.id ? updatedUnit : u) }));
+  }, []);
+
+  const deleteTenantUnit = useCallback((unitId: string) => {
+    setData(prev => ({ ...prev, tenantUnits: prev.tenantUnits.filter(u => u.id !== unitId) }));
   }, []);
 
   const kpiData = useMemo(() => {
@@ -275,7 +287,9 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     updateTeamMember,
     deleteTeamMember,
     setTenantUnits: (units) => setData(p => ({...p, tenantUnits: typeof units === 'function' ? units(p.tenantUnits) : units})),
+    addTenantUnit,
     updateTenantUnit,
+    deleteTenantUnit,
   };
 
   return <ProjectDataContext.Provider value={value}>{children}</ProjectDataContext.Provider>;
