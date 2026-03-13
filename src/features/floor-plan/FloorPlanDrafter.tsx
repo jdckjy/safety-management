@@ -4,8 +4,8 @@ import { useProjectData } from '../../providers/ProjectDataProvider';
 import floor1F from '../../assets/1F.png';
 import floor2F from '../../assets/2F.png';
 import floor3F from '../../assets/3F.png';
+import { TenantUnit } from '../../types';
 
-// No longer needs props from parent for floor selection
 interface FloorPlanDrafterProps {}
 
 const floorImages: { [key: string]: string } = {
@@ -16,7 +16,7 @@ const floorImages: { [key: string]: string } = {
 
 const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
   const { tenantUnits, setTenantUnits } = useProjectData();
-  const [selectedFloor, setSelectedFloor] = useState('1F'); // Manage floor state internally
+  const [selectedFloor, setSelectedFloor] = useState('1F');
   const [points, setPoints] = useState<number[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState<string>('');
   const svgRef = useRef<SVGSVGElement>(null);
@@ -25,9 +25,29 @@ const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
 
   useEffect(() => {
     setImageUrl(floorImages[selectedFloor]);
-    setPoints([]);
-    setSelectedUnitId('');
+    setSelectedUnitId(''); // 층 변경 시 유닛 선택 초기화
+    setPoints([]); // 층 변경 시 포인트 초기화
   }, [selectedFloor]);
+
+  useEffect(() => {
+    if (!selectedUnitId) {
+      setPoints([]);
+      return;
+    }
+
+    const selectedUnit = tenantUnits.find(u => u.id === selectedUnitId);
+    if (selectedUnit && selectedUnit.pathData) {
+      const parsedPoints = selectedUnit.pathData
+        .replace(/[MLZ]/g, '')
+        .trim()
+        .split(/[\s,]+/)
+        .filter(Boolean)
+        .map(Number);
+      setPoints(parsedPoints);
+    } else {
+      setPoints([]);
+    }
+  }, [selectedUnitId, tenantUnits]);
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight } = e.currentTarget;
@@ -46,14 +66,32 @@ const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
         svgPoint.y = e.clientY;
         
         const ctm = svgRef.current.getScreenCTM();
-        
-        if (ctm) {
-          try {
+        if (!ctm) return;
+
+        try {
             const transformedPoint = svgPoint.matrixTransform(ctm.inverse());
-            setPoints([...points, transformedPoint.x, transformedPoint.y]);
-          } catch (error) {
+            let newX = transformedPoint.x;
+            let newY = transformedPoint.y;
+
+            // Snap-to-axis logic
+            if (points.length >= 2) {
+                const lastX = points[points.length - 2];
+                const lastY = points[points.length - 1];
+                const snapThreshold = 10; // Snap distance in SVG coordinates
+
+                const deltaX = Math.abs(newX - lastX);
+                const deltaY = Math.abs(newY - lastY);
+
+                if (deltaX < snapThreshold && deltaX < deltaY) {
+                    newX = lastX; // Snap vertically
+                } else if (deltaY < snapThreshold) {
+                    newY = lastY; // Snap horizontally
+                }
+            }
+            
+            setPoints([...points, newX, newY]);
+        } catch (error) {
             console.error("Could not invert CTM", error);
-          }
         }
     }
   };
@@ -63,8 +101,7 @@ const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
     const pathData = `M ${points[0]} ${points[1]} ` + points.slice(2).reduce((acc, val, i) => acc + (i % 2 === 0 ? 'L ' : ' ') + val + ' ', '') + 'Z';
     const updatedUnits = tenantUnits.map(unit => unit.id === selectedUnitId ? { ...unit, pathData } : unit);
     setTenantUnits(updatedUnits);
-    setPoints([]);
-    // Don't reset selectedUnitId, user might want to adjust the same unit
+    alert('저장되었습니다!');
   };
   
   const unitsForFloor = tenantUnits.filter(u => u.floor === selectedFloor);
@@ -87,7 +124,7 @@ const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
         <h2 className="text-xl font-bold mb-2">도면 편집기 ({selectedFloor})</h2>
         <div className="mb-4">
             <label htmlFor="unit-select" className="mr-2">수정할 유닛:</label>
-            <select id="unit-select" value={selectedUnitId} onChange={(e) => { setSelectedUnitId(e.target.value); setPoints([]); }} className="p-2 border rounded">
+            <select id="unit-select" value={selectedUnitId} onChange={(e) => setSelectedUnitId(e.target.value)} className="p-2 border rounded">
                 <option value="">유닛 선택</option>
                 {unitsForFloor.map(unit => <option key={unit.id} value={unit.id}>{`${unit.id} - ${unit.name}`}</option>)}
             </select>
@@ -108,13 +145,15 @@ const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
             {tenantUnits.filter(u => u.floor === selectedFloor && u.pathData && u.id !== selectedUnitId).map(unit => (
                 <path key={unit.id} d={unit.pathData} fill="rgba(0, 0, 255, 0.3)" stroke="#0000FF" strokeWidth="1" />
             ))}
-            {tenantUnits.find(u => u.id === selectedUnitId)?.pathData && (
-                <path d={tenantUnits.find(u => u.id === selectedUnitId)!.pathData!} fill="rgba(255, 0, 0, 0.3)" stroke="#FF0000" strokeWidth="1" />
+            {/* Show existing path for the selected unit if not being edited */}
+            {tenantUnits.find(u => u.id === selectedUnitId)?.pathData && points.length === 0 && (
+                <path d={tenantUnits.find(u => u.id === selectedUnitId)!.pathData!} fill="rgba(255, 165, 0, 0.4)" stroke="#FFA500" strokeWidth="1" />
             )}
-            {points.length > 0 && <polyline points={points.join(' ')} fill="none" stroke="lime" strokeWidth="2"/>}
+            {/* Show path being actively drawn or edited */}
+            {points.length > 0 && <polyline points={points.join(' ')} fill="rgba(255, 0, 0, 0.4)" stroke="lime" strokeWidth="2"/>}
         </svg>
       </div>
-      {points.length > 0 && (
+      {selectedUnitId && (
         <div className="mt-4">
             <button onClick={handleSave} className="px-4 py-2 rounded bg-blue-500 text-white">저장</button>
             <button onClick={() => setPoints([])} className="px-4 py-2 rounded bg-gray-300 ml-2">초기화</button>
