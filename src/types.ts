@@ -14,6 +14,14 @@ export interface WeeklyRecord {
   comment?: string;
 }
 
+// Interface for a single comment on a task
+export interface Comment {
+  id: string;
+  author: string; // Name of the user who made the comment
+  timestamp: string; // ISO 8601 timestamp
+  content: string;
+}
+
 export interface Task {
   id: string;
   name: string;
@@ -21,6 +29,7 @@ export interface Task {
   endDate: string;
   status: TaskStatus;
   records: WeeklyRecord[];
+  comments?: Comment[]; // Array of comments for this task
 }
 
 export interface Activity {
