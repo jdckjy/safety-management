@@ -253,7 +253,10 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, []);
 
   const updateTenantUnit = useCallback((updatedUnit: TenantUnit) => {
-    setData(prev => ({ ...prev, tenantUnits: prev.tenantUnits.map(u => u.id === updatedUnit.id ? updatedUnit : u) }));
+    setData(prev => {
+        const newTenantUnits = prev.tenantUnits.map(u => u.id === updatedUnit.id ? updatedUnit : u);
+        return { ...prev, tenantUnits: newTenantUnits };
+    });
   }, []);
 
   const deleteTenantUnit = useCallback((unitId: string) => {

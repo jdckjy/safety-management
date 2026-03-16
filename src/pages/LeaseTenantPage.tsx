@@ -1,6 +1,5 @@
 
-import React, { useState } from 'react';
-// [수정] 절대 경로로 변경
+import React, { useState, useMemo } from 'react';
 import { useProjectData } from '@/providers/ProjectDataProvider';
 import { getOptimalTenantRecommendations, Recommendation } from '@/services/aiTenantRecommender';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,20 +7,65 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Lightbulb, Zap, BarChart } from 'lucide-react';
+import { Lightbulb, Zap, BarChart, Building, Percent } from 'lucide-react';
+import { UNIT_STATUS } from '@/constants';
 
 const LeaseTenantPage: React.FC = () => {
-  const { complexFacilities } = useProjectData();
-  const [activeTab, setActiveTab] = useState("aiRecommendation");
+  const { complexFacilities, tenantUnits } = useProjectData();
+  const [activeTab, setActiveTab] = useState("tenantRoster");
   const [selectedFacility, setSelectedFacility] = useState<string>("");
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 상업용 시설만 필터링 (예: "상가", "몰", "스트리트")
   const commercialFacilities = complexFacilities.filter(f => 
     f.category.includes('상가') || f.category.includes('몰') || f.category.includes('스트리트')
   );
+
+  const leaseRateStats = useMemo(() => {
+    const calculateRate = (units: any[]) => {
+      if (units.length === 0) return { rate: 0, occupied: 0, inDiscussion: 0, vacant: 0, totalRentable: 0 };
+
+      const occupiedArea = units
+        .filter(u => u.status === UNIT_STATUS.OCCUPIED)
+        .reduce((sum, u) => sum + u.area, 0);
+
+      const inDiscussionArea = units
+        .filter(u => u.status === UNIT_STATUS.IN_DISCUSSION)
+        .reduce((sum, u) => sum + u.area, 0);
+        
+      const vacantArea = units
+        .filter(u => u.status === UNIT_STATUS.VACANT)
+        .reduce((sum, u) => sum + u.area, 0);
+
+      const totalRentableArea = occupiedArea + inDiscussionArea + vacantArea;
+      
+      if (totalRentableArea === 0) return { rate: 0, occupied: 0, inDiscussion: 0, vacant: 0, totalRentable: 0 };
+
+      const rate = (occupiedArea / totalRentableArea) * 100;
+
+      return {
+        rate: parseFloat(rate.toFixed(2)),
+        occupied: occupiedArea,
+        inDiscussion: inDiscussionArea,
+        vacant: vacantArea,
+        totalRentable: totalRentableArea
+      };
+    };
+
+    const allUnits = tenantUnits;
+    const floor1Units = allUnits.filter(u => u.floor === '1F');
+    const floor2Units = allUnits.filter(u => u.floor === '2F');
+    const floor3Units = allUnits.filter(u => u.floor === '3F');
+
+    return {
+      total: calculateRate(allUnits),
+      '1F': calculateRate(floor1Units),
+      '2F': calculateRate(floor2Units),
+      '3F': calculateRate(floor3Units),
+    };
+  }, [tenantUnits]);
+
 
   const handleAnalyze = async () => {
     if (!selectedFacility) {
@@ -70,15 +114,63 @@ const LeaseTenantPage: React.FC = () => {
 
         {/* 임차인 명단 탭 */}
         <TabsContent value="tenantRoster">
-          <Card>
-            <CardHeader>
-              <CardTitle>임차인 명단</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p>임차인 명단 기능은 현재 개발 중입니다.</p>
-            </CardContent>
-          </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>임대율 현황</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    {/* 전체 임대율 */}
+                    <div className="bg-gray-50 rounded-lg p-6">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <Building className="w-8 h-8 text-blue-600" />
+                                <h3 className="text-xl font-bold text-gray-800">전체 임대율</h3>
+                            </div>
+                            <div className="text-3xl font-bold text-blue-600">
+                                {leaseRateStats.total.rate}%
+                            </div>
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                            <div>
+                                <p className="text-sm text-gray-500">임대 면적</p>
+                                <p className="text-lg font-semibold">{leaseRateStats.total.occupied.toLocaleString()} m²</p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-500">협의중 면적</p>
+                                <p className="text-lg font-semibold">{leaseRateStats.total.inDiscussion.toLocaleString()} m²</p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-500">공실 면적</p>
+                                <p className="text-lg font-semibold">{leaseRateStats.total.vacant.toLocaleString()} m²</p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-500">총 임대가능 면적</p>
+                                <p className="text-lg font-semibold">{leaseRateStats.total.totalRentable.toLocaleString()} m²</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 층별 임대율 */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {(['1F', '2F', '3F'] as const).map(floor => (
+                            <Card key={floor}>
+                                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                    <CardTitle className="text-lg font-medium">{floor} 임대율</CardTitle>
+                                    <Percent className="w-5 h-5 text-gray-400" />
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold text-gray-800">{leaseRateStats[floor].rate}%</div>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {leaseRateStats[floor].occupied.toLocaleString()} m² / {leaseRateStats[floor].totalRentable.toLocaleString()} m²
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
         </TabsContent>
+
 
         {/* AI 최적 임차인 추천 탭 */}
         <TabsContent value="aiRecommendation">
@@ -96,15 +188,15 @@ const LeaseTenantPage: React.FC = () => {
                     <SelectContent>
                         {commercialFacilities.map(f => (
                             <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>
-                        ))}
+                        ))}\
                     </SelectContent>
                 </Select>
                 <Button onClick={handleAnalyze} disabled={isLoading || !selectedFacility}>
-                  {isLoading ? "분석 중..." : "최적 임차인 분석 실행"}
+                  {isLoading ? "분석 중..." : "최적 임차인 분석 실행"}\
                 </Button>
               </div>
 
-              {error && <Alert variant="destructive">
+              {error && <Alert variant="destructive">\
                   <AlertTitle>오류</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
               </Alert>}

@@ -65,3 +65,12 @@ export const UI_STATUS_OPTIONS = [
   value: status,
   label: TASK_STATUS_DISPLAY_NAMES[status],
 }));
+
+// 5. 임대 유닛 상태 (Tenant Unit Status)
+// -----------------------------------------------------------------------------
+export const UNIT_STATUS = {
+  VACANT: '공실',
+  OCCUPIED: '입주',
+  IN_DISCUSSION: '협의중',
+  NON_RENTABLE: '비임대',
+} as const;

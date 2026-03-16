@@ -7,8 +7,9 @@ import FloorPlan from './FloorPlan';
 import UnitDetailPanel from './UnitDetailPanel';
 import { Button } from '../../components/ui/button';
 import FloorPlanDrafter from '../floor-plan/FloorPlanDrafter';
+import { Card, CardContent } from "../../components/ui/card";
+import { UNIT_STATUS } from '../../constants';
 
-// 수정된 이미지 경로 임포트
 import floor1F from '../../assets/1F.png';
 import floor2F from '../../assets/2F.png';
 import floor3F from '../../assets/3F.png';
@@ -26,6 +27,50 @@ const TenantRoster: React.FC = () => {
     '2F': floor2F,
     '3F': floor3F,
   };
+  
+  const leaseRateStats = useMemo(() => {
+    const calculateRate = (units: TenantUnit[]) => {
+      if (!units || units.length === 0) return { rate: 0, occupied: 0, totalRentable: 0 };
+      const roundToTwo = (num: number) => parseFloat(num.toFixed(2));
+
+      // 산식: 입주 / (입주 + 공실 + 협의중)
+      const rentableStatuses: string[] = [UNIT_STATUS.OCCUPIED, UNIT_STATUS.VACANT, UNIT_STATUS.IN_DISCUSSION];
+
+      const occupiedArea = roundToTwo(
+        units
+          .filter(u => u.status === UNIT_STATUS.OCCUPIED)
+          .reduce((sum, u) => sum + u.area, 0)
+      );
+
+      const totalRentableArea = roundToTwo(
+        units
+          .filter(u => rentableStatuses.includes(u.status))
+          .reduce((sum, u) => sum + u.area, 0)
+      );
+      
+      if (totalRentableArea === 0) return { rate: 0, occupied: occupiedArea, totalRentable: 0 };
+
+      const rate = (occupiedArea / totalRentableArea) * 100;
+
+      return {
+        rate: roundToTwo(rate),
+        occupied: occupiedArea,
+        totalRentable: totalRentableArea
+      };
+    };
+
+    const allUnits = tenantUnits;
+    const floor1Units = allUnits.filter(u => u.floor === '1F');
+    const floor2Units = allUnits.filter(u => u.floor === '2F');
+    const floor3Units = allUnits.filter(u => u.floor === '3F');
+
+    return {
+      total: calculateRate(allUnits),
+      '1F': calculateRate(floor1Units),
+      '2F': calculateRate(floor2Units),
+      '3F': calculateRate(floor3Units),
+    };
+  }, [tenantUnits]);
 
   const unitsOnSelectedFloor = useMemo(() => 
     tenantUnits.filter(u => u.floor === selectedFloor),
@@ -72,8 +117,38 @@ const TenantRoster: React.FC = () => {
         unit={editingUnit}
         floor={selectedFloor}
       />
+      
+      {/* 최종 디자인: 정보는 한 줄에 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-baseline justify-between space-x-2">
+              <div className="flex items-baseline space-x-2">
+                  <p className="text-sm font-medium">전체</p>
+                  <p className="text-xl font-bold text-blue-600">{leaseRateStats.total.rate}%</p>
+              </div>
+              <p className="text-sm text-muted-foreground whitespace-nowrap">
+                {leaseRateStats.total.occupied.toLocaleString()}m² / {leaseRateStats.total.totalRentable.toLocaleString()}m²
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-3">
+            <div className="flex items-baseline justify-between space-x-2">
+              <div className="flex items-baseline space-x-2">
+                  <p className="text-sm font-medium">{selectedFloor}</p>
+                  <p className="text-xl font-bold">{leaseRateStats[selectedFloor as '1F' | '2F' | '3F'].rate}%</p>
+              </div>
+              <p className="text-sm text-muted-foreground whitespace-nowrap">
+                {leaseRateStats[selectedFloor as '1F' | '2F' | '3F'].occupied.toLocaleString()}m² / {leaseRateStats[selectedFloor as '1F' | '2F' | '3F'].totalRentable.toLocaleString()}m²
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center mt-2">
         <div className="flex space-x-2">
           {Object.keys(floorPlanImages).map(floor => (
             <Button 
