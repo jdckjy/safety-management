@@ -46,7 +46,19 @@
 
 ## 7. Provider 분석
 
-(내용 생략)
+### 7.1. ProjectDataProvider
+
+앱의 핵심 데이터(KPI, 활동, 업무 등)와 관련된 모든 상태 및 비즈니스 로직을 포함하는 가장 중요한 Provider입니다. Firestore 데이터베이스와의 통신을 담당하며, 데이터 CRUD(생성, 읽기, 업데이트, 삭제)를 위한 함수들을 UI 컴포넌트에 제공합니다.
+
+**주요 함수:**
+- `addTask`: 새로운 업무를 추가합니다.
+- `updateTask`: 기존 업무를 수정합니다.
+- `deleteTask`: 업무를 삭제합니다.
+- `addCommentToTask` **(신규)**: 특정 업무에 댓글을 추가합니다. 댓글 내용과 작성자, 타임스탬프를 포함하는 객체를 생성하여 해당 업무의 `comments` 배열에 추가하고, 변경사항을 데이터베이스에 저장합니다.
+- `updateTenantUnit`: 임대 유닛 정보(도면 데이터 포함)를 업데이트합니다.
+- `deleteActivityFromKpi`: KPI에서 특정 활동을 삭제합니다.
+- (기타 데이터 관련 함수들...)
+
 
 ## 8. 동적 도면 관리 시스템 (구: 도면 편집기)
 
@@ -71,4 +83,27 @@
     - 컴포넌트는 배열을 순회하며 각 `unit` 객체의 `pathData` 속성을 읽어 SVG `path` 태그의 `d` 속성에 바인딩하여 화면에 렌더링합니다.
     - **과거에 참조했던 `floorPlanLayouts.ts` 파일은 이제 존재하지 않으며, 컴포넌트는 오직 DB 데이터에만 의존합니다.**
 
-(이하 기존 문서 내용과 동일)
+## 9. 작업 기반 댓글 기능 (신규)
+
+### 9.1. 개요
+단순한 업무 목록을 넘어, 각 업무(Task)의 상세 맥락과 히스토리를 추적하고 팀원 간의 소통을 활성화하기 위해 도입된 기능입니다. 사용자는 이제 각 업무별로 댓글을 작성하고, 다른 사람들이 남긴 댓글을 시간 순으로 확인할 수 있습니다.
+
+### 9.2. 핵심 컴포넌트 및 데이터 모델
+- **`WeeklyPerformanceModal.tsx`**: 기능의 핵심 UI가 구현된 곳입니다.
+    - 기존의 주간 업무 목록 뷰에서 특정 업무를 클릭하면, 해당 업무의 상세 정보와 댓글을 볼 수 있는 '댓글 뷰(Comments View)'로 전환됩니다.
+    - 댓글 뷰에서는 댓글 목록을 스크롤하여 확인하고, 하단의 입력 폼을 통해 새로운 댓글을 등록할 수 있습니다.
+    - '업무 목록으로 돌아가기' 버튼을 통해 다시 목록 뷰로 돌아갈 수 있습니다.
+- **`ProjectDataProvider.tsx`**: 데이터 처리를 담당합니다.
+    - `addCommentToTask` 함수가 새롭게 추가되었습니다. 이 함수는 KPI ID, 활동 ID, 업무 ID 및 댓글 내용을 인자로 받아 새로운 댓글 객체를 생성하고, Firestore 데이터베이스의 해당 업무 문서(document) 내 `comments` 배열에 추가합니다.
+- **`types.ts`**: 데이터 모델이 확장되었습니다.
+    - `Task` 인터페이스에 `comments` 속성이 추가되었습니다. 이 속성은 `Comment[]` 타입의 배열로, 각 댓글은 `id`, `author`, `content`, `timestamp`를 포함합니다.
+
+### 9.3. 데이터 흐름
+1.  **댓글 작성**:
+    - 사용자가 `WeeklyPerformanceModal.tsx`의 댓글 입력 폼에 내용을 작성하고 '전송(Send)' 버튼을 클릭합니다.
+    - `handleAddComment` 이벤트 핸들러가 `useProjectData` 훅에서 제공하는 `addCommentToTask` 함수를 호출합니다.
+2.  **데이터 업데이트**:
+    - `ProjectDataProvider`의 `addCommentToTask` 함수는 먼저 로컬 상태(`kpiData`)를 즉시 업데이트하여 UI에 낙관적 업데이트(Optimistic Update)를 반영합니다.
+    - 그 다음, `updateKpiDocInFirestore` 함수를 호출하여 변경된 데이터 전체를 Firestore 데이터베이스에 비동기적으로 저장합니다. 이를 통해 데이터의 일관성과 영속성을 보장합니다.
+3.  **조회**:
+    - `WeeklyPerformanceModal`이 렌더링될 때, `liveSelectedTask` 객체(실시간 데이터가 반영된 Task)의 `comments` 배열을 읽어 화면에 댓글 목록을 표시합니다. 데이터는 Provider를 통해 항상 최신 상태로 유지됩니다.
