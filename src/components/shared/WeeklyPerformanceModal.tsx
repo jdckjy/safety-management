@@ -240,9 +240,18 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
           {tasksForSelectedWeek.length > 0 ? (
             tasksForSelectedWeek.map(task => {
               const computedStatus = getComputedTaskStatus(task);
+              const commentCount = task.comments?.length || 0;
               return (
                 <div key={task.id} onClick={() => handleTaskClick(task)} className="p-4 bg-white border rounded-lg cursor-pointer hover:bg-gray-50 transition-all group flex justify-between items-center shadow-sm hover:shadow-md">
-                  <p className="font-semibold text-gray-800 group-hover:text-orange-600 truncate">{task.name}</p>
+                  <div className="flex items-center gap-3">
+                    <p className="font-semibold text-gray-800 group-hover:text-orange-600 truncate">{task.name}</p>
+                    {commentCount > 0 && (
+                        <div className="flex items-center gap-1.5 text-gray-400 group-hover:text-orange-500 transition-colors">
+                            <MessageSquare size={14} />
+                            <span className="text-xs font-bold">{commentCount}</span>
+                        </div>
+                    )}
+                  </div>
                   <div className="flex items-center gap-4 flex-shrink-0">
                     <span className={`px-3 py-1 text-xs font-bold rounded-full border ${getStatusBadgeClass(computedStatus)}`}>
                       {TASK_STATUS_DISPLAY_NAMES[computedStatus]}
