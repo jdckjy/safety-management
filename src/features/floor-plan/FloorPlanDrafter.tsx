@@ -15,7 +15,7 @@ const floorImages: { [key: string]: string } = {
 };
 
 const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
-  const { tenantUnits, setTenantUnits } = useProjectData();
+  const { tenantUnits, updateTenantUnit } = useProjectData(); // setTenantUnits 대신 updateTenantUnit 사용
   const [selectedFloor, setSelectedFloor] = useState('1F');
   const [points, setPoints] = useState<number[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState<string>('');
@@ -97,11 +97,30 @@ const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
   };
 
   const handleSave = () => {
-    if (points.length < 4) return;
+    if (!selectedUnitId) {
+        alert('저장할 유닛이 선택되지 않았습니다.');
+        return;
+    }
+    if (points.length < 4) {
+        alert('유닛의 영역은 최소 2개 이상의 점으로 그려져야 합니다.');
+        return;
+    }
+
+    const unitToUpdate = tenantUnits.find(unit => unit.id === selectedUnitId);
+    if (!unitToUpdate) {
+        alert('선택된 유닛 정보를 찾을 수 없습니다.');
+        return;
+    }
+
     const pathData = `M ${points[0]} ${points[1]} ` + points.slice(2).reduce((acc, val, i) => acc + (i % 2 === 0 ? 'L ' : ' ') + val + ' ', '') + 'Z';
-    const updatedUnits = tenantUnits.map(unit => unit.id === selectedUnitId ? { ...unit, pathData } : unit);
-    setTenantUnits(updatedUnits);
-    alert('저장되었습니다!');
+    
+    const updatedUnit: TenantUnit = { 
+        ...unitToUpdate, 
+        pathData 
+    };
+
+    updateTenantUnit(updatedUnit);
+    alert('저장되었습니다! 변경사항이 데이터베이스에 반영됩니다.');
   };
   
   const unitsForFloor = tenantUnits.filter(u => u.floor === selectedFloor);
@@ -126,7 +145,7 @@ const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
             <label htmlFor="unit-select" className="mr-2">수정할 유닛:</label>
             <select id="unit-select" value={selectedUnitId} onChange={(e) => setSelectedUnitId(e.target.value)} className="p-2 border rounded">
                 <option value="">유닛 선택</option>
-                {unitsForFloor.map(unit => <option key={unit.id} value={unit.id}>{`${unit.id} - ${unit.name}`}</option>)}
+                {unitsForFloor.map(unit => <option key={unit.id} value={unit.id}>{`${unit.name}`}</option>)}
             </select>
         </div>
       <div style={{ position: 'relative', width: '100%' }}>
