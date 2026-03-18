@@ -1,40 +1,45 @@
 
+import { useMemo } from 'react';
 import { useProjectData } from '../providers/ProjectDataProvider';
-import { Task, KPI } from '../types';
-import { isToday, isPast } from 'date-fns';
+import { isToday, isAfter, parseISO, subDays } from 'date-fns';
+import { KPI, Task, Activity } from '../types';
 
-// Helper function to find urgent tasks from KPIs
-const findUrgentTasks = (kpis: KPI[] = [], monthlyTasks: Task[] = []) => {
-  const urgentKpiIds = kpis.filter(kpi => kpi.pulse?.trend === 'down').map(kpi => kpi.id);
-  return monthlyTasks.filter(task => urgentKpiIds.includes(task.kpiId) && task.status !== 'completed');
-};
+export interface BriefingData {
+  tasksDueToday: Task[];
+  importantUpdates: (Activity & { parentKpiTitle: string })[];
+  kpisNeedingAttention: KPI[];
+}
 
-export const useDailyBriefing = () => {
-  const { safetyKPIs, leaseKPIs, infraKPIs, monthlyTasks } = useProjectData();
+export const useDailyBriefing = (): BriefingData => {
+  const { kpiData } = useProjectData();
 
-  // 1. 신규 발생 및 시급한 이슈 (데이터가 없을 경우 빈 배열로 처리)
-  const urgentSafetyTasks = findUrgentTasks(safetyKPIs || [], monthlyTasks || []);
-  const urgentLeaseTasks = findUrgentTasks(leaseKPIs || [], monthlyTasks || []);
-  const urgentInfraTasks = findUrgentTasks(infraKPIs || [], monthlyTasks || []);
-  const urgentIssues = [...urgentSafetyTasks, ...urgentLeaseTasks, ...urgentInfraTasks]
-    .map(task => ({ id: task.id, text: `[${task.kpiId}] ${task.name}` }));
+  const yesterday = subDays(new Date(), 1);
 
-  // 2. 오늘 마감 업무 (데이터가 없을 경우 빈 배열로 처리)
-  const dueToday = (monthlyTasks || [])
-    .filter(task => task.dueDate && isToday(new Date(task.dueDate)))
-    .map(task => ({ id: task.id, text: task.name }));
+  const tasksDueToday = useMemo(() => {
+    return kpiData
+      .flatMap(kpi => kpi.activities?.flatMap(a => a.tasks) || [])
+      .filter(task => task && isToday(parseISO(task.endDate)));
+  }, [kpiData]);
 
-  // 3. 지연 중인 업무 (데이터가 없을 경우 빈 배열로 처리)
-  const delayedTasks = (monthlyTasks || [])
-    .filter(task => task.dueDate && isPast(new Date(task.dueDate)) && task.status !== 'completed')
-    .map(task => ({ id: task.id, text: task.name }));
+  const importantUpdates = useMemo(() => {
+    const allActivities = kpiData.flatMap(kpi => 
+      (kpi.activities || []).map(a => ({ ...a, parentKpiTitle: kpi.title }))
+    );
+    
+    return allActivities
+      .filter(activity => 
+        activity.tasks.some(task => 
+          task.comments && task.comments.some(c => isAfter(parseISO(c.timestamp), yesterday))
+        )
+      );
+  }, [kpiData, yesterday]);
 
-  const isLoading = !safetyKPIs || !leaseKPIs || !infraKPIs || !monthlyTasks;
+  const kpisNeedingAttention = useMemo(() => {
+    return kpiData.filter(kpi => {
+      const progress = (kpi.current / kpi.target) * 100;
+      return progress < 50; 
+    });
+  }, [kpiData]);
 
-  return {
-    urgentIssues,
-    dueToday,
-    delayedTasks,
-    isLoading,
-  };
+  return { tasksDueToday, importantUpdates, kpisNeedingAttention };
 };

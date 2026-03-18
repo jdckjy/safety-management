@@ -22,6 +22,11 @@ export interface Comment {
   content: string;
 }
 
+export interface Assignee {
+    id: string;
+    name: string;
+}
+
 export interface Task {
   id: string;
   name: string;
@@ -30,6 +35,7 @@ export interface Task {
   status: TaskStatus;
   records: WeeklyRecord[];
   comments?: Comment[]; // Array of comments for this task
+  assignee?: Assignee;
 }
 
 export interface Activity {
