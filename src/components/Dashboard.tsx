@@ -1,49 +1,12 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowUpRight, TrendingUp, CheckCircle2, AlertCircle } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { useProjectData } from '../providers/ProjectDataProvider';
 import DailyBriefing from './DailyBriefing';
 import { TASK_STATUS, TASK_STATUS_DISPLAY_NAMES } from '../constants';
 import { startOfMonth, endOfMonth, parseISO, subDays, isAfter, formatDistanceToNow, isBefore } from 'date-fns';
 import { ko } from 'date-fns/locale';
-
-const ProjectStatCard: React.FC<{
-  title: string;
-  value: string;
-  status: string;
-  isPrimary?: boolean;
-  isAlert?: boolean;
-}> = ({ title, value, status, isPrimary = false, isAlert = false }) => {
-  const cardClasses = isAlert
-    ? 'bg-rose-800 text-white'
-    : isPrimary
-    ? 'bg-teal-800 text-white'
-    : 'bg-white text-gray-800 border border-gray-100';
-
-  const statusIconColor = isAlert ? 'text-rose-300' : isPrimary ? 'text-teal-300' : 'text-gray-400';
-  const iconContainerBg = isAlert ? 'bg-white/10' : isPrimary ? 'bg-white/10' : 'bg-gray-100';
-  const titleColor = isAlert ? 'text-rose-200' : isPrimary ? 'text-teal-200' : 'text-gray-600';
-  const IconComponent = isAlert ? AlertCircle : ArrowUpRight;
-  const iconColor = isAlert ? 'text-white' : isPrimary ? 'text-white' : 'text-gray-500';
-
-  return (
-    <div className={`p-6 rounded-3xl shadow-sm flex flex-col justify-between h-full ${cardClasses}`}>
-      <div>
-        <div className="flex justify-between items-start">
-          <p className={`font-bold ${titleColor}`}>{title}</p>
-          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${iconContainerBg}`}>
-            <IconComponent size={16} className={iconColor} />
-          </div>
-        </div>
-        <h3 className="text-5xl font-black tracking-tighter mt-4">{value}</h3>
-      </div>
-      <div className="flex items-center gap-2 text-xs mt-6">
-        <TrendingUp size={14} className={statusIconColor} />
-        <span className={statusIconColor}>{status}</span>
-      </div>
-    </div>
-  );
-};
+import LeaseStatusWidget from './dashboard/LeaseStatusWidget';
 
 const Dashboard: React.FC = () => {
   const { kpiData, navigationState } = useProjectData();
@@ -148,85 +111,77 @@ const Dashboard: React.FC = () => {
       return new Date(0, month).toLocaleString('ko-KR', { month: 'long' });
   }, [navigationState.selectedMonth]);
 
-  const projectStats = [
-    { title: `${selectedMonthName} 총 업무`, value: taskStats.total.toString(), status: '실시간 업데이트', isPrimary: true },
-    { title: TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.OVERDUE] + ' 업무', value: taskStats.overdue.toString(), status: '즉시 조치 필요', isAlert: true },
-    { title: TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.COMPLETED] + ' 업무', value: taskStats.completed.toString(), status: '지난 달 대비 증가' },
-    { title: TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.IN_PROGRESS] + ' 업무', value: taskStats.inProgress.toString(), status: '지난 달 대비 증가' },
-  ];
-
   return (
-    <div className="flex flex-col gap-8 pb-10">
+    <div className="flex flex-col gap-6 p-4 sm:p-6">
       <DailyBriefing isOpen={isBriefingOpen} onClose={() => setBriefingOpen(false)} />
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {projectStats.map(stat => (
-          <ProjectStatCard key={stat.title} {...stat} />
-        ))}
+        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{selectedMonthName} 총 업무</p><p className="text-3xl font-bold text-gray-800">{taskStats.total}</p></div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.OVERDUE]} 업무</p><p className="text-3xl font-bold text-red-500">{taskStats.overdue}</p></div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.COMPLETED]} 업무</p><p className="text-3xl font-bold text-blue-500">{taskStats.completed}</p></div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.IN_PROGRESS]} 업무</p><p className="text-3xl font-bold text-yellow-500">{taskStats.inProgress}</p></div>
       </div>
 
-      <div className="grid grid-cols-12 gap-8">
-        <div className="col-span-12 lg:col-span-4 bg-white p-8 rounded-3xl shadow-sm border border-gray-50">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="font-bold text-lg">주요 KPI 요약</h3>
-          </div>
-          <div className="space-y-6">
-            {kpiData.length > 0 ? (
-              kpiData.slice(0, 5).map((kpi) => {
-                const isPositive = (kpi.current - (kpi.previous || 0)) >= 0;
-                const change = Math.abs(kpi.current - (kpi.previous || 0));
-
-                return (
-                  <div key={kpi.id} className="flex items-center justify-between group cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center ${kpi.color}`}>
-                        {kpi.icon}
-                      </div>
-                      <span className="text-xs font-bold text-gray-500 group-hover:text-black transition-colors">{kpi.title}</span>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-black tracking-tight">{`${kpi.current}${kpi.unit}`}</p>
-                      <div className={`flex items-center justify-end gap-1 text-[10px] font-bold ${isPositive ? 'text-pink-500' : 'text-blue-500'}`}>
-                        {isPositive ? '↗' : '↘'}
-                        <span>{change}{kpi.unit}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-center text-gray-400 font-bold">KPI 데이터가 없습니다.</div>
-            )}
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-1">
+          <LeaseStatusWidget />
         </div>
+        <div className="lg:col-span-2">
+            <div className="bg-white p-6 rounded-2xl shadow-md h-full">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">주요 KPI 요약</h3>
+                <div className="space-y-4">
+                    {kpiData.length > 0 ? (
+                    kpiData.slice(0, 5).map((kpi) => {
+                        const change = kpi.current - (kpi.previous || 0);
+                        const isPositive = change >= 0;
 
-        <div className="col-span-12 lg:col-span-8 bg-white p-8 rounded-3xl shadow-sm border border-gray-50 flex flex-col min-h-[400px]">
-           <h3 className="font-bold text-lg mb-4">최근 활동 피드</h3>
-           <div className="space-y-3 flex-1 overflow-y-auto pr-2">
+                        return (
+                        <div key={kpi.id} className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 ${kpi.color}`}>
+                                {kpi.icon}
+                            </div>
+                            <div className="flex-1">
+                                <p className="font-semibold text-gray-800">{kpi.title}</p>
+                                <p className="text-sm text-gray-500">{kpi.description}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xl font-bold text-gray-900">{`${kpi.current.toLocaleString()}${kpi.unit}`}</p>
+                                <p className={`text-sm font-medium ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                                    {isPositive ? '▲' : '▼'} {Math.abs(change).toLocaleString()}{kpi.unit}
+                                </p>
+                            </div>
+                        </div>
+                        );
+                    })
+                    ) : (
+                    <div className="text-center py-8 text-gray-500">KPI 데이터가 없습니다.</div>
+                    )}
+                </div>
+            </div>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-2xl shadow-md">
+           <h3 className="text-lg font-semibold text-gray-900 mb-4">최근 활동 피드</h3>
+           <div className="space-y-2">
             {recentActivities.length > 0 ? (
                 recentActivities.map(activity => (
-                    <div key={activity.id} className="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors">
-                        <div className="w-8 h-8 rounded-full bg-teal-50 flex items-center justify-center mt-0.5">
-                            <CheckCircle2 size={16} className="text-teal-500" />
-                        </div>
+                    <div key={activity.id} className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                        <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" />
                         <div className='flex-1'>
-                            <p className="text-sm font-bold text-gray-800 leading-snug">
-                                {activity.name}
+                            <p className="text-sm text-gray-800">
+                                <span className="font-semibold">{activity.name}</span>
                             </p>
-                             <p className="text-xs text-gray-400 mt-0.5">
-                                <span className='font-semibold'>{activity.parentKpiTitle}</span> 섹션에서
-                                {' '}{formatDistanceToNow(parseISO(activity.timestamp), { addSuffix: true, locale: ko })} 완료
+                             <p className="text-xs text-gray-500">
+                                {activity.parentKpiTitle} › {formatDistanceToNow(parseISO(activity.timestamp), { addSuffix: true, locale: ko })} 완료
                             </p>
                         </div>
                     </div>
                 ))
             ) : (
-              <div className="flex-1 flex items-center justify-center h-full">
-                <p className="text-gray-400 font-bold">최근 7일간 완료된 활동이 없습니다.</p>
-              </div>
+              <div className="text-center py-8 text-gray-500">최근 7일간 완료된 활동이 없습니다.</div>
             )}
            </div>
-        </div>
       </div>
     </div>
   );
