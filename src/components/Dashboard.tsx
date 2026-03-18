@@ -115,11 +115,12 @@ const Dashboard: React.FC = () => {
     <div className="flex flex-col gap-6 p-4 sm:p-6">
       <DailyBriefing isOpen={isBriefingOpen} onClose={() => setBriefingOpen(false)} />
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{selectedMonthName} 총 업무</p><p className="text-3xl font-bold text-gray-800">{taskStats.total}</p></div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.OVERDUE]} 업무</p><p className="text-3xl font-bold text-red-500">{taskStats.overdue}</p></div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.COMPLETED]} 업무</p><p className="text-3xl font-bold text-blue-500">{taskStats.completed}</p></div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.NOT_STARTED]} 업무</p><p className="text-3xl font-bold text-gray-500">{taskStats.notStarted}</p></div>
         <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.IN_PROGRESS]} 업무</p><p className="text-3xl font-bold text-yellow-500">{taskStats.inProgress}</p></div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.COMPLETED]} 업무</p><p className="text-3xl font-bold text-blue-500">{taskStats.completed}</p></div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.OVERDUE]} 업무</p><p className="text-3xl font-bold text-red-500">{taskStats.overdue}</p></div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

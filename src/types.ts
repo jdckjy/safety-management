@@ -22,10 +22,7 @@ export interface Comment {
   content: string;
 }
 
-export interface Assignee {
-    id: string;
-    name: string;
-}
+// TeamMember 인터페이스를 직접 사용하므로 Assignee는 제거합니다.
 
 export interface Task {
   id: string;
@@ -35,7 +32,7 @@ export interface Task {
   status: TaskStatus;
   records: WeeklyRecord[];
   comments?: Comment[]; // Array of comments for this task
-  assignee?: Assignee;
+  assignees?: TeamMember[]; // 여러 명의 담당자를 위해 배열로 변경
 }
 
 export interface Activity {

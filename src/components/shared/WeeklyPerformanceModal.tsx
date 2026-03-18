@@ -1,8 +1,8 @@
 
 import React, { useState, useMemo, MouseEvent } from 'react';
-import { X, PlusCircle, Trash2, MessageSquare, ArrowLeft, Send } from 'lucide-react';
+import { X, PlusCircle, Trash2, MessageSquare, ArrowLeft, Send, Users } from 'lucide-react';
 import { useProjectData } from '../../providers/ProjectDataProvider';
-import { KPI, Activity, Task, WeeklyRecord, TaskStatus, Comment } from '../../types';
+import { KPI, Activity, Task, TaskStatus, Comment } from '../../types';
 import TaskEditModal from '../TaskEditModal';
 import { 
     startOfWeek, 
@@ -25,7 +25,7 @@ import { getHolidaysForYear } from '../../data/holidays';
 import { getComputedTaskStatus } from '../../utils/taskUtils';
 import { TASK_STATUS, TASK_STATUS_DISPLAY_NAMES } from '../../constants';
 
-// Helper function to get weeks in a month
+// Helper to get weeks in a month
 const getWeeksForMonth = (date: Date) => {
     const monthStart = startOfMonth(date);
     const monthEnd = endOfMonth(date);
@@ -51,7 +51,7 @@ const getWeeksForMonth = (date: Date) => {
     );
 };
 
-// Helper function for status badge styling
+// Helper for status badge styling
 const getStatusBadgeClass = (status: TaskStatus): string => {
   switch (status) {
     case TASK_STATUS.OVERDUE: return 'bg-rose-100 text-rose-800 border-rose-200';
@@ -69,17 +69,17 @@ interface WeeklyPerformanceModalProps {
 }
 
 export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ kpi, activity, onClose }) => {
-  // --- STATE MANAGEMENT ---
-  const { addTask, updateTask, deleteTask, deleteActivityFromKpi, kpiData, addCommentToTask } = useProjectData();
+  // --- STATE ---
+  const { addTask, deleteTask, deleteActivityFromKpi, kpiData, addCommentToTask } = useProjectData();
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null); // This now controls the List vs. Comment view
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [newTaskName, setNewTaskName] = useState('');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [daySelection, setDaySelection] = useState<[number | null, number | null]>([null, null]);
-  const [newComment, setNewComment] = useState(''); // State for the new comment input
+  const [newComment, setNewComment] = useState('');
 
-  // --- MEMOIZED CALCULATIONS ---
+  // --- MEMOIZED DATA ---
   const selectedYear = currentDate.getFullYear();
   const selectedMonth = currentDate.getMonth() + 1;
 
@@ -88,7 +88,6 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
     return liveKpi?.activities.find(a => a.id === activity.id);
   }, [kpiData, kpi.id, activity.id]);
 
-  // Find the most up-to-date version of the selected task, including comments
   const liveSelectedTask = useMemo(() => {
       if (!selectedTask || !liveActivity) return null;
       return liveActivity.tasks.find(t => t.id === selectedTask.id) || null;
@@ -122,7 +121,7 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
       return range;
   }, [daySelection]);
 
-  // --- EVENT HANDLERS ---
+  // --- HANDLERS ---
   const handleDayClick = (dayIndex: number) => {
     const [start, end] = daySelection;
     if (start === null || (start !== null && end !== null)) setDaySelection([dayIndex, null]);
@@ -139,7 +138,7 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
     }
     const startDate = addDays(weekStart, startDay);
     const endDate = addDays(weekStart, endDay);
-    addTask(kpi.id, activity.id, { name: newTaskName.trim(), startDate: startDate.toISOString(), endDate: endDate.toISOString() });
+    addTask(kpi.id, activity.id, { name: newTaskName.trim(), startDate: startDate.toISOString(), endDate: endDate.toISOString(), assignees: [] });
     setNewTaskName('');
     setDaySelection([null, null]);
   };
@@ -157,18 +156,8 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
   const handleAddComment = (e: React.FormEvent) => {
       e.preventDefault();
       if (!newComment.trim() || !liveSelectedTask) return;
-      
-      // Call the new function from the provider
       addCommentToTask(kpi.id, activity.id, liveSelectedTask.id, newComment);
-      
       setNewComment('');
-  };
-
-  const handleSaveTask = (taskId: string, updatedRecords: WeeklyRecord[], newStatus: TaskStatus) => {
-    const taskToUpdate = liveActivity?.tasks.find(t => t.id === taskId);
-    if (!taskToUpdate) return;
-    updateTask(kpi.id, activity.id, { ...taskToUpdate, records: updatedRecords, status: newStatus });
-    setIsEditModalOpen(false);
   };
 
   const handleDeleteActivity = () => {
@@ -197,7 +186,6 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
   const renderTaskList = () => (
     <>
       <form onSubmit={handleAddTask} className="p-4 border rounded-lg bg-gray-50 space-y-4">
-        {/* New Task Input Form - content is unchanged */}
         <div className="flex items-center gap-2">
             <PlusCircle size={20} className="text-gray-400 flex-shrink-0" />
             <input type="text" value={newTaskName} onChange={(e) => setNewTaskName(e.target.value)} placeholder={`${selectedMonth}월 ${selectedWeekNumber}주차 업무 입력...`} className="w-full bg-transparent focus:outline-none placeholder-gray-400 font-semibold" />
@@ -206,9 +194,7 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
         <div className="border-t pt-4 mt-4">
             <div className="grid grid-cols-7 gap-2">
               {daysInWeek.map((day, index) => {
-                  const dayOfWeek = getDay(day);
                   const isHoliday = holidaysSet.has(format(day, 'yyyy-MM-dd'));
-                  const isWeekend = isSunday(day) || isSaturday(day);
                   const textColor = (isSunday(day) || isHoliday) ? 'text-red-600' : isSaturday(day) ? 'text-orange-600' : 'text-gray-700';
                   const isSelected = selectedDayIndices.has(index);
                   const isStartOrEnd = daySelection[0] === index || daySelection[1] === index;
@@ -241,9 +227,11 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
             tasksForSelectedWeek.map(task => {
               const computedStatus = getComputedTaskStatus(task);
               const commentCount = task.comments?.length || 0;
+              const assignees = task.assignees || [];
+
               return (
                 <div key={task.id} onClick={() => handleTaskClick(task)} className="p-4 bg-white border rounded-lg cursor-pointer hover:bg-gray-50 transition-all group flex justify-between items-center shadow-sm hover:shadow-md">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-grow min-w-0">
                     <p className="font-semibold text-gray-800 group-hover:text-orange-600 truncate">{task.name}</p>
                     {commentCount > 0 && (
                         <div className="flex items-center gap-1.5 text-gray-400 group-hover:text-orange-500 transition-colors">
@@ -253,10 +241,27 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
                     )}
                   </div>
                   <div className="flex items-center gap-4 flex-shrink-0">
+                    <div className="flex items-center">
+                        {assignees.length > 0 ? (
+                            <div className="flex -space-x-3 rtl:space-x-reverse">
+                                {assignees.slice(0, 2).map(a => (
+                                    <img key={a.id} className="w-7 h-7 border-2 border-white rounded-full object-cover" src={a.photo} alt={a.name} title={a.name} />
+                                ))}
+                                {assignees.length > 2 && (
+                                    <div className="flex items-center justify-center w-7 h-7 text-xs font-medium text-white bg-gray-500 border-2 border-white rounded-full">+{assignees.length - 2}</div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-1.5 text-gray-400">
+                                <Users size={14}/>
+                                <span className="text-xs italic">미지정</span>
+                            </div>
+                        )}
+                    </div>
                     <span className={`px-3 py-1 text-xs font-bold rounded-full border ${getStatusBadgeClass(computedStatus)}`}>
                       {TASK_STATUS_DISPLAY_NAMES[computedStatus]}
                     </span>
-                    <span className="text-sm font-medium text-gray-600 w-48 text-right">{formatTaskDate(task)}</span>
+                    <span className="text-sm font-medium text-gray-600 w-40 text-right hidden md:inline">{formatTaskDate(task)}</span>
                     <button onClick={(e) => handleDeleteTask(e, task.id)} className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="업무 삭제">
                       <Trash2 size={16} />
                     </button>
@@ -277,12 +282,10 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
 
   const renderCommentsView = () => {
     if (!liveSelectedTask) return null;
-
     const computedStatus = getComputedTaskStatus(liveSelectedTask);
 
     return (
         <div className="flex flex-col h-full">
-            {/* Header for the comment view */}
             <div className="flex-shrink-0 pb-4 mb-4 border-b">
                 <button onClick={handleBackToList} className="flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-900 mb-3">
                     <ArrowLeft size={16} />
@@ -298,13 +301,12 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
                             <span>{formatTaskDate(liveSelectedTask)}</span>
                         </div>
                     </div>
-                    <button onClick={() => { setIsEditModalOpen(true); }} className="px-4 py-2 text-sm font-semibold bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                    <button onClick={() => { setSelectedTask(liveSelectedTask); setIsEditModalOpen(true); }} className="px-4 py-2 text-sm font-semibold bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
                         업무 수정
                     </button>
                 </div>
             </div>
 
-            {/* Comments List */}
             <div className="flex-grow overflow-y-auto space-y-4 pr-2">
                 {liveSelectedTask.comments && liveSelectedTask.comments.length > 0 ? (
                     liveSelectedTask.comments.map(comment => (
@@ -330,7 +332,6 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
                 )}
             </div>
 
-            {/* New Comment Form */}
             <div className="flex-shrink-0 pt-4 mt-4 border-t">
                 <form onSubmit={handleAddComment} className="flex items-center gap-2">
                     <input
@@ -354,7 +355,6 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
   return (
     <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center animate-fade-in">
       <div className="bg-gray-100 flex flex-col h-[90vh] w-[90vw] max-w-5xl rounded-2xl shadow-2xl overflow-hidden">
-        {/* Modal Header */}
         <header className="flex-shrink-0 flex justify-between items-start p-6 border-b border-gray-200">
             <div>
                 <p className="text-orange-500 font-bold text-sm tracking-wider">WEEKLY PERFORMANCE MONITORING</p>
@@ -363,7 +363,6 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
             <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-200/80 transition-colors"><X size={24} className="text-gray-500" /></button>
         </header>
 
-        {/* Month/Week Navigation */}
         {!selectedTask && (
              <section className="flex-shrink-0 p-6 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -383,23 +382,21 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
             </section>
         )}
 
-        {/* Main Content: Switches between Task List and Comments */}
         <main className="flex-grow bg-white rounded-t-2xl m-6 mt-0 p-6 overflow-y-auto">
             {selectedTask ? renderCommentsView() : renderTaskList()}
         </main>
 
-        {/* Footer */}
         <footer className="flex-shrink-0 flex justify-between items-center p-6 border-t border-gray-200 bg-gray-50/50">
             <button onClick={handleDeleteActivity} className="text-sm font-semibold text-red-500 hover:text-red-700">활동 삭제</button>
             <button onClick={onClose} className="px-6 py-3 text-sm font-bold text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300">닫기</button>
         </footer>
 
-        {/* The original Edit Modal is still available from the comments view */}
         {isEditModalOpen && liveSelectedTask && 
           <TaskEditModal 
             task={liveSelectedTask} 
+            kpiId={kpi.id}
+            activityId={activity.id}
             onClose={() => setIsEditModalOpen(false)} 
-            onSave={handleSaveTask} 
           />
         }
       </div>

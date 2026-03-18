@@ -74,7 +74,8 @@ const sanitizeKpi = (partialKpi: Partial<KPI>): KPI => {
       endDate: task.endDate || new Date().toISOString(),
       status: MASTER_STATUS_TRANSITION_MAP[task.status as any] || TASK_STATUS.NOT_STARTED,
       records: task.records || [],
-      comments: task.comments || [], // Ensure comments array exists
+      comments: task.comments || [],
+      assignees: task.assignees || [], // assignee를 assignees 배열로 변경
     })),
   }));
 
@@ -169,7 +170,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, [updateKpiArray, findAndUpdatKpi]);
 
   const addTask = useCallback((kpiId: string, activityId: string, newTaskData: Omit<Task, 'id' | 'status' | 'records'>) => {
-    const newTask: Task = { ...newTaskData, id: `task-${Date.now()}`, status: TASK_STATUS.NOT_STARTED, records: [], comments: [] };
+    const newTask: Task = { ...newTaskData, id: `task-${Date.now()}`, status: TASK_STATUS.NOT_STARTED, records: [], comments: [], assignees: [] }; // assignees 추가
     const updateActivitiesFn = (kpi: KPI): KPI => ({ ...kpi, activities: (kpi.activities || []).map(act => act.id === activityId ? { ...act, tasks: [...(act.tasks || []), newTask] } : act) });
     updateKpiArray(data => findAndUpdatKpi(kpiId, data, updateActivitiesFn));
   }, [updateKpiArray, findAndUpdatKpi]);
