@@ -7,6 +7,8 @@ import { MoreHorizontal, PlusCircle } from 'lucide-react';
 import { ComplexFacility } from '@/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FacilityDetailModal from '@/components/shared/FacilityDetailModal';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const formatNumber = (num: number | null | undefined) => num?.toLocaleString() ?? '-';
 const formatRatio = (num: number | null | undefined) => num?.toFixed(2) ?? '-';
@@ -16,9 +18,22 @@ const ComplexFacilitiesTab: React.FC = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingFacility, setEditingFacility] = useState<ComplexFacility | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCriteria, setFilterCriteria] = useState('name');
+
+  const filteredFacilities = useMemo(() => {
+    return (complexFacilities || []).filter(facility => {
+      if (!searchTerm) return true;
+      const target = facility[filterCriteria as keyof ComplexFacility];
+      if (typeof target === 'string') {
+        return target.toLowerCase().includes(searchTerm.toLowerCase());
+      }
+      return false;
+    });
+  }, [complexFacilities, searchTerm, filterCriteria]);
 
   const groupedFacilities = useMemo(() => 
-    (complexFacilities || []).reduce((acc, facility) => {
+    (filteredFacilities || []).reduce((acc, facility) => {
       const { category } = facility;
       if (!acc[category]) {
         acc[category] = [];
@@ -26,7 +41,7 @@ const ComplexFacilitiesTab: React.FC = () => {
       acc[category].push(facility);
       return acc;
     }, {} as Record<string, ComplexFacility[]>),
-  [complexFacilities]);
+  [filteredFacilities]);
 
   const categories = Object.keys(groupedFacilities);
 
@@ -57,26 +72,44 @@ const ComplexFacilitiesTab: React.FC = () => {
 
   return (
     <div className="pt-4">
-      <Tabs defaultValue={categories.length > 0 ? categories[0] : 'empty'}>
-        <div className="flex justify-between items-center mb-4">
-          <TabsList className="bg-transparent p-0 h-auto overflow-x-auto flex items-center space-x-1">
-            {categories.map((category) => (
-              <TabsTrigger key={category} value={category} 
-                className="whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium text-gray-500 transition-all
-                           hover:bg-gray-200/70
-                           data-[state=active]:bg-gray-800 data-[state=active]:text-gray-50 data-[state=active]:shadow-sm"
-              >
-                {category}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          <div className="pl-4 flex-shrink-0">
-            <Button onClick={handleAddNew} variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
-              <PlusCircle className="mr-2 h-4 w-4" />
-              신규 시설 추가
-            </Button>
-          </div>
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center space-x-2">
+          <Input
+            placeholder="검색..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-60"
+          />
+          <Select value={filterCriteria} onValueChange={setFilterCriteria}>
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="필터" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">시설명</SelectItem>
+              <SelectItem value="mainUse">주용도</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
+        <div className="flex-shrink-0">
+          <Button onClick={handleAddNew} variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            신규 시설 추가
+          </Button>
+        </div>
+      </div>
+
+      <Tabs defaultValue={categories.length > 0 ? categories[0] : 'empty'}>
+        <TabsList className="bg-transparent p-0 h-auto overflow-x-auto flex items-center space-x-1 border-b">
+          {categories.map((category) => (
+            <TabsTrigger key={category} value={category} 
+              className="whitespace-nowrap rounded-none border-b-2 border-transparent px-4 py-2 text-sm font-medium text-gray-500 transition-all
+                         hover:bg-gray-200/70 hover:border-gray-300
+                         data-[state=active]:border-blue-600 data-[state=active]:text-gray-900 data-[state=active]:shadow-none"
+            >
+              {category}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
         {categories.length > 0 ? (
           categories.map((category) => (
@@ -124,19 +157,17 @@ const ComplexFacilitiesTab: React.FC = () => {
                           </DropdownMenu>
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ))}\
                   </TableBody>
                 </Table>
               </div>
             </TabsContent>
           ))
         ) : (
-          <TabsContent value="empty" className="mt-6">
-            <div className="text-center py-20">
-              <p className="text-lg text-gray-500">표시할 시설 정보가 없습니다.</p>
-              <p className="text-sm text-gray-400 mt-2">우측 상단의 '신규 시설 추가' 버튼으로 정보를 등록해보세요.</p>
-            </div>
-          </TabsContent>
+          <div className="text-center py-20 mt-6">
+            <p className="text-lg text-gray-500">{searchTerm ? '검색 결과가 없습니다.' : '표시할 시설 정보가 없습니다.'}</p>
+            {!searchTerm && <p className="text-sm text-gray-400 mt-2">우측 상단의 '신규 시설 추가' 버튼으로 정보를 등록해보세요.</p>}
+          </div>
         )}
       </Tabs>
 
