@@ -23,7 +23,7 @@ const DailyBriefing: React.FC<DailyBriefingProps> = ({ isOpen, onClose }) => {
             <AlertCircle className="mr-4 h-8 w-8 text-blue-500" />
             <div>
               <h2 className="text-2xl font-bold text-gray-800">오늘의 브리핑</h2>
-              <p className="text-sm text-gray-500">오늘의 주요 사항을 빠르게 확인하세요.</p>
+              <p className="text-sm text-gray-500">오늘의 주요 업무와 업데이트를 확인하세요.</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
@@ -31,7 +31,7 @@ const DailyBriefing: React.FC<DailyBriefingProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        <div className="p-8 space-y-8">
+        <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto">
           <BriefingSection
             icon={<Calendar className="text-red-500" />}
             title="오늘 마감 업무"
@@ -42,7 +42,13 @@ const DailyBriefing: React.FC<DailyBriefingProps> = ({ isOpen, onClose }) => {
                 {tasksDueToday.map(task => (
                   <li key={task.id} className="flex items-center">
                     <span className="font-semibold">{task.name}</span>
-                    <Badge variant="outline" className="ml-auto">{task.assignee?.name || '미지정'}</Badge>
+                    <div className="ml-auto flex -space-x-2 overflow-hidden">
+                      {task.assignees && task.assignees.length > 0 ? (
+                        task.assignees.map(a => <img key={a.id} className="inline-block h-6 w-6 rounded-full ring-2 ring-white" src={a.photo} alt={a.name} />)
+                      ) : (
+                        <Badge variant="outline">미지정</Badge>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -105,7 +111,7 @@ const DailyBriefing: React.FC<DailyBriefingProps> = ({ isOpen, onClose }) => {
 interface BriefingSectionProps {
   icon: React.ReactNode;
   title: string;
-  count: number;
+  count?: number;
   children: React.ReactNode;
 }
 
@@ -114,7 +120,7 @@ const BriefingSection: React.FC<BriefingSectionProps> = ({ icon, title, count, c
     <div className="flex items-center mb-4">
       <div className="w-8 h-8 flex items-center justify-center mr-3">{icon}</div>
       <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
-      <Badge variant="default" className="ml-3">{count}</Badge>
+      {count !== undefined && <Badge variant="default" className="ml-3">{count}</Badge>}
     </div>
     <div className="pl-11 border-l-2 border-gray-100 ml-4">
         <div className="pl-8 pb-4">

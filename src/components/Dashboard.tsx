@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { useProjectData } from '../providers/ProjectDataProvider';
 import DailyBriefing from './DailyBriefing';
+import AnalysisDashboard from './AnalysisDashboard'; // 새로 추가된 부분
 import { TASK_STATUS, TASK_STATUS_DISPLAY_NAMES } from '../constants';
 import { startOfMonth, endOfMonth, parseISO, subDays, isAfter, formatDistanceToNow, isBefore } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -115,6 +116,9 @@ const Dashboard: React.FC = () => {
     <div className="flex flex-col gap-6 p-4 sm:p-6">
       <DailyBriefing isOpen={isBriefingOpen} onClose={() => setBriefingOpen(false)} />
       
+      {/* 분석 대시보드 컴포넌트 추가 */}
+      <AnalysisDashboard />
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{selectedMonthName} 총 업무</p><p className="text-3xl font-bold text-gray-800">{taskStats.total}</p></div>
         <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.NOT_STARTED]} 업무</p><p className="text-3xl font-bold text-gray-500">{taskStats.notStarted}</p></div>
