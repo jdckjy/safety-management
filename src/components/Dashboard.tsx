@@ -3,7 +3,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { useProjectData } from '../providers/ProjectDataProvider';
 import DailyBriefing from './DailyBriefing';
-import AnalysisDashboard from './AnalysisDashboard'; // 새로 추가된 부분
 import { TASK_STATUS, TASK_STATUS_DISPLAY_NAMES } from '../constants';
 import { startOfMonth, endOfMonth, parseISO, subDays, isAfter, formatDistanceToNow, isBefore } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -22,6 +21,8 @@ const Dashboard: React.FC = () => {
   }, []);
   
   const taskStats = useMemo(() => {
+    if (!kpiData) return { completed: 0, inProgress: 0, notStarted: 0, overdue: 0, total: 0 };
+
     const viewDate = new Date();
     viewDate.setMonth(navigationState.selectedMonth ?? viewDate.getMonth());
     const monthStart = startOfMonth(viewDate);
@@ -74,6 +75,7 @@ const Dashboard: React.FC = () => {
   }, [kpiData, navigationState.selectedMonth]);
   
   const recentActivities = useMemo(() => {
+    if (!kpiData) return [];
     const allTasks = kpiData.flatMap(kpi => kpi.activities ?? []).flatMap(activity => activity.tasks ?? []);
     const sevenDaysAgo = subDays(new Date(), 7);
 
@@ -116,9 +118,6 @@ const Dashboard: React.FC = () => {
     <div className="flex flex-col gap-6 p-4 sm:p-6">
       <DailyBriefing isOpen={isBriefingOpen} onClose={() => setBriefingOpen(false)} />
       
-      {/* 분석 대시보드 컴포넌트 추가 */}
-      <AnalysisDashboard />
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{selectedMonthName} 총 업무</p><p className="text-3xl font-bold text-gray-800">{taskStats.total}</p></div>
         <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.NOT_STARTED]} 업무</p><p className="text-3xl font-bold text-gray-500">{taskStats.notStarted}</p></div>
@@ -135,7 +134,7 @@ const Dashboard: React.FC = () => {
             <div className="bg-white p-6 rounded-2xl shadow-md h-full">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">주요 KPI 요약</h3>
                 <div className="space-y-4">
-                    {kpiData.length > 0 ? (
+                    {kpiData && kpiData.length > 0 ? (
                     kpiData.slice(0, 5).map((kpi) => {
                         const change = kpi.current - (kpi.previous || 0);
                         const isPositive = change >= 0;
@@ -169,7 +168,7 @@ const Dashboard: React.FC = () => {
       <div className="bg-white p-6 rounded-2xl shadow-md">
            <h3 className="text-lg font-semibold text-gray-900 mb-4">최근 활동 피드</h3>
            <div className="space-y-2">
-            {recentActivities.length > 0 ? (
+            {recentActivities && recentActivities.length > 0 ? (
                 recentActivities.map(activity => (
                     <div key={activity.id} className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
                         <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" />

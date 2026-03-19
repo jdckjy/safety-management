@@ -1,137 +1,89 @@
 
-// src/types.ts
-import { TaskStatus } from './constants';
+// 프로젝트의 주요 데이터 유형을 정의합니다.
 
+/**
+ * 최상위 프로젝트 데이터 구조
+ */
+export interface ProjectData {
+  projectName: string;
+  complexFacilities: ComplexFacility[];
+  tenantUnits: TenantUnit[];
+  safetyScores: SafetyScore[];
+  leaseKPIs: LeaseKPI[];
+  assetKPIs: AssetKPI[];
+  infraKPIs: InfraKPI[];
+  // [수정] 대시보드에서 사용하던 탭 관련 타입을 제거합니다.
+}
+
+/**
+ * 좌측 사이드바 메뉴 키
+ */
 export type MenuKey = 'dashboard' | 'safety' | 'lease' | 'asset' | 'infra';
 
-export type { TaskStatus };
+/**
+ * 임대 유닛(호실)의 상태
+ */
+export type TenantUnitStatus = '입주' | '공실' | '협의중';
 
-export interface WeeklyRecord {
-  year: number;
-  month: number;
-  week: number;
-  status: TaskStatus;
-  comment?: string;
-}
-
-// Interface for a single comment on a task
-export interface Comment {
+/**
+ * 임대 유닛(호실) 정보
+ */
+export interface TenantUnit {
   id: string;
-  author: string; // Name of the user who made the comment
-  timestamp: string; // ISO 8601 timestamp
-  content: string;
+  facilityId?: string; // [수정] 각 유닛이 속한 시설 ID (옵셔널)
+  floor: string;
+  ho: string;
+  area: number; // 면적 (제곱미터)
+  status: TenantUnitStatus;
+  tenantName?: string;
+  rent?: number; // 월 임대료
 }
 
-// TeamMember 인터페이스를 직접 사용하므로 Assignee는 제거합니다.
-
-export interface Task {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  status: TaskStatus;
-  records: WeeklyRecord[];
-  comments?: Comment[]; // Array of comments for this task
-  assignees?: TeamMember[]; // 여러 명의 담당자를 위해 배열로 변경
-}
-
-export interface Activity {
-  id: string;
-  name: string;
-  status: TaskStatus;
-  tasks: Task[];
-}
-
-export interface KPI {
-  id: string;
-  title: string;
-  description: string;
-  target: number;
-  current: number;
-  previous?: number;
-  unit: string;
-  activities: Activity[];
-}
-
-export interface HotSpot {
-  id: string;
-  name: string;
-  location: string;
-  description: string;
-}
-
-export interface Facility {
-  id: string;
-  name: string;
-  type: string;
-  status: string;
-}
-
+/**
+ * 단지 내 주요 시설 정보
+ */
 export interface ComplexFacility {
   id: string;
-  category: string;
   name: string;
-  area: number | null;
-  compositionRatio: number | null;
-  details: string;
-  buildingArea: number | null;
-  buildingCoverageRatio: number | null;
-  grossFloorArea: number | null;
-  floorAreaRatio: number | null;
-  mainUse: string;
-  height: string;
-  remarks: string;
+  category: '상가시설' | '운동시설' | '문화시설' | '주차장' | '기타';
+  area: number; // 총 면적
+  floor: string; // 위치한 층
 }
 
-export interface TeamMember {
+/**
+ * KPI 항목
+ */
+export interface KPI {
   id: string;
   name: string;
-  position: string;
-  phone: string;
-  photo: string;
+  value: number | string;
+  unit: string;
+  change: number; // 이전 기간 대비 변화율 (%)
 }
 
-export interface NavigationState {
-  menuKey: string;
-  selectedKpiId?: string;
-  activityId?: string;
-  selectedMonth?: number;
+// 각 메뉴별 KPI 타입 (기본 KPI 인터페이스 확장)
+export interface LeaseKPI extends KPI {}
+export interface AssetKPI extends KPI {}
+export interface InfraKPI extends KPI {}
+
+/**
+ * 안전 관리 점수
+ */
+export interface SafetyScore {
+  category: string;
+  score: number;
+  lastInspection: string;
 }
 
-export interface Tenant {
-    id: string;
-    name: string;
-    // Add other tenant properties as needed
+/**
+ * 알림 정보
+ */
+export interface Notification {
+  id: number;
+  type: 'alert' | 'info';
+  message: string;
+  timestamp: string;
+  read: boolean;
 }
 
-export type TenantUnitStatus = '공실' | '입주' | '협의중' | '비임대';
-
-export interface TenantUnit {
-    id: string;
-    floor: string;
-    name: string; // 호실명 (예: 101호)
-    area: number; // 면적 (m²)
-    status: TenantUnitStatus;
-    tenant?: string; // 임차인
-    rent?: number; // 월 임대료
-    deposit?: number; // 보증금
-    contractDate?: string;
-    moveInDate?: string;
-    moveOutDate?: string;
-    pathData?: string; // For SVG path
-}
-
-
-export interface IProjectData {
-  safetyKPIs: KPI[];
-  leaseKPIs: KPI[];
-  assetKPIs: KPI[];
-  infraKPIs: KPI[];
-  hotspots: HotSpot[];
-  facilities: Facility[];
-  complexFacilities: ComplexFacility[];
-  teamMembers: TeamMember[];
-  tenantUnits: TenantUnit[];
-}
-
-export type StateUpdater<T> = React.Dispatch<React.SetStateAction<T>>;
+// [수정] 대시보드에서 동적으로 추가되던 탭 관련 타입을 제거합니다.

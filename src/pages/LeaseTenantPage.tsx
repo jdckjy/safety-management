@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Lightbulb, Zap, BarChart, Building, Percent } from 'lucide-react';
 import { UNIT_STATUS } from '@/constants';
+import LeaseAnalysisPage from './LeaseAnalysisPage';
 
 const LeaseTenantPage: React.FC = () => {
   const { complexFacilities, tenantUnits } = useProjectData();
@@ -94,9 +95,10 @@ const LeaseTenantPage: React.FC = () => {
     <div className="p-4 sm:p-6 md:p-8">
       <h1 className="text-2xl font-bold tracking-tight mb-6">임대 및 세대 관리</h1>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="kpiReports">KPI 보고서</TabsTrigger>
           <TabsTrigger value="tenantRoster">임차인 명단</TabsTrigger>
+          <TabsTrigger value="leaseAnalysis">수익 분석</TabsTrigger>
           <TabsTrigger value="aiRecommendation">AI 최적 임차인 추천</TabsTrigger>
         </TabsList>
 
@@ -171,6 +173,10 @@ const LeaseTenantPage: React.FC = () => {
             </Card>
         </TabsContent>
 
+        {/* 수익 분석 탭 */}
+        <TabsContent value="leaseAnalysis">
+            <LeaseAnalysisPage />
+        </TabsContent>
 
         {/* AI 최적 임차인 추천 탭 */}
         <TabsContent value="aiRecommendation">
@@ -188,15 +194,15 @@ const LeaseTenantPage: React.FC = () => {
                     <SelectContent>
                         {commercialFacilities.map(f => (
                             <SelectItem key={f.id} value={f.name}>{f.name}</SelectItem>
-                        ))}\
+                        ))}
                     </SelectContent>
                 </Select>
                 <Button onClick={handleAnalyze} disabled={isLoading || !selectedFacility}>
-                  {isLoading ? "분석 중..." : "최적 임차인 분석 실행"}\
+                  {isLoading ? "분석 중..." : "최적 임차인 분석 실행"}
                 </Button>
               </div>
 
-              {error && <Alert variant="destructive">\
+              {error && <Alert variant="destructive">
                   <AlertTitle>오류</AlertTitle>
                   <AlertDescription>{error}</AlertDescription>
               </Alert>}

@@ -2,14 +2,16 @@
 import React, { useState } from 'react';
 import KPIManager from './KPIManager';
 import TenantManager from './TenantManager';
-import AITenantRecommender from './AITenantRecommender'; // 1. AI Recommender 컴포넌트 임포트
+import AITenantRecommender from './AITenantRecommender';
+import LeaseAnalysisPage from '../pages/LeaseAnalysisPage'; // 수익 분석 페이지 임포트
 import { useProjectData } from '../providers/ProjectDataProvider';
 
 // Tab configuration
 const subTabs = [
-  { id: 'performance', label: 'KPI Reports', component: KPIManager },
-  { id: 'roster', label: 'Tenant Roster', component: TenantManager },
-  { id: 'ai-recommender', label: 'AI Tenant Recommender', component: AITenantRecommender }, // 2. 새로운 탭 추가
+  { id: 'performance', label: 'KPI Reports' },
+  { id: 'roster', label: 'Tenant Roster' },
+  { id: 'lease-analysis', label: '수익 분석' }, // '수익 분석' 탭 추가
+  { id: 'ai-recommender', label: 'AI Tenant Recommender' },
 ];
 
 const LeaseRecruitment: React.FC = () => {
@@ -24,11 +26,12 @@ const LeaseRecruitment: React.FC = () => {
     const activeTabConfig = subTabs.find(tab => tab.id === activeTab);
     if (!activeTabConfig) return null;
 
-    // 3. 탭 ID에 따라 올바른 컴포넌트를 렌더링하도록 로직 간소화
     if (activeTabConfig.id === 'performance') {
       return <KPIManager sectionTitle="KPI Reports" kpis={leaseKPIs} onUpdate={setLeaseKPIs} />;
     } else if (activeTabConfig.id === 'roster') {
       return <TenantManager />;
+    } else if (activeTabConfig.id === 'lease-analysis') {
+      return <LeaseAnalysisPage />; // '수익 분석' 탭 컨텐츠 렌더링
     } else if (activeTabConfig.id === 'ai-recommender') {
         return <AITenantRecommender />;
     }
