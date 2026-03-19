@@ -1,7 +1,6 @@
 
 import React, { useMemo, useEffect, useState } from 'react';
 import { Search, Bell, ChevronDown, Calendar, Menu, LogOut, X } from 'lucide-react';
-// [수정] 더 이상 전역 customTabs를 사용하지 않으므로, useProjectData에서 해당 부분을 가져오지 않습니다.
 import { useProjectData } from '../providers/ProjectDataProvider';
 import { useAuth } from '../features/auth/AuthContext';
 import { useDropdown } from '../hooks/useDropdown';
@@ -9,14 +8,14 @@ import { useNotifications } from '../providers/NotificationProvider';
 import { useSearch } from '../providers/SearchProvider';
 import NotificationDropdown from './NotificationDropdown';
 import GlobalSearchResults from './GlobalSearchResults';
+import { TeamMember } from '../types';
 
 interface HeaderProps {
   activeMenu: string;
 }
 
 const Header: React.FC<HeaderProps> = ({ activeMenu }) => {
-  // [수정] customTabs를 제거합니다.
-  const { navigationState, setSelectedMonth } = useProjectData();
+  const { navigationState, setSelectedMonth, teamMembers } = useProjectData();
   const { currentUser, logout } = useAuth();
   const { isOpen: isNotificationOpen, toggle: toggleNotification, close: closeNotification, dropdownRef: notificationRef } = useDropdown();
   const { unreadCount } = useNotifications();
@@ -24,6 +23,12 @@ const Header: React.FC<HeaderProps> = ({ activeMenu }) => {
   const { query, search, clear } = useSearch();
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const { isOpen: isSearchResultsOpen, close: closeSearchResults, dropdownRef: searchRef } = useDropdown();
+
+  // [수정] 정확한 일치(===) 대신, 전체 이름이 displayName을 포함하는지(includes) 확인합니다.
+  const currentUserMemberInfo = useMemo(() => {
+    if (!currentUser?.displayName || !teamMembers) return null;
+    return teamMembers.find(m => m.name.includes(currentUser.displayName!));
+  }, [currentUser, teamMembers]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     search(e.target.value);
@@ -35,26 +40,14 @@ const Header: React.FC<HeaderProps> = ({ activeMenu }) => {
     }
   }, [query, closeSearchResults]);
 
-  // [핵심 수정] getTitle 함수를 당신의 요구사항에 맞게 재구성합니다.
   const getTitle = () => {
     if (activeMenu === 'dashboard') return '';
-    // 당신의 지시대로, 'base-info' 페이지에서는 제목을 표시하지 않습니다.
     if (activeMenu === 'base-info') return '';
     if (activeMenu === 'safety') return '안전 관리';
     if (activeMenu === 'lease') return '임대 및 세대 관리';
     if (activeMenu === 'asset') return '자산 가치 관리';
     if (activeMenu === 'infra') return '인프라 개발';
-
-    // 이전의 잘못된 custom tab 관련 로직을 모두 제거합니다.
     return '';
-  };
-
-  const getDisplayName = () => {
-    if (currentUser) {
-      const emailName = currentUser.email?.split('@')[0];
-      return emailName ? emailName.charAt(0).toUpperCase() + emailName.slice(1) : "김프로";
-    }
-    return "김프로";
   };
 
   const months = useMemo(() =>
@@ -119,11 +112,28 @@ const Header: React.FC<HeaderProps> = ({ activeMenu }) => {
         </div>
 
         <div className="flex items-center gap-3">
-          <img src={`https://i.pravatar.cc/40?u=${currentUser?.uid || 'default'}`} alt="user" className="w-10 h-10 rounded-full border-2 border-white shadow-md" />
-          <div>
-            <p className="text-sm font-bold">{getDisplayName()}</p>
-            <p className="text-xs text-gray-400 font-bold">Project Manager</p>
-          </div>
+        {currentUser ? (
+            <>
+                <img 
+                  src={currentUserMemberInfo?.photo || currentUser.photoURL || `https://i.pravatar.cc/40?u=${currentUser.uid}`}
+                  alt="user" 
+                  className="w-10 h-10 rounded-full border-2 border-white shadow-md" 
+                />
+                <div>
+                    {/* [수정] 사용자를 찾으면 전체 이름을, 아니면 기존 displayName을 표시합니다. */}
+                    <p className="text-sm font-bold">{currentUserMemberInfo?.name || currentUser.displayName || '사용자'}</p>
+                    <p className="text-xs text-gray-400 font-bold">{currentUserMemberInfo?.position || 'Project Manager'}</p>
+                </div>
+            </>
+        ) : (
+          <>
+              <div className="w-10 h-10 rounded-full bg-gray-200 animate-pulse" />
+              <div>
+                  <div className="h-4 w-20 bg-gray-200 rounded animate-pulse mb-1"></div>
+                  <div className="h-3 w-24 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+          </>
+        )}
           <button
             onClick={logout}
             className="p-2 rounded-full hover:bg-red-100 text-gray-500 hover:text-red-600 transition-colors"
