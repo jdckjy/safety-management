@@ -1,94 +1,214 @@
-
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { useLeaseAnalytics } from '../hooks/useLeaseAnalytics';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Bar } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { DollarSign } from "lucide-react";
 import { useProjectData } from '../providers/ProjectDataProvider';
-import LeaseSimulator from '../components/LeaseSimulator'; // [신규] 시뮬레이터 컴포넌트 임포트
+import { useLeaseAnalytics } from '@/hooks/useLeaseAnalytics';
+import LeaseSimulator from '@/components/LeaseSimulator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { FinancialEntryForm } from '@/components/FinancialEntryForm';
+import { FinancialDataTable } from '@/components/FinancialDataTable';
+import { IncomeItem, ExpenseItem } from '@/types';
+import {
+  addIncome, addExpense,
+  getIncomes, getExpenses,
+  updateIncome, updateExpense,
+  deleteIncome, deleteExpense
+} from '@/firebase';
 
-ChartJS.register(
-  CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
-const StatDisplay = ({ label, value }: { label: string; value: string | number }) => (
-  <div className="flex flex-col items-center justify-center p-2 rounded-lg bg-gray-50 text-center">
-    <p className="text-sm font-medium text-gray-500">{label}</p>
-    <p className="text-xl font-bold text-gray-800">{value}</p>
-  </div>
-);
-
-const LeaseAnalysisPage: React.FC = () => {
+const LeaseAnalysisPage = () => {
   const { tenantUnits, complexFacilities } = useProjectData();
   const { analytics } = useLeaseAnalytics(tenantUnits, complexFacilities);
 
-  const chartData = {
-    labels: Object.keys(analytics).filter(k => k !== '전체'),
-    datasets: [
-      {
-        label: '임대율 (%)',
-        data: Object.values(analytics).filter(v => v !== analytics['전체']).map(v => v.leaseRate.toFixed(1)),
-        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-      },
-    ],
+  const [incomeItems, setIncomeItems] = useState<IncomeItem[]>([]);
+  const [expenseItems, setExpenseItems] = useState<ExpenseItem[]>([]);
+
+  const fetchFinancialData = useCallback(async () => {
+    try {
+      const [incomes, expenses] = await Promise.all([getIncomes(), getExpenses()]);
+      setIncomeItems(incomes);
+      setExpenseItems(expenses);
+    } catch (error) {
+      console.error("재무 데이터를 불러오는 중 오류 발생:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFinancialData();
+  }, [fetchFinancialData]);
+
+  const handleAddFinancialItem = async (
+    item: Omit<IncomeItem, 'id'> | Omit<ExpenseItem, 'id'>, 
+    type: 'income' | 'expense'
+  ) => {
+    try {
+      if (type === 'income') {
+        await addIncome(item as Omit<IncomeItem, 'id'>);
+      } else {
+        await addExpense(item as Omit<ExpenseItem, 'id'>);
+      }
+      await fetchFinancialData();
+    } catch (error) {
+      console.error("항목 추가 중 오류 발생:", error);
+    }
   };
 
-  const overallAnalytics = analytics['전체'];
+  const handleUpdateFinancialItem = async (
+    id: string, 
+    updates: Partial<Omit<IncomeItem, 'id'>> | Partial<Omit<ExpenseItem, 'id'>>,
+    type: 'income' | 'expense'
+  ) => {
+    try {
+      if (type === 'income') {
+        await updateIncome(id, updates);
+      } else {
+        await updateExpense(id, updates);
+      }
+      await fetchFinancialData();
+    } catch (error) {
+      console.error("항목 수정 중 오류 발생:", error);
+    }
+  };
 
-  if (!tenantUnits || !complexFacilities || !overallAnalytics) {
-    return (
-        <div className="flex justify-center items-center h-screen">
-            <p className="text-lg text-gray-600">분석 데이터를 불러오는 중입니다...</p>
-        </div>
-    );
-  }
+  const handleDeleteFinancialItem = async (id: string, type: 'income' | 'expense') => {
+    try {
+      if (type === 'income') {
+        await deleteIncome(id);
+      } else {
+        await deleteExpense(id);
+      }
+      await fetchFinancialData();
+    } catch (error) {
+      console.error("항목 삭제 중 오류 발생:", error);
+    }
+  };
+  
+  const chartData = useMemo(() => {
+    const labels = Object.keys(analytics).filter(key => key !== '전체');
+    return {
+      labels,
+      datasets: [{
+        label: '시설별 임대율 (%)',
+        data: labels.map(key => analytics[key].leaseRate),
+        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+      }],
+    };
+  }, [analytics]);
 
-  // [수정] 2단 그리드 레이아웃 적용
+  const chartOptions = {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: '시설별 임대율',
+      },
+    },
+  };
+
+  const totalAnalytics = analytics['전체'] || { leasedRevenue: 0, leaseRate: 0 };
+  const totalLeaseRevenue = totalAnalytics.leasedRevenue;
+  const totalOtherIncome = incomeItems.reduce((sum, item) => sum + item.amount, 0);
+  const totalExpense = expenseItems.reduce((sum, item) => sum + item.amount, 0);
+  const netIncome = totalLeaseRevenue + totalOtherIncome - totalExpense;
+
+  const formatCurrency = (value: number) => new Intl.NumberFormat('ko-KR').format(value) + '원';
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* 좌측: 기존 분석 대시보드 */}
-      <div className="lg:col-span-2">
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle>실시간 임대 현황 및 수익 분석</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <StatDisplay label="전체 임대율" value={`${overallAnalytics.leaseRate.toFixed(1)}%`} />
-                <StatDisplay label="월 예상수익 (현재)" value={`${(overallAnalytics.leasedRevenue / 100000000).toFixed(1)}억`} />
-                <StatDisplay label="총 공실 수" value={`${overallAnalytics.vacantCount}개`} />
-                <StatDisplay label="전체 잠재수익" value={`${(overallAnalytics.totalPotentialRevenue / 100000000).toFixed(1)}억`} />
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">실시간 임대 현황 및 수익 분석</h1>
+      
+      <Tabs defaultValue="overview">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="overview">종합 분석</TabsTrigger>
+          <TabsTrigger value="details">상세 수익/지출 내역</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="overview">
+          <div className="grid gap-6 mt-6 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-sm font-medium">총 임대료 수입</CardTitle>
+                  <DollarSign className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{formatCurrency(totalLeaseRevenue)}</div>
+                  <p className="text-xs text-muted-foreground">모든 임대 세대 합산</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-sm font-medium">총 기타 수입</CardTitle>
+                  <DollarSign className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{formatCurrency(totalOtherIncome)}</div>
+                  <p className="text-xs text-muted-foreground">관리비, 부대시설 등</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-sm font-medium">총 지출</CardTitle>
+                  <DollarSign className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{formatCurrency(totalExpense)}</div>
+                  <p className="text-xs text-muted-foreground">유지보수, 용역비 등</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                  <CardTitle className="text-sm font-medium">총 순수익</CardTitle>
+                  <DollarSign className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                  <div className="text-2xl font-bold">{formatCurrency(netIncome)}</div>
+                  <p className="text-xs text-muted-foreground">(총 수입 - 총 지출)</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+            <div className="lg:col-span-2">
+                <Card>
+                    <CardHeader><CardTitle>시설별 임대율 현황</CardTitle></CardHeader>
+                    <CardContent>
+                        <Bar options={chartOptions} data={chartData} />
+                    </CardContent>
+                </Card>
             </div>
+            <div>
+              <LeaseSimulator />
+            </div>
+          </div>
+        </TabsContent>
 
-            {Object.keys(analytics).filter(k => k !== '전체').length > 0 ? (
-              <div>
-                <h3 className="font-semibold text-md mb-2 text-gray-800">시설별 임대율 현황</h3>
-                <div style={{height: '250px'}}>
-                  <Bar 
-                    data={chartData} 
-                    options={{ maintainAspectRatio: false, responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 100, ticks: { stepSize: 25, callback: (value) => `${value}%` } }, x: { grid: { display: false } } } }}
-                  />
+        <TabsContent value="details">
+            <div className="grid gap-6 mt-6 lg:grid-cols-3">
+                <div className="lg:col-span-1">
+                    <FinancialEntryForm onSubmit={handleAddFinancialItem} />
                 </div>
-              </div>
-            ) : (
-              <div className="text-center text-gray-500">시설별 분석 데이터가 없습니다.</div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* 우측: 공실 해소 시뮬레이터 */}
-      <div className="lg:col-span-1">
-        <LeaseSimulator />
-      </div>
+                <div className="lg:col-span-2">
+                    <Card>
+                        <CardHeader><CardTitle>수입 및 지출 내역</CardTitle></CardHeader>
+                        <CardContent>
+                            <FinancialDataTable 
+                                incomeItems={incomeItems} 
+                                expenseItems={expenseItems} 
+                                onUpdate={handleUpdateFinancialItem}
+                                onDelete={handleDeleteFinancialItem}
+                            />
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

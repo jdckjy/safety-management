@@ -1,89 +1,135 @@
-
-// 프로젝트의 주요 데이터 유형을 정의합니다.
-
-/**
- * 최상위 프로젝트 데이터 구조
- */
-export interface ProjectData {
-  projectName: string;
-  complexFacilities: ComplexFacility[];
-  tenantUnits: TenantUnit[];
-  safetyScores: SafetyScore[];
-  leaseKPIs: LeaseKPI[];
-  assetKPIs: AssetKPI[];
-  infraKPIs: InfraKPI[];
-  // [수정] 대시보드에서 사용하던 탭 관련 타입을 제거합니다.
+export interface Comment {
+    id: string;
+    author: string;
+    timestamp: string;
+    content: string;
 }
 
-/**
- * 좌측 사이드바 메뉴 키
- */
-export type MenuKey = 'dashboard' | 'safety' | 'lease' | 'asset' | 'infra';
-
-/**
- * 임대 유닛(호실)의 상태
- */
-export type TenantUnitStatus = '입주' | '공실' | '협의중';
-
-/**
- * 임대 유닛(호실) 정보
- */
-export interface TenantUnit {
-  id: string;
-  facilityId?: string; // [수정] 각 유닛이 속한 시설 ID (옵셔널)
-  floor: string;
-  ho: string;
-  area: number; // 면적 (제곱미터)
-  status: TenantUnitStatus;
-  tenantName?: string;
-  rent?: number; // 월 임대료
+export interface TaskRecord {
+    id: string;
+    date: string;
+    status: string;
+    comment: string;
 }
 
-/**
- * 단지 내 주요 시설 정보
- */
-export interface ComplexFacility {
-  id: string;
-  name: string;
-  category: '상가시설' | '운동시설' | '문화시설' | '주차장' | '기타';
-  area: number; // 총 면적
-  floor: string; // 위치한 층
+export interface Task {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    status: string;
+    assignees: string[];
+    records: TaskRecord[];
+    comments: Comment[];
 }
 
-/**
- * KPI 항목
- */
+export interface Activity {
+    id: string;
+    name: string;
+    status: string;
+    tasks: Task[];
+    description: string;
+    startDate: string;
+    endDate: string;
+    assignee: string;
+}
+
 export interface KPI {
-  id: string;
-  name: string;
-  value: number | string;
-  unit: string;
-  change: number; // 이전 기간 대비 변화율 (%)
+    id: string;
+    title: string;
+    description: string;
+    current: number;
+    target: number;
+    unit: string;
+    previous: number;
+    activities: Activity[];
 }
 
-// 각 메뉴별 KPI 타입 (기본 KPI 인터페이스 확장)
-export interface LeaseKPI extends KPI {}
-export interface AssetKPI extends KPI {}
-export interface InfraKPI extends KPI {}
-
-/**
- * 안전 관리 점수
- */
-export interface SafetyScore {
-  category: string;
-  score: number;
-  lastInspection: string;
+export interface HotSpot {
+    id: string;
+    name: string;
+    x: number;
+    y: number;
+    floor: string;
+    type: 'safety' | 'traffic' | 'congestion';
 }
 
-/**
- * 알림 정보
- */
-export interface Notification {
-  id: number;
-  type: 'alert' | 'info';
-  message: string;
-  timestamp: string;
-  read: boolean;
+export interface Facility {
+    id: string;
+    name: string;
+    type: string;
+    location: string;
 }
 
-// [수정] 대시보드에서 동적으로 추가되던 탭 관련 타입을 제거합니다.
+export interface NavigationState {
+    menuKey: string;
+    selectedKpi?: string;
+    selectedActivity?: string;
+    selectedTask?: string;
+    selectedMonth: number;
+}
+export interface TenantUnit {
+    id: string;
+    name: string;
+    floor: string;
+    area: number;
+    status: '입주' | '공실' | '수리중';
+    tenantName?: string;
+    leaseStartDate?: string;
+    leaseEndDate?: string;
+    rent?: number;
+    facilityId?: string;
+    pathData?: string;
+}
+
+export interface ComplexFacility {
+    id: string;
+    name: string;
+    type: '주거' | '상업' | '의료' | '기타';
+    floorRange: [number, number];
+}
+
+export interface TeamMember {
+    id: string;
+    name: string;
+    team: string;
+    position: string;
+    phone: string;
+    email: string;
+    avatar?: string;
+}
+
+export interface IProjectData {
+    safetyKPIs: KPI[];
+    leaseKPIs: KPI[];
+    assetKPIs: KPI[];
+    infraKPIs: KPI[];
+    hotspots: HotSpot[];
+    facilities: Facility[];
+    tenantUnits: TenantUnit[];
+    complexFacilities: ComplexFacility[];
+    teamMembers: TeamMember[];
+}
+
+
+export type TenantUnitStatus = '입주' | '공실' | '수리중';
+
+export type IncomeCategory = '관리비' | '주차비' | '기타';
+
+export type ExpenseCategory = '공과금' | '수리비' | '인건비' | '마케팅' | '용역비' | '기타';
+
+export interface IncomeItem {
+    id: string;
+    date: string;
+    category: string;
+    description: string;
+    amount: number;
+}
+
+export interface ExpenseItem {
+    id: string;
+    date: string;
+    category: string;
+    description: string;
+    amount: number;
+}
