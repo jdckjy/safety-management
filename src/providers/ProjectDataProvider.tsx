@@ -1,10 +1,10 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, TaskStatus, ComplexFacility, TeamMember, TenantUnit, Comment } from '../types';
+import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, TenantUnit } from '../types'; // TaskStatus 제거
 import { getFirestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../features/auth/AuthContext';
 import { Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
-import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '../constants';
+import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '../constants'; // TaskStatus 여기서 import
 import { initialComplexFacilities } from '../data/initial-complex-facilities';
 import { initialTeamMembers } from '../data/initial-team-members';
 import { initialTenantUnits } from '../data/tenantUnits';
@@ -13,11 +13,12 @@ import { initialTenantUnits } from '../data/tenantUnits';
 interface IProjectDataContext extends IProjectData {
   kpiData: (KPI & { type: string; icon: React.ReactNode; color: string; })[];
   navigationState: NavigationState;
+  isDataLoaded: boolean; // 데이터 로딩 완료 상태
   setData: React.Dispatch<React.SetStateAction<IProjectData>>;
   addActivityToKpi: (kpiId: string, newActivity: Omit<Activity, 'id' | 'status' | 'tasks'>) => Promise<Activity>;
   updateActivityInKpi: (kpiId: string, updatedActivity: Activity) => void;
   deleteActivityFromKpi: (kpiId: string, activityId: string) => void;
-  addTask: (kpiId: string, activityId: string, newTaskData: Omit<Task, 'id' | 'status' | 'records'>) => void;
+  addTask: (kpiId: string, activityId: string, newTaskData: Omit<Task, 'id' | 'status' | 'records' | 'comments'>) => void; // comments 제거
   updateTask: (kpiId: string, activityId: string, updatedTask: Task) => void;
   deleteTask: (kpiId: string, activityId: string, taskId: string) => void;
   addCommentToTask: (kpiId: string, activityId: string, taskId: string, content: string) => void;
@@ -75,7 +76,7 @@ const sanitizeKpi = (partialKpi: Partial<KPI>): KPI => {
       status: MASTER_STATUS_TRANSITION_MAP[task.status as any] || TASK_STATUS.NOT_STARTED,
       records: task.records || [],
       comments: task.comments || [],
-      assignees: task.assignees || [], // assignee를 assignees 배열로 변경
+      assignees: task.assignees || [],
     })),
   }));
 
@@ -85,23 +86,22 @@ const sanitizeKpi = (partialKpi: Partial<KPI>): KPI => {
 export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
   const db = getFirestore();
-  const isInitialLoad = React.useRef(true);
   const [data, setData] = useState<IProjectData>(initialData);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   
   const [navigationState, setNavigationState] = useState<NavigationState>({
     menuKey: 'dashboard',
     selectedMonth: new Date().getMonth(),
   });
 
-  // --- DATA SYNC EFFECTS ---
   useEffect(() => {
     if (!currentUser) {
       setData(initialData);
-      isInitialLoad.current = true;
+      setIsDataLoaded(true); 
       return;
     }
     const fetchData = async () => {
-      isInitialLoad.current = true;
+      setIsDataLoaded(false);
       const userDocRef = doc(db, 'users', currentUser.uid);
       try {
         const userDocSnap = await getDoc(userDocRef);
@@ -124,21 +124,20 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
           setData(initialData);
         }
       } catch (error) { console.error("Error fetching data:", error); setData(initialData); }
-      finally { setTimeout(() => { isInitialLoad.current = false; }, 0); }
+      finally { setIsDataLoaded(true); }
     };
     fetchData();
   }, [currentUser, db]);
 
   useEffect(() => {
-    if (isInitialLoad.current || !currentUser) return;
+    if (!isDataLoaded || !currentUser) return;
     const debounceSave = setTimeout(() => {
         try { setDoc(doc(db, 'users', currentUser.uid), data, { merge: true });
         } catch (error) { console.error("Error saving data:", error); }
     }, 300);
     return () => clearTimeout(debounceSave);
-  }, [data, currentUser, db]);
+  }, [data, currentUser, db, isDataLoaded]);
 
-  // --- GENERIC STATE UPDATE HELPERS ---
   const updateKpiArray = useCallback((updateFn: (data: IProjectData) => IProjectData) => {
     setData(prevData => updateFn(prevData));
   }, []);
@@ -154,7 +153,6 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     return data;
   }, []);
 
-  // --- CRUD OPERATIONS ---
   const addActivityToKpi = useCallback(async (kpiId: string, newActivityData: Omit<Activity, 'id' | 'status' | 'tasks'>): Promise<Activity> => {
     const newActivity: Activity = { ...newActivityData, id: `activity-${Date.now()}`, status: TASK_STATUS.NOT_STARTED, tasks: [] };
     updateKpiArray(data => findAndUpdatKpi(kpiId, data, kpi => ({ ...kpi, activities: [...(kpi.activities || []), newActivity] })));
@@ -169,8 +167,8 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     updateKpiArray(data => findAndUpdatKpi(kpiId, data, kpi => ({ ...kpi, activities: (kpi.activities || []).filter(act => act.id !== activityId) })));
   }, [updateKpiArray, findAndUpdatKpi]);
 
-  const addTask = useCallback((kpiId: string, activityId: string, newTaskData: Omit<Task, 'id' | 'status' | 'records'>) => {
-    const newTask: Task = { ...newTaskData, id: `task-${Date.now()}`, status: TASK_STATUS.NOT_STARTED, records: [], comments: [], assignees: [] }; // assignees 추가
+  const addTask = useCallback((kpiId: string, activityId: string, newTaskData: Omit<Task, 'id' | 'status' | 'records' | 'comments'>) => {
+    const newTask: Task = { ...newTaskData, id: `task-${Date.now()}`, status: TASK_STATUS.NOT_STARTED, records: [], comments: [], assignees: [] };
     const updateActivitiesFn = (kpi: KPI): KPI => ({ ...kpi, activities: (kpi.activities || []).map(act => act.id === activityId ? { ...act, tasks: [...(act.tasks || []), newTask] } : act) });
     updateKpiArray(data => findAndUpdatKpi(kpiId, data, updateActivitiesFn));
   }, [updateKpiArray, findAndUpdatKpi]);
@@ -192,19 +190,13 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
         timestamp: new Date().toISOString(),
         content: content
     };
-
     const updateActivitiesFn = (kpi: KPI): KPI => ({
         ...kpi,
         activities: (kpi.activities || []).map(act => {
             if (act.id !== activityId) return act;
-            return {
-                ...act,
-                tasks: (act.tasks || []).map(task => {
+            return { ...act, tasks: (act.tasks || []).map(task => {
                     if (task.id !== taskId) return task;
-                    return {
-                        ...task,
-                        comments: [...(task.comments || []), newComment]
-                    };
+                    return { ...task, comments: [...(task.comments || []), newComment] };
                 })
             };
         })
@@ -212,7 +204,6 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     updateKpiArray(data => findAndUpdatKpi(kpiId, data, updateActivitiesFn));
   }, [updateKpiArray, findAndUpdatKpi, currentUser]);
 
-  // Other setters and functions (Complex Facilities, Team Members, etc.) follow...
   const navigateTo = useCallback((newState: Partial<NavigationState>) => { setNavigationState(prevState => ({ ...prevState, ...newState })); }, []);
   const setSelectedMonth = useCallback((month: number) => { navigateTo({ selectedMonth: month }); }, [navigateTo]);
   const addComplexFacility = useCallback((newFacility: Omit<ComplexFacility, 'id'>) => setData(prev => ({ ...prev, complexFacilities: [...prev.complexFacilities, { ...newFacility, id: `complex-${Date.now()}` }] })), []);
@@ -233,7 +224,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
   ], [data]);
 
   const value: IProjectDataContext = {
-    ...data, kpiData, navigationState, setData, addActivityToKpi, updateActivityInKpi, deleteActivityFromKpi, 
+    ...data, kpiData, navigationState, isDataLoaded, setData, addActivityToKpi, updateActivityInKpi, deleteActivityFromKpi, 
     addTask, updateTask, deleteTask, addCommentToTask, navigateTo, setSelectedMonth,
     setSafetyKPIs: (kpis) => setData(p => ({...p, safetyKPIs: typeof kpis === 'function' ? kpis(p.safetyKPIs) : kpis})),
     setLeaseKPIs: (kpis) => setData(p => ({...p, leaseKPIs: typeof kpis === 'function' ? kpis(p.leaseKPIs) : kpis})),

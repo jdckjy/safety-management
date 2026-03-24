@@ -68,6 +68,15 @@ export interface NavigationState {
     selectedTask?: string;
     selectedMonth: number;
 }
+
+// 신규: 임대 이력 단일 기록 인터페이스
+export interface LeaseRecord {
+    tenantName: string;
+    leaseStartDate: string;
+    leaseEndDate: string;
+    rent: number;
+}
+
 export interface TenantUnit {
     id: string;
     name: string;
@@ -80,6 +89,7 @@ export interface TenantUnit {
     rent?: number;
     facilityId?: string;
     pathData?: string;
+    leaseHistory?: LeaseRecord[]; // 수정: 임대 이력 배열 추가
 }
 
 export interface ComplexFacility {

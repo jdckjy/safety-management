@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { useProjectData } from '../providers/ProjectDataProvider';
-import DailyBriefing from './DailyBriefing';
+import { DailyBriefing } from './DailyBriefing';
 import { TASK_STATUS, TASK_STATUS_DISPLAY_NAMES } from '../constants';
 import { startOfMonth, endOfMonth, parseISO, subDays, isAfter, formatDistanceToNow, isBefore } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -10,16 +10,7 @@ import LeaseStatusWidget from './dashboard/LeaseStatusWidget';
 
 const Dashboard: React.FC = () => {
   const { kpiData, navigationState } = useProjectData();
-  const [isBriefingOpen, setBriefingOpen] = useState(false);
 
-  useEffect(() => {
-    const hasSeenBriefing = sessionStorage.getItem('hasSeenDailyBriefing');
-    if (!hasSeenBriefing) {
-      setBriefingOpen(true);
-      sessionStorage.setItem('hasSeenDailyBriefing', 'true');
-    }
-  }, []);
-  
   const taskStats = useMemo(() => {
     if (!kpiData) return { completed: 0, inProgress: 0, notStarted: 0, overdue: 0, total: 0 };
 
@@ -116,7 +107,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6">
-      <DailyBriefing isOpen={isBriefingOpen} onClose={() => setBriefingOpen(false)} />
+      <DailyBriefing />
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{selectedMonthName} 총 업무</p><p className="text-3xl font-bold text-gray-800">{taskStats.total}</p></div>
