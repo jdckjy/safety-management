@@ -1,3 +1,4 @@
+
 export interface Comment {
     id: string;
     author: string;
@@ -93,10 +94,19 @@ export interface TenantUnit {
 }
 
 export interface ComplexFacility {
-    id: string;
-    name: string;
-    type: '주거' | '상업' | '의료' | '기타';
-    floorRange: [number, number];
+  id: string;
+  category: string;
+  name: string;
+  area: number;
+  compositionRatio: number;
+  buildingArea: number;
+  grossFloorArea: number;
+  buildingCoverageRatio: number;
+  floorAreaRatio: number;
+  mainUse: string;
+  height: string;
+  remarks: string;
+  details?: string; // for compatibility
 }
 
 export interface TeamMember {
