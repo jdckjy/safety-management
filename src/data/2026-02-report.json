@@ -1,0 +1,106 @@
+
+{
+  "reportDate": {
+    "year": 2026,
+    "month": 2
+  },
+  "energyUsage": {
+    "electricityKwh": { "value": 63545, "unit": "kWh" },
+    "waterM3": { "value": 231, "unit": "m³" },
+    "gasM3": { "value": 864, "unit": "m³" },
+    "solarGenerationKwh": { "value": 10753, "unit": "kWh" },
+    "reclaimedWaterM3": { "value": 53, "unit": "m³" }
+  },
+  "energyCosts": {
+    "electricity": {
+      "totalUsage": { "value": 63545, "unit": "Kw" },
+      "baseRate": { "value": 2961920, "unit": "원" },
+      "energyRate": { "value": 7949609, "unit": "원" },
+      "climateEnvRate": { "value": 571905, "unit": "원" },
+      "fuelCostAdj": { "value": 317725, "unit": "원" },
+      "powerFactorRate": { "value": -17771, "unit": "원" },
+      "totalBill": { "value": 11783388, "unit": "원" },
+      "vat": { "value": 1178339, "unit": "원" },
+      "powerFund": { "value": 318150, "unit": "원" },
+      "rounding": { "value": -7, "unit": "원" },
+      "finalAmount": { "value": 13279870, "unit": "원" }
+    },
+    "water": {
+      "generalUsage": { "value": 231, "unit": "m³" },
+      "generalBaseRate": { "value": 3700, "unit": "원" },
+      "waterSupplyRate": { "value": 541900, "unit": "원" },
+      "sewerRate": { "value": 451100, "unit": "원" },
+      "reclaimedWaterDiscount": { "value": -297900, "unit": "원" },
+      "generalTotal": { "value": 698800, "unit": "원" },
+      "fireFightingTotal": { "value": 22110, "unit": "원" }
+    },
+    "gas": {
+      "meterReading": { "value": 33422, "unit": "m³" },
+      "usage": { "value": 864, "unit": "m³" },
+      "unitPrice": { "value": 2600, "unit": "원" },
+      "usageCharge": { "value": 2246400, "unit": "원" }
+    },
+    "total": {
+      "value": 16247180,
+      "unit": "원"
+    }
+  },
+  "teamActivities": [
+    {
+      "id": "facility",
+      "teamName": "시설팀",
+      "tasks": [
+        "1주차: 기계실,승강기,방화관리 일일업무, 중수처리시설 점검 (동현환경), 의료센터 방역작업 (한국방역), 2층 동관 카페 도어손잡이 고정, Knl 사무실 내부 비품창고 도어락 설치, 제설 작업, LPG 가스 충전, 2층 서관 장애인 화장실 배터리 교체, 중수점검, 발전기 배터리 충전 불량 충전기 교체",
+        "2주차: 기계실,승강기,방화관리 일일업무, 의료센터 방역작업 (한국방역), 전기실,태양광 설비, 저수조, 옥상층 주간 점검, 제설작업, 정기 방역, 승강기 정기 점검, EV4호기 비상 배터리 교체, 소방서 ESS실 점검",
+        "3주차: 기계실,승강기,방화관리 일일업무, 중수처리시설 점검(동현환경), 의료센터 방역작업(한국방역), 전기실,태양광 설비,저수조,옥상층 주간 점검, 2층서관 장애인 화장실 건전지 교체, 2층 장애인 주자장 CCTV 미출력 케이블 재연결, 비상 발전기 점검",
+        "4주차: 기계실,승강기,방화관리 일일업무, 중수처리시설 점검(동현환경), 전기실,태양광 설비,저수조,옥상층 주간 점검, 3층 동관 여자화장실 비데 점검, 중수 점검, 소화기 점검, 3층 동관 컨벤션 벽 메지 탈락 수선, MDF실 정리, 2층 서관 치과 복도 창호 누수 실리콘 작업"
+      ]
+    },
+    {
+      "id": "cleaning",
+      "teamName": "미화팀",
+      "tasks": [
+        "1주차: 일상청소(전층 화장실, 주출입문, 2층 외부주차장 등), 청소기작업(1,2층 건강검진센터, 공용부 로비), 먼지청소(1-3층 전체 공용부), 바닥청소(1,2층 건강검진센터), 얼룩제거작업(1층 외부 천장), 유리세척작업(1층 주출입문 4군데)",
+        "2주차: 일상청소, 청소기작업, 먼지청소, 바닥청소, 장비세척작업(2층 카페테리아 로비, 진단검사실 로비), 얼룩제거작업(2층 외부 천장), 행사후 뒤처리청소(3층 컨벤션)",
+        "3주차: 일상청소, 청소기작업, 먼지청소, 바닥청소, 장비세척작업(2층 외부 연결통로, 실내주차장), 내부 청소기 및 카페트 오염세척(3층 컨벤션)",
+        "4주차: 일상청소, 청소기작업(3층 의원8-중앙관리센터 로비, 비상계단), 먼지청소, 바닥청소, 장비세척작업(1층 촬영실 로비, 3층 의원 로비), 얼룩제거작업(3층 외부 천장)"
+      ]
+    },
+    {
+      "id": "security",
+      "teamName": "보안팀",
+      "tasks": [
+        "1주차: 의료서비스센터 내,외부 순찰, 경비실 CCTV 감시, 감시제어실 CCTV 저장장치 점검, 에어컨 DMS 중앙제어 작동상태 점검, JDC 캡스 출퇴근기록 전송, 동홍동연합청년회 이,취임식 행사",
+        "2주차: 의료서비스센터 내,외부 순찰, 경비실 CCTV 감시, 감시제어실 CCTV 저장장치 점검, 에어컨 DMS 중앙제어 작동상태 점검",
+        "3주차: 의료서비스센터 내,외부 순찰, 경비실 CCTV 감시, 감시제어실 CCTV 저장장치 점검, 에어컨 DMS 중앙제어 작동상태 점검",
+        "4주차: 의료서비스센터 내,외부 순찰, 경비실 CCTV 감시, 감시제어실 CCTV 저장장치 점검, 에어컨 DMS 중앙제어 작동상태 점검"
+      ]
+    }
+  ],
+  "safetyChecks": [
+    { "id": "safety-0", "item": "시설팀 일일 업무일지", "status": "good" },
+    { "id": "safety-1", "item": "보안팀 일일 업무일지", "status": "good" },
+    { "id": "safety-2", "item": "미화팀 일일 업무일지", "status": "good" },
+    { "id": "safety-3", "item": "승강기 점검일지", "status": "good" },
+    { "id": "safety-4", "item": "방화관리 점검일지", "status": "good" },
+    { "id": "safety-5", "item": "기계실 점검일지", "status": "good" },
+    { "id": "safety-6", "item": "방범관리 점검일지", "status": "good" },
+    { "id": "safety-7", "item": "비상발전기 점검일지[월간]", "status": "good" },
+    { "id": "safety-8", "item": "옥상층 점검일지[주간]", "status": "good" },
+    { "id": "safety-9", "item": "저수조 점검일지[주간]", "status": "good" },
+    { "id": "safety-10", "item": "전기실 점검일지[주간]", "status": "good" },
+    { "id": "safety-11", "item": "태양광설비 점검일지[주간]", "status": "good" },
+    { "id": "safety-12", "item": "에너지 저장장치[ESS] 점검일지[주간]", "status": "bad" },
+    { "id": "safety-13", "item": "소화기 관리대장[월간]", "status": "good" },
+    { "id": "safety-14", "item": "부하전류 측정기록부", "status": "good" },
+    { "id": "safety-15", "item": "절연저항 측정기록부", "status": "good" },
+    { "id": "safety-16", "item": "수변전기기 점검일지", "status": "good" },
+    { "id": "safety-17", "item": "건축물 하자 관리대장", "status": "good" },
+    { "id": "safety-18", "item": "월동기 안전점검표", "status": "good" },
+    { "id": "safety-19", "item": "우기 안전점검표", "status": "good" },
+    { "id": "safety-20", "item": "태풍대비 안전점검표", "status": "good" },
+    { "id": "safety-21", "item": "시설물 안전교육 일지", "status": "good" },
+    { "id": "safety-22", "item": "민원대응 및 친절교육", "status": "good" },
+    { "id": "safety-23", "item": "장비이력카드", "status": "good" }
+  ]
+}

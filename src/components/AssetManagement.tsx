@@ -1,11 +1,13 @@
 
 import React, { useState } from 'react';
 import KPIManager from './KPIManager';
+import OmsSystem from './oms/OmsSystem'; // OmsSystem 임포트
 import { useProjectData } from '../providers/ProjectDataProvider';
 
 // Tab configuration
 const subTabs = [
-  { id: 'value', label: 'Asset Value Indices', component: KPIManager },
+  { id: 'value', label: 'Asset Value Indices' },
+  { id: 'oms', label: '운영관리 시스템' },
 ];
 
 const AssetManagement: React.FC = () => {
@@ -13,10 +15,14 @@ const AssetManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState(subTabs[0].id);
 
   const renderActiveComponent = () => {
-    const activeTabConfig = subTabs.find(tab => tab.id === activeTab);
-    if (!activeTabConfig) return null;
-
-    return <KPIManager sectionTitle="Asset Value Indices" kpis={assetKPIs} onUpdate={setAssetKPIs} />;
+    switch (activeTab) {
+      case 'value':
+        return <KPIManager sectionTitle="Asset Value Indices" kpis={assetKPIs} onUpdate={setAssetKPIs} />;
+      case 'oms':
+        return <OmsSystem />;
+      default:
+        return null;
+    }
   };
 
   return (

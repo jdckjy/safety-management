@@ -1,155 +1,183 @@
 
-export interface Comment {
-    id: string;
-    author: string;
-    timestamp: string;
-    content: string;
+// src/types.ts
+
+// ==================================================================================
+// OMS (단지 운영 관리) 관련 타입
+// =================================G=================================================
+
+/**
+ * 월간 보고서 전체 데이터 구조
+ */
+export interface MonthlyReport {
+  id: string; // 예: "2026-02"
+  year: number;
+  month: number;
+  report_date: string; // 예: "2026-03-05"
+  raw_data: {
+    energyUsage: {
+      electricityKwh: { value: number; unit: string };
+      waterM3: { value: number; unit: string };
+      gasM3: { value: number; unit: string };
+    };
+    energyCosts: {
+      electricity: {
+        basicCharge: { value: number };
+        usageCharge: { value: number };
+        demandCharge: { value: number };
+        vat: { value: number };
+        fund: { value: number };
+        finalAmount: { value: number };
+      };
+      water: {
+        usageCharge: { value: number };
+        generalTotal: { value: number };
+      };
+      gas: {
+        usageCharge: { value: number };
+      };
+      total: { value: number; unit: string };
+    };
+    teamActivities: TeamActivity[];
+  };
 }
 
-export interface TaskRecord {
-    id: string;
-    date: string;
-    status: string;
-    comment: string;
+/**
+ * 팀별 활동 데이터 구조
+ */
+export interface TeamActivity {
+  id: string; // 예: "facility", "cleaning", "security"
+  teamName: string; // 예: "시설팀", "미화팀", "보안팀"
+  tasks: string[];
 }
 
-export interface Task {
-    id: string;
-    name: string;
-    startDate: string;
-    endDate: string;
-    status: string;
-    assignees: string[];
-    records: TaskRecord[];
-    comments: Comment[];
-}
+// ==================================================================================
+// 기존 프로젝트 타입 (수정 없음)
+// ==================================================================================
 
-export interface Activity {
-    id: string;
-    name: string;
-    status: string;
-    tasks: Task[];
-    description: string;
-    startDate: string;
-    endDate: string;
-    assignee: string;
+export interface IProjectData {
+  safetyKPIs: KPI[];
+  leaseKPIs: KPI[];
+  assetKPIs: KPI[];
+  infraKPIs: KPI[];
+  hotspots: HotSpot[];
+  facilities: Facility[];
+  complexFacilities: ComplexFacility[];
+  teamMembers: TeamMember[];
+  tenantUnits: TenantUnit[];
+  generalActivities: GeneralActivity[];
+  customTabs: CustomTab[];
+  monthly_reports: MonthlyReport[];
 }
 
 export interface KPI {
-    id: string;
-    title: string;
-    description: string;
-    current: number;
-    target: number;
-    unit: string;
-    previous: number;
-    activities: Activity[];
+  id: string;
+  title: string;
+  description: string;
+  current: number;
+  target: number;
+  previous: number;
+  unit: string;
+  activities?: Activity[];
+}
+
+export interface Activity {
+  id: string;
+  name: string;
+  description?: string;
+  status: string;
+  startDate?: string;
+  endDate?: string;
+  assignees?: string[];
+  tasks?: Task[];
+}
+
+export interface Task {
+  id: string;
+  name: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  assignees?: string[];
+  records: { date: string; value: number }[];
+  comments: Comment[];
+}
+
+export interface Comment {
+  id: string;
+  author: string;
+  timestamp: string;
+  content: string;
 }
 
 export interface HotSpot {
-    id: string;
-    name: string;
-    x: number;
-    y: number;
-    floor: string;
-    type: 'safety' | 'traffic' | 'congestion';
+  id: string;
+  name: string;
+  description: string;
+  location: string;
+  imageUrl: string;
+  status: string; 
 }
 
 export interface Facility {
-    id: string;
-    name: string;
-    type: string;
-    location: string;
+  id: string;
+  name: string;
+  description: string;
+  status: string; 
+  imageUrl?: string;
 }
 
 export interface NavigationState {
-    menuKey: string;
-    selectedKpi?: string;
-    selectedActivity?: string;
-    selectedTask?: string;
-    selectedMonth: number;
-}
-
-// 신규: 임대 이력 단일 기록 인터페이스
-export interface LeaseRecord {
-    tenantName: string;
-    leaseStartDate: string;
-    leaseEndDate: string;
-    rent: number;
-}
-
-export interface TenantUnit {
-    id: string;
-    name: string;
-    floor: string;
-    area: number;
-    status: '입주' | '공실' | '수리중';
-    tenantName?: string;
-    leaseStartDate?: string;
-    leaseEndDate?: string;
-    rent?: number;
-    facilityId?: string;
-    pathData?: string;
-    leaseHistory?: LeaseRecord[]; // 수정: 임대 이력 배열 추가
+  menuKey: string;
+  selectedKpiId?: string;
+  selectedActivityId?: string;
+  selectedTaskId?: string;
+  selectedHotspotId?: string;
+  selectedFacilityId?: string;
+  selectedMonth: number;
 }
 
 export interface ComplexFacility {
   id: string;
-  category: string;
+  floor: number;
   name: string;
   area: number;
-  compositionRatio: number;
-  buildingArea: number;
-  grossFloorArea: number;
-  buildingCoverageRatio: number;
-  floorAreaRatio: number;
-  mainUse: string;
-  height: string;
-  remarks: string;
-  details?: string; // for compatibility
+  category: 'public' | 'commercial' | 'office' | 'residential' | 'special';
 }
 
 export interface TeamMember {
     id: string;
     name: string;
     team: string;
-    position: string;
-    phone: string;
-    email: string;
-    avatar?: string;
+    role: string;
+    contact: string;
+    isManager: boolean;
 }
 
-export interface IProjectData {
-    safetyKPIs: KPI[];
-    leaseKPIs: KPI[];
-    assetKPIs: KPI[];
-    infraKPIs: KPI[];
-    hotspots: HotSpot[];
-    facilities: Facility[];
-    tenantUnits: TenantUnit[];
-    complexFacilities: ComplexFacility[];
-    teamMembers: TeamMember[];
-}
-
-
-export type TenantUnitStatus = '입주' | '공실' | '수리중';
-
-export type IncomeCategory = '관리비' | '주차비' | '기타';
-
-export type ExpenseCategory = '공과금' | '수리비' | '인건비' | '마케팅' | '용역비' | '기타';
-
-export interface IncomeItem {
+export interface TenantUnit {
     id: string;
-    date: string;
-    category: string;
-    description: string;
-    amount: number;
+    floor: number;
+    unitNumber: string;
+    companyName: string;
+    contactPerson: string;
+    contactNumber: string;
+    industry: string; 
+    pathData?: string;
 }
 
-export interface ExpenseItem {
-    id: string;
-    date: string;
-    category: string;
-    description: string;
-    amount: number;
+export interface GeneralActivity {
+  id: string;
+  title: string;
+  category: string;
+  date: string;
+  description: string;
 }
+
+export interface CustomTab {
+  id: string;
+  name: string;
+  type: 'kpi-based' | 'general-activities';
+  kpiIds?: string[];
+  activityCategories?: string[];
+}
+

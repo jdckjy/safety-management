@@ -7,24 +7,25 @@ import {
   Landmark,
   HardHat,
   ChevronDown,
-  FolderOpen
+  FolderOpen,
+  Calendar // 1. Calendar 아이콘을 임포트합니다.
 } from 'lucide-react';
-// [수정] 더 이상 CustomTab 관련 props는 Sidebar가 관리하지 않으므로 타입을 가져올 필요가 없습니다.
 import { MenuKey } from '../types';
 
-// [수정] Sidebar가 받아야 할 props를 정리합니다. 동적 탭 관련 로직은 모두 제거됩니다.
+// 2. activeMenu와 onMenuChange의 타입에 'calendar'를 추가합니다.
 interface SidebarProps {
-  activeMenu: MenuKey | 'base-info';
-  onMenuChange: (menu: MenuKey | 'base-info') => void;
+  activeMenu: MenuKey | 'base-info' | 'calendar';
+  onMenuChange: (menu: MenuKey | 'base-info' | 'calendar') => void;
 }
 
-// [수정] props에서 customTabs와 onAddTabOpen를 제거합니다.
 const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange }) => {
   const menuSections = [
     {
       title: '탐색',
       items: [
         { key: 'dashboard', label: '대시보드', icon: <LayoutDashboard size={18} /> },
+        // 3. '대시보드' 다음에 '캘린더' 메뉴 아이템을 추가합니다.
+        { key: 'calendar', label: '캘린더', icon: <Calendar size={18} /> },
         { key: 'safety', label: '안전 관리', icon: <ShieldCheck size={18} /> },
         { key: 'lease', label: '임대 및 세대', icon: <Building2 size={18} /> },
         { key: 'asset', label: '자산 가치', icon: <Landmark size={18} /> },
@@ -38,7 +39,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange }) => {
     return (
       <button
         key={key}
-        onClick={() => onMenuChange(key as MenuKey | 'base-info')}
+        // 4. onMenuChange 핸들러의 타입 캐스팅을 업데이트합니다.
+        onClick={() => onMenuChange(key as MenuKey | 'base-info' | 'calendar')}
         className={`w-full flex items-center p-3 rounded-lg transition-all group ${
           isActive
             ? 'bg-white text-black font-bold shadow-sm ring-1 ring-gray-100'
@@ -56,7 +58,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange }) => {
   return (
     <div className="w-64 h-full flex flex-col py-6 px-4 transition-all duration-300 z-50 bg-[#F8F7F4] border-r border-gray-100">
       <div className="mb-8 flex items-center gap-3 px-4">
-        {/* ... 로고 및 프로젝트 이름 ... */}
         <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center text-white text-xs font-black">C</div>
         <div className="flex items-center gap-1 cursor-pointer group">
           <span className="font-bold text-sm tracking-tight">Codename.com</span>
@@ -76,9 +77,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange }) => {
           </div>
         ))}
 
-        {/* ====================================================================================== */}
-        {/* [핵심 수정] 당신의 지시대로 '공통관리' 섹션을 복원하고 '기본정보' 메뉴만 고정합니다. */}
-        {/* ====================================================================================== */}
         <div>
           <div className="px-4 mb-2">
             <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">공통관리</span>
@@ -90,7 +88,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange }) => {
       </div>
 
       <div className="mt-auto px-4 py-4">
-        {/* ... 폴더 관리 ... */}
       </div>
     </div>
   );

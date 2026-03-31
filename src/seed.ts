@@ -1,5 +1,6 @@
 
-import { IAppData, Building, Lead, Activity, Unit } from './types';
+import { IAppData, Building, Lead, Activity, Unit, MonthlyReport, ReportRawData } from './types';
+import reportJson from './data/2026-02-report.json';
 
 // [✅ 최종 수정] buildings를 객체가 아닌 '배열'로 수정하여 flatMap 에러를 근본적으로 해결합니다.
 const buildings: Building[] = [
@@ -57,8 +58,19 @@ const leads: Lead[] = [
 
 const activities: Activity[] = []; // 현재는 비어있음
 
+// --- 월간 보고서 데이터 추가 ---
+const reportRawData: ReportRawData = reportJson as ReportRawData;
+
+const monthlyReports: MonthlyReport[] = [{
+  id: '2026-02',
+  year: 2026,
+  month: 2,
+  raw_data: reportRawData,
+}];
+
 export const seedData: Partial<IAppData> = {
   buildings,
   leads,
   activities,
+  monthly_reports: monthlyReports,
 };
