@@ -11,6 +11,9 @@
     "solarGenerationKwh": { "value": 10753, "unit": "kWh" },
     "reclaimedWaterM3": { "value": 53, "unit": "m³" }
   },
+  "weather": {
+    "averageTemperatureC": { "value": 6.0, "unit": "°C" }
+  },
   "energyCosts": {
     "electricity": {
       "totalUsage": { "value": 63545, "unit": "Kw" },

@@ -1,11 +1,10 @@
-
 import React, { useState } from 'react';
 import { useProjectData } from '@/providers/ProjectDataProvider';
 import { MonthlyReport, TeamActivity } from '@/types';
 import OmsUploader from './OmsUploader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import OmsEnergyDashboard from './OmsEnergyDashboard';
-import OmsTeamTasks from './OmsTeamTasks';
+import OmsDashboard from './OmsDashboard'; // OmsTeamTasks 대신 OmsDashboard를 import
 import Modal from '@/components/ui/Modal';
 import { Button } from '@/components/ui/button';
 
@@ -49,7 +48,7 @@ const MonthlyReportDetailModal: React.FC<{ report: MonthlyReport | null; onClose
 };
 
 
-// OmsSystem 컴포넌트: 최종 수정본
+// OmsSystem 컴포넌트
 const OmsSystem: React.FC = () => {
   const { monthly_reports } = useProjectData();
   const [selectedReport, setSelectedReport] = useState<MonthlyReport | null>(null);
@@ -82,12 +81,20 @@ const OmsSystem: React.FC = () => {
             <p className="text-gray-500 mt-2">'새 보고서 업로드' 버튼을 눌러 첫 보고서를 만들어보세요.</p>
         </div>
        ) : (
-        <Tabs defaultValue="list" className="w-full">
+        <Tabs defaultValue="dashboard" className="w-full">
             <TabsList className="grid w-full grid-cols-3 max-w-2xl mx-auto">
-              <TabsTrigger value="list">보고서 목록</TabsTrigger>
+              <TabsTrigger value="dashboard">대시보드</TabsTrigger>
               <TabsTrigger value="energy">에너지 사용량</TabsTrigger>
-              <TabsTrigger value="tasks">팀별 업무내역</TabsTrigger>
+              <TabsTrigger value="list">보고서 목록</TabsTrigger>
             </TabsList>
+
+            <TabsContent value="dashboard" className="mt-6">
+              <OmsDashboard />
+            </TabsContent>
+
+            <TabsContent value="energy" className="mt-6">
+              <OmsEnergyDashboard />
+            </TabsContent>
 
             <TabsContent value="list" className="mt-6">
                 <div className="bg-white p-6 rounded-lg shadow">
@@ -108,14 +115,6 @@ const OmsSystem: React.FC = () => {
                         ))}
                     </div>
                 </div>
-            </TabsContent>
-
-            <TabsContent value="energy" className="mt-6">
-              <OmsEnergyDashboard />
-            </TabsContent>
-
-            <TabsContent value="tasks" className="mt-6">
-              <OmsTeamTasks />
             </TabsContent>
         </Tabs>
       )}

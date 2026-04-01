@@ -3,7 +3,7 @@
 
 // ==================================================================================
 // OMS (단지 운영 관리) 관련 타입
-// =================================G=================================================
+// ==================================================================================
 
 /**
  * 월간 보고서 전체 데이터 구조
@@ -18,6 +18,10 @@ export interface MonthlyReport {
       electricityKwh: { value: number; unit: string };
       waterM3: { value: number; unit: string };
       gasM3: { value: number; unit: string };
+      solarGenerationKwh: { value: number; unit: string }; // 태양광 발전량
+    };
+    weather: {
+      averageTemperatureC: { value: number; unit: string }; // 평균 기온
     };
     energyCosts: {
       electricity: {
