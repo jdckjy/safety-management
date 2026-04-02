@@ -2,16 +2,18 @@
 import React, { useMemo } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { useProjectData } from '../providers/ProjectDataProvider';
-import { DailyBriefing } from './DailyBriefing';
-import { TASK_STATUS, TASK_STATUS_DISPLAY_NAMES } from '../constants';
-import { startOfMonth, endOfMonth, parseISO, subDays, isAfter, formatDistanceToNow, isBefore } from 'date-fns';
+import { TASK_STATUS, TASK_STATUS_DISPLAY_NAMES, TASK_STATUS_COLORS } from '../constants';
+import { startOfYear, startOfMonth, endOfMonth, parseISO, subDays, isAfter, formatDistanceToNow, isBefore } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import LeaseStatusWidget from './dashboard/LeaseStatusWidget';
+import TaskStatusPieChart from './charts/TaskStatusPieChart';
+import OverdueTasks from './dashboard/OverdueTasks';
 
 const Dashboard: React.FC = () => {
   const { kpiData, navigationState } = useProjectData();
 
-  const taskStats = useMemo(() => {
+  // 월별 통계 (상단 KPI용)
+  const monthlyTaskStats = useMemo(() => {
     if (!kpiData) return { completed: 0, inProgress: 0, notStarted: 0, overdue: 0, total: 0 };
 
     const viewDate = new Date();
@@ -64,6 +66,57 @@ const Dashboard: React.FC = () => {
 
     return stats;
   }, [kpiData, navigationState.selectedMonth]);
+
+  // 연간 누적 통계 (업무 현황 요약 차트용)
+  const yearlyTaskStats = useMemo(() => {
+    if (!kpiData) return { completed: 0, inProgress: 0, notStarted: 0, overdue: 0, total: 0 };
+
+    const now = new Date();
+    const yearStart = startOfYear(now);
+
+    const allTasks = kpiData.flatMap(kpi => kpi.activities ?? []).flatMap(activity => activity.tasks ?? []);
+    
+    const tasksForYear = allTasks.filter(task => {
+      try {
+        const taskStart = parseISO(task.startDate);
+        return taskStart >= yearStart;
+      } catch (e) {
+        return false;
+      }
+    });
+
+    const initialStats = { completed: 0, inProgress: 0, notStarted: 0, overdue: 0, total: 0 };
+
+    const stats = tasksForYear.reduce((acc, task) => {
+        acc.total += 1;
+        try {
+            if (task.status !== TASK_STATUS.COMPLETED && isBefore(parseISO(task.endDate), now)) {
+                acc.overdue += 1;
+                return acc;
+            }
+        } catch(e) { /* empty */ }
+
+        switch (task.status) {
+          case TASK_STATUS.COMPLETED:
+            acc.completed += 1;
+            break;
+          case TASK_STATUS.IN_PROGRESS:
+            acc.inProgress += 1;
+            break;
+          case TASK_STATUS.NOT_STARTED:
+            acc.notStarted += 1;
+            break;
+          default:
+            if (!task.status) acc.notStarted +=1;
+            break;
+        }
+        return acc;
+      },
+      initialStats
+    );
+
+    return stats;
+  }, [kpiData]);
   
   const recentActivities = useMemo(() => {
     if (!kpiData) return [];
@@ -107,76 +160,41 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6">
-      <DailyBriefing />
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{selectedMonthName} 총 업무</p><p className="text-3xl font-bold text-gray-800">{taskStats.total}</p></div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.NOT_STARTED]} 업무</p><p className="text-3xl font-bold text-gray-500">{taskStats.notStarted}</p></div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.IN_PROGRESS]} 업무</p><p className="text-3xl font-bold text-yellow-500">{taskStats.inProgress}</p></div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.COMPLETED]} 업무</p><p className="text-3xl font-bold text-blue-500">{taskStats.completed}</p></div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.OVERDUE]} 업무</p><p className="text-3xl font-bold text-red-500">{taskStats.overdue}</p></div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{selectedMonthName} 총 업무</p><p className="text-3xl font-bold text-gray-800">{monthlyTaskStats.total}</p></div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.NOT_STARTED]}</p><p className="text-3xl font-bold text-gray-500">{monthlyTaskStats.notStarted}</p></div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.IN_PROGRESS]}</p><p className={`text-3xl font-bold ${TASK_STATUS_COLORS[TASK_STATUS.IN_PROGRESS]}`}>{monthlyTaskStats.inProgress}</p></div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.COMPLETED]}</p><p className={`text-3xl font-bold ${TASK_STATUS_COLORS[TASK_STATUS.COMPLETED]}`}>{monthlyTaskStats.completed}</p></div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.OVERDUE]}</p><p className={`text-3xl font-bold ${TASK_STATUS_COLORS[TASK_STATUS.OVERDUE]}`}>{monthlyTaskStats.overdue}</p></div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <LeaseStatusWidget />
-        </div>
-        <div className="lg:col-span-2">
-            <div className="bg-white p-6 rounded-2xl shadow-md h-full">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">주요 KPI 요약</h3>
-                <div className="space-y-4">
-                    {kpiData && kpiData.length > 0 ? (
-                    kpiData.slice(0, 5).map((kpi) => {
-                        const change = kpi.current - (kpi.previous || 0);
-                        const isPositive = change >= 0;
-
-                        return (
-                        <div key={kpi.id} className="flex items-center p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center mr-4 ${kpi.color}`}>
-                                {kpi.icon}
-                            </div>
-                            <div className="flex-1">
-                                <p className="font-semibold text-gray-800">{kpi.title}</p>
-                                <p className="text-sm text-gray-500">{kpi.description}</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-xl font-bold text-gray-900">{`${kpi.current.toLocaleString()}${kpi.unit}`}</p>
-                                <p className={`text-sm font-medium ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                                    {isPositive ? '▲' : '▼'} {Math.abs(change).toLocaleString()}{kpi.unit}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <TaskStatusPieChart stats={yearlyTaskStats} />
+        <LeaseStatusWidget />
+        <OverdueTasks />
+        <div className="bg-white p-6 rounded-2xl shadow-md">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">최근 활동 피드</h3>
+            <div className="space-y-2">
+                {recentActivities && recentActivities.length > 0 ? (
+                    recentActivities.map(activity => (
+                        <div key={activity.id} className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                            <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" />
+                            <div className='flex-1'>
+                                <p className="text-sm text-gray-800">
+                                    <span className="font-semibold">{activity.name}</span>
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                    {activity.parentKpiTitle} › {formatDistanceToNow(parseISO(activity.timestamp), { addSuffix: true, locale: ko })} 완료
                                 </p>
                             </div>
                         </div>
-                        );
-                    })
-                    ) : (
-                    <div className="text-center py-8 text-gray-500">KPI 데이터가 없습니다.</div>
-                    )}
-                </div>
+                    ))
+                ) : (
+                <div className="text-center py-8 text-gray-500">최근 7일간 완료된 활동이 없습니다.</div>
+                )}
             </div>
         </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-2xl shadow-md">
-           <h3 className="text-lg font-semibold text-gray-900 mb-4">최근 활동 피드</h3>
-           <div className="space-y-2">
-            {recentActivities && recentActivities.length > 0 ? (
-                recentActivities.map(activity => (
-                    <div key={activity.id} className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                        <CheckCircle2 size={20} className="text-green-500 flex-shrink-0" />
-                        <div className='flex-1'>
-                            <p className="text-sm text-gray-800">
-                                <span className="font-semibold">{activity.name}</span>
-                            </p>
-                             <p className="text-xs text-gray-500">
-                                {activity.parentKpiTitle} › {formatDistanceToNow(parseISO(activity.timestamp), { addSuffix: true, locale: ko })} 완료
-                            </p>
-                        </div>
-                    </div>
-                ))
-            ) : (
-              <div className="text-center py-8 text-gray-500">최근 7일간 완료된 활동이 없습니다.</div>
-            )}
-           </div>
       </div>
     </div>
   );

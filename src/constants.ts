@@ -27,7 +27,19 @@ export const TASK_STATUS_DISPLAY_NAMES: { [key in TaskStatus]: string } = {
   [TASK_STATUS.OVERDUE]: '지연', // 신규: 지연 상태 표시 이름
 };
 
-// 3. 마스터 상태 변환 맵 (Master Status Transition Map)
+// 3. 상태별 색상 (Status Colors)
+// -----------------------------------------------------------------------------
+// 대시보드, 차트 등 UI 전반에서 상태를 시각적으로 구분하는 데 사용됩니다.
+export const TASK_STATUS_COLORS: { [key in TaskStatus | 'default']: string } = {
+    [TASK_STATUS.NOT_STARTED]: 'text-gray-500',
+    [TASK_STATUS.IN_PROGRESS]: 'text-yellow-500',
+    [TASK_STATUS.COMPLETED]: 'text-blue-500',
+    [TASK_STATUS.OVERDUE]: 'text-red-500',
+    'default': 'text-gray-800',
+};
+
+
+// 4. 마스터 상태 변환 맵 (Master Status Transition Map)
 // -----------------------------------------------------------------------------
 // 시스템에 존재했던 모든 레거시/변형 상태 값을 공식 TaskStatus로 매핑합니다.
 // 데이터 정제(sanitize), UI 컴포넌트 등 상태를 다루는 모든 곳에서 이 맵을
@@ -53,7 +65,7 @@ export const MASTER_STATUS_TRANSITION_MAP: { [key: string]: TaskStatus } = {
   ...legacyAndVariantStatusMap,
 };
 
-// 4. UI 렌더링용 상태 목록
+// 5. UI 렌더링용 상태 목록
 // -----------------------------------------------------------------------------
 // 드롭다운 메뉴와 같이 사용자가 '직접' 상태를 변경할 때 사용되는 옵션 목록입니다.
 // '지연' 상태는 시스템에 의해 '계산'되는 상태이므로, 사용자가 선택할 수 있는 옵션에는 포함하지 않습니다.
@@ -66,11 +78,11 @@ export const UI_STATUS_OPTIONS = [
   label: TASK_STATUS_DISPLAY_NAMES[status],
 }));
 
-// 5. 임대 유닛 상태 (Tenant Unit Status)
+// 6. 임대 유닛 상태 (Tenant Unit Status)
 // -----------------------------------------------------------------------------
 export const UNIT_STATUS = {
-  VACANT: '공실',
   OCCUPIED: '입주',
+  VACANT: '공실',
   IN_DISCUSSION: '협의중',
   NON_RENTABLE: '비임대',
 } as const;

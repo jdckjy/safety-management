@@ -55,7 +55,7 @@ export interface TeamActivity {
 }
 
 // ==================================================================================
-// 기존 프로젝트 타입 (수정 없음)
+// 기존 프로젝트 타입 (수정됨)
 // ==================================================================================
 
 export interface IProjectData {
@@ -160,13 +160,17 @@ export interface TeamMember {
 
 export interface TenantUnit {
     id: string;
-    floor: number;
-    unitNumber: string;
-    companyName: string;
-    contactPerson: string;
-    contactNumber: string;
-    industry: string; 
-    pathData?: string;
+    floor: string;
+    name: string;
+    tenant: string;
+    area: number;
+    status: string;
+    unitNumber?: string;
+    companyName?: string;
+    contactPerson?: string;
+    contactNumber?: string;
+    industry?: string; 
+    svgPath?: string;
 }
 
 export interface GeneralActivity {
@@ -184,4 +188,3 @@ export interface CustomTab {
   kpiIds?: string[];
   activityCategories?: string[];
 }
-
