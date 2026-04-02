@@ -1,98 +1,193 @@
 
-import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { useProjectData } from '../../providers/ProjectDataProvider';
-import { MonthlyReport } from '../../types';
+import React, { useState, useMemo } from 'react';
+import { useProjectData } from '@/providers/ProjectDataProvider';
+import { MonthlyReport } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TrendingUp, Zap, Droplets, Flame } from 'lucide-react';
 
+// Helper to format numbers
+const formatCurrency = (value: number) => `${value.toLocaleString()}원`;
+
+// Detailed cost breakdown for electricity
+const ElectricityCostDetail: React.FC<{ details: MonthlyReport['raw_data']['energyCosts']['electricity'] }> = ({ details }) => (
+    <Table>
+        <TableHeader>
+            <TableRow>
+                <TableHead>항목</TableHead>
+                <TableHead className="text-right">금액</TableHead>
+            </TableRow>
+        </TableHeader>
+        <TableBody>
+            <TableRow><TableCell>기본요금</TableCell><TableCell className="text-right">{formatCurrency(details.basicCharge.value)}</TableCell></TableRow>
+            <TableRow><TableCell>전력량요금</TableCell><TableCell className="text-right">{formatCurrency(details.usageCharge.value)}</TableCell></TableRow>
+            <TableRow><TableCell>기후환경요금</TableCell><TableCell className="text-right">{formatCurrency(details.demandCharge.value)}</TableCell></TableRow>
+            <TableRow><TableCell>연료비조정액</TableCell><TableCell className="text-right">{formatCurrency(details.fund.value)}</TableCell></TableRow>
+            <TableRow><TableCell>부가가치세</TableCell><TableCell className="text-right">{formatCurrency(details.vat.value)}</TableCell></TableRow>
+            <TableRow><TableCell>전력산업기반기금</TableCell><TableCell className="text-right">{formatCurrency(details.fund.value)}</TableCell></TableRow>
+        </TableBody>
+    </Table>
+);
+
+// Detailed cost breakdown for water
+const WaterCostDetail: React.FC<{ details: MonthlyReport['raw_data']['energyCosts']['water'] }> = ({ details }) => (
+    <Table>
+        <TableHeader>
+            <TableRow>
+                <TableHead>항목</TableHead>
+                <TableHead className="text-right">금액</TableHead>
+            </TableRow>
+        </TableHeader>
+        <TableBody>
+            <TableRow><TableCell>상수도요금</TableCell><TableCell className="text-right">{formatCurrency(details.usageCharge.value)}</TableCell></TableRow>
+        </TableBody>
+    </Table>
+);
+
+// Detailed cost breakdown for gas
+const GasCostDetail: React.FC<{ details: MonthlyReport['raw_data']['energyCosts']['gas'] }> = ({ details }) => (
+     <Table>
+        <TableHeader>
+            <TableRow>
+                <TableHead>항목</TableHead>
+                <TableHead className="text-right">금액</TableHead>
+            </TableRow>
+        </TableHeader>
+        <TableBody>
+             <TableRow><TableCell>가스 사용요금</TableCell><TableCell className="text-right">{formatCurrency(details.usageCharge.value)}</TableCell></TableRow>
+        </TableBody>
+    </Table>
+);
+
+
 const OmsEnergyDashboard: React.FC = () => {
-  const { monthly_reports } = useProjectData();
+    const { monthly_reports } = useProjectData();
+    const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
-  if (!monthly_reports || monthly_reports.length === 0) {
+    const sortedReports = useMemo(() => {
+        if (!monthly_reports) return [];
+        return [...monthly_reports].sort((a, b) => {
+            if (a.year !== b.year) return b.year - a.year;
+            return b.month - a.month;
+        });
+    }, [monthly_reports]);
+
+    if (!sortedReports || sortedReports.length === 0) {
+        return (
+            <Alert>
+                <TrendingUp className="h-4 w-4" />
+                <AlertTitle>데이터 없음</AlertTitle>
+                <AlertDescription>
+                    표시할 에너지 데이터가 없습니다. 먼저 '새 보고서 업로드' 탭에서 월간 보고서를 추가해주세요.
+                </AlertDescription>
+            </Alert>
+        );
+    }
+    
+    // Set default selected month to the latest report
+    if (!selectedMonth && sortedReports.length > 0) {
+        const latest = sortedReports[0];
+        setSelectedMonth(`${latest.year}-${latest.month}`);
+    }
+
+    const selectedReport = sortedReports.find(r => `${r.year}-${r.month}` === selectedMonth);
+
+    if (!selectedReport) {
+        // This should not happen if selectedMonth is set correctly
+        return <Alert><AlertTitle>오류</AlertTitle><AlertDescription>선택된 보고서를 찾을 수 없습니다.</AlertDescription></Alert>
+    }
+
+    const { energyCosts, energyUsage, weather } = selectedReport.raw_data;
+
     return (
-      <Alert>
-        <TrendingUp className="h-4 w-4" />
-        <AlertTitle>데이터 없음</AlertTitle>
-        <AlertDescription>
-          표시할 에너지 데이터가 없습니다. 먼저 '보고서 업로드' 탭에서 월간 보고서를 추가해주세요.
-        </AlertDescription>
-      </Alert>
+        <div className="space-y-6">
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <CardTitle>에너지 비용 상세 분석</CardTitle>
+                    <Select onValueChange={setSelectedMonth} value={selectedMonth ?? ""}>
+                        <SelectTrigger className="w-[220px]">
+                            <SelectValue placeholder="분석 월 선택..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {sortedReports.map(report => (
+                                <SelectItem key={report.id} value={`${report.year}-${report.month}`}>
+                                    {`${report.year}년 ${report.month}월`}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </CardHeader>
+                <CardContent>
+                    <Accordion type="single" collapsible defaultValue="item-1" className="w-full">
+                        <AccordionItem value="item-1">
+                            <AccordionTrigger className="hover:no-underline">
+                                <div className="flex items-center justify-between w-full pr-4">
+                                    <div className="flex items-center">
+                                        <div className="w-2 h-8 bg-blue-500 rounded-full mr-4"></div>
+                                        <Zap className="w-5 h-5 mr-3 text-blue-500" />
+                                        <span className="font-semibold text-lg">전기</span>
+                                    </div>
+                                    <span className="text-xl font-bold">{formatCurrency(energyCosts.electricity.finalAmount.value)}</span>
+                                </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="p-4 bg-gray-50/50 rounded-b-md">
+                                <ElectricityCostDetail details={energyCosts.electricity} />
+                            </AccordionContent>
+                        </AccordionItem>
+                        
+                        <AccordionItem value="item-2">
+                             <AccordionTrigger className="hover:no-underline">
+                                <div className="flex items-center justify-between w-full pr-4">
+                                    <div className="flex items-center">
+                                        <div className="w-2 h-8 bg-cyan-500 rounded-full mr-4"></div>
+                                        <Droplets className="w-5 h-5 mr-3 text-cyan-500" />
+                                        <span className="font-semibold text-lg">수도</span>
+                                    </div>
+                                    <span className="text-xl font-bold">{formatCurrency(energyCosts.water.generalTotal.value)}</span>
+                                </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="p-4 bg-gray-50/50 rounded-b-md">
+                                <WaterCostDetail details={energyCosts.water} />
+                            </AccordionContent>
+                        </AccordionItem>
+
+                        <AccordionItem value="item-3">
+                             <AccordionTrigger className="hover:no-underline">
+                                <div className="flex items-center justify-between w-full pr-4">
+                                    <div className="flex items-center">
+                                        <div className="w-2 h-8 bg-orange-500 rounded-full mr-4"></div>
+                                        <Flame className="w-5 h-5 mr-3 text-orange-500" />
+                                        <span className="font-semibold text-lg">가스</span>
+                                    </div>
+                                    <span className="text-xl font-bold">{formatCurrency(energyCosts.gas.usageCharge.value)}</span>
+                                </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="p-4 bg-gray-50/50 rounded-b-md">
+                                <GasCostDetail details={energyCosts.gas} />
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
+                </CardContent>
+            </Card>
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle>총 에너지 비용</CardTitle>
+                </CardHeader>
+                <CardContent className="text-center">
+                    <p className="text-4xl font-bold text-gray-800">{formatCurrency(energyCosts.total.value)}</p>
+                    {weather?.averageTemperatureC && (
+                        <p className="text-sm text-gray-500 mt-1">
+                            기온: {weather.averageTemperatureC.value}°C
+                        </p>
+                    )}
+                </CardContent>
+            </Card>
+        </div>
     );
-  }
-
-  // 최신 보고서를 기준으로 데이터를 표시합니다.
-  const latestReport = monthly_reports.reduce((latest, report) => 
-    new Date(report.year, report.month - 1) > new Date(latest.year, latest.month - 1) ? report : latest
-  , monthly_reports[0]);
-
-  const { energyUsage, energyCosts } = latestReport.raw_data;
-
-  // 월별 전기 사용량 데이터 (과거 데이터가 있다면 차트에 표시)
-  const chartData = monthly_reports
-    .map((report: MonthlyReport) => ({
-      month: `${report.year}-${String(report.month).padStart(2, '0')}`,
-      "전기 사용량 (kWh)": report.raw_data.energyUsage.electricityKwh.value || 0,
-      "수도 사용량 (m³)": report.raw_data.energyUsage.waterM3.value || 0,
-    }))
-    .sort((a, b) => a.month.localeCompare(b.month));
-
-  return (
-    <div className="space-y-6">
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center">
-                    <TrendingUp className="mr-2 text-indigo-500" />
-                    {latestReport.year}년 {latestReport.month}월 에너지 현황
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
-                    <h4 className="text-sm font-medium text-gray-500 flex items-center"><Zap className="w-4 h-4 mr-1.5 text-yellow-500"/>전기</h4>
-                    <p className="text-2xl font-bold">{energyUsage.electricityKwh.value.toLocaleString()} <span className="text-sm font-normal">{energyUsage.electricityKwh.unit}</span></p>
-                    <p className="text-sm text-gray-600">{energyCosts.electricity.finalAmount.value.toLocaleString()}원</p>
-                </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                    <h4 className="text-sm font-medium text-gray-500 flex items-center"><Droplets className="w-4 h-4 mr-1.5 text-blue-500"/>수도</h4>
-                    <p className="text-2xl font-bold">{energyUsage.waterM3.value.toLocaleString()} <span className="text-sm font-normal">{energyUsage.waterM3.unit}</span></p>
-                    <p className="text-sm text-gray-600">{energyCosts.water.generalTotal.value.toLocaleString()}원</p>
-                </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                    <h4 className="text-sm font-medium text-gray-500 flex items-center"><Flame className="w-4 h-4 mr-1.5 text-red-500"/>가스</h4>
-                    <p className="text-2xl font-bold">{energyUsage.gasM3.value.toLocaleString()} <span className="text-sm font-normal">{energyUsage.gasM3.unit}</span></p>
-                    <p className="text-sm text-gray-600">{energyCosts.gas.usageCharge.value.toLocaleString()}원</p>
-                </div>
-                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                    <h4 className="text-sm font-medium text-green-700">총 에너지 비용</h4>
-                    <p className="text-2xl font-bold text-green-800">{energyCosts.total.value.toLocaleString()}<span className="text-sm font-normal">원</span></p>
-                </div>
-            </CardContent>
-        </Card>
-
-        <Card>
-            <CardHeader>
-                <CardTitle>월별 사용량 추이</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div style={{ width: '100%', height: 300 }}>
-                    <ResponsiveContainer>
-                    <BarChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="month" />
-                        <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
-                        <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
-                        <Tooltip formatter={(value: number, name: string) => [value.toLocaleString(), name]} />
-                        <Legend />
-                        <Bar yAxisId="left" dataKey="전기 사용량 (kWh)" fill="#8884d8" />
-                        <Bar yAxisId="right" dataKey="수도 사용량 (m³)" fill="#82ca9d" />
-                    </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </CardContent>
-        </Card>
-    </div>
-  );
 };
 
 export default OmsEnergyDashboard;
