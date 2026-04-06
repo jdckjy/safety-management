@@ -1,4 +1,3 @@
-
 /**
  * 애플리케이션 전체에서 사용되는 핵심 상수들을 정의하는 파일입니다.
  * "Single Source of Truth" 원칙에 따라, 상태, 유형, 표시 이름 등
@@ -81,8 +80,8 @@ export const UI_STATUS_OPTIONS = [
 // 6. 임대 유닛 상태 (Tenant Unit Status)
 // -----------------------------------------------------------------------------
 export const UNIT_STATUS = {
-  OCCUPIED: '입주',
-  VACANT: '공실',
-  IN_DISCUSSION: '협의중',
-  NON_RENTABLE: '비임대',
+  OCCUPIED: 'OCCUPIED',
+  VACANT: 'VACANT',
+  IN_DISCUSSION: 'IN_DISCUSSION',
+  NON_RENTABLE: 'NON_RENTABLE',
 } as const;

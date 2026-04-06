@@ -17,6 +17,7 @@ interface RawReportData {
     electricityKwh: { value: number; unit: string; };
     waterM3: { value: number; unit: string; };
     gasM3: { value: number; unit: string; };
+    solarGenerationKwh?: { value: number; unit: string; };
   };
   energyCosts: {
     electricity: { finalAmount: { value: number; }; baseRate: {value: number}; energyRate: {value: number}; climateEnvRate: {value: number}; powerFund: {value: number} };
@@ -35,7 +36,15 @@ const transformRawDataToMonthlyReport = (rawData: RawReportData): MonthlyReport 
     month: rawData.reportDate.month,
     report_date: `${rawData.reportDate.year}-${String(rawData.reportDate.month).padStart(2, '0')}-01`, // 임의의 날짜
     raw_data: {
-      energyUsage: rawData.energyUsage,
+      energyUsage: {
+        electricityKwh: rawData.energyUsage.electricityKwh,
+        waterM3: rawData.energyUsage.waterM3,
+        gasM3: rawData.energyUsage.gasM3,
+        solarGenerationKwh: rawData.energyUsage.solarGenerationKwh || { value: 0, unit: 'kWh' },
+      },
+      weather: {
+        averageTemperatureC: { value: 10, unit: '°C'}
+      },
       energyCosts: {
         electricity: {
           basicCharge: { value: rawData.energyCosts.electricity.baseRate.value },
