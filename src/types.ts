@@ -187,3 +187,19 @@ export interface CustomTab {
   kpiIds?: string[];
   activityCategories?: string[];
 }
+
+export interface Income {
+  id: string;
+  source: string;
+  amount: number;
+  date: string; // ex: "2024-07-26"
+  category: 'rent' | 'service' | 'other';
+}
+
+export interface Expense {
+  id: string;
+  item: string;
+  amount: number;
+  date: string; // ex: "2024-07-26"
+  category: 'maintenance' | 'utilities' | 'salary' | 'other';
+}

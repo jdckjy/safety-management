@@ -1,6 +1,4 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import { DollarSign } from "lucide-react";
 import { useProjectData } from '../providers/ProjectDataProvider';
 import { useLeaseAnalytics } from '@/hooks/useLeaseAnalytics';
@@ -9,7 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { FinancialEntryForm } from '@/components/FinancialEntryForm';
 import { FinancialDataTable } from '@/components/FinancialDataTable';
-import { IncomeItem, ExpenseItem } from '@/types';
+import { Income, Expense } from '@/types';
+import FinancialSummary from '@/components/FinancialSummary';
 import {
   addIncome, addExpense,
   getIncomes, getExpenses,
@@ -17,14 +16,12 @@ import {
   deleteIncome, deleteExpense
 } from '@/firebase';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
-
 const LeaseAnalysisPage = () => {
   const { tenantUnits, complexFacilities } = useProjectData();
   const { analytics } = useLeaseAnalytics(tenantUnits, complexFacilities);
 
-  const [incomeItems, setIncomeItems] = useState<IncomeItem[]>([]);
-  const [expenseItems, setExpenseItems] = useState<ExpenseItem[]>([]);
+  const [incomeItems, setIncomeItems] = useState<Income[]>([]);
+  const [expenseItems, setExpenseItems] = useState<Expense[]>([]);
 
   const fetchFinancialData = useCallback(async () => {
     try {
@@ -41,14 +38,14 @@ const LeaseAnalysisPage = () => {
   }, [fetchFinancialData]);
 
   const handleAddFinancialItem = async (
-    item: Omit<IncomeItem, 'id'> | Omit<ExpenseItem, 'id'>, 
+    item: Omit<Income, 'id'> | Omit<Expense, 'id'>, 
     type: 'income' | 'expense'
   ) => {
     try {
       if (type === 'income') {
-        await addIncome(item as Omit<IncomeItem, 'id'>);
+        await addIncome(item as Omit<Income, 'id'>);
       } else {
-        await addExpense(item as Omit<ExpenseItem, 'id'>);
+        await addExpense(item as Omit<Expense, 'id'>);
       }
       await fetchFinancialData();
     } catch (error) {
@@ -58,7 +55,7 @@ const LeaseAnalysisPage = () => {
 
   const handleUpdateFinancialItem = async (
     id: string, 
-    updates: Partial<Omit<IncomeItem, 'id'>> | Partial<Omit<ExpenseItem, 'id'>>,
+    updates: Partial<Omit<Income, 'id'>> | Partial<Omit<Expense, 'id'>>,
     type: 'income' | 'expense'
   ) => {
     try {
@@ -86,31 +83,6 @@ const LeaseAnalysisPage = () => {
     }
   };
   
-  const chartData = useMemo(() => {
-    const labels = Object.keys(analytics).filter(key => key !== '전체');
-    return {
-      labels,
-      datasets: [{
-        label: '시설별 임대율 (%)',
-        data: labels.map(key => analytics[key].leaseRate),
-        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-      }],
-    };
-  }, [analytics]);
-
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: '시설별 임대율',
-      },
-    },
-  };
-
   const totalAnalytics = analytics['전체'] || { leasedRevenue: 0, leaseRate: 0 };
   const totalLeaseRevenue = totalAnalytics.leasedRevenue;
   const totalOtherIncome = incomeItems.reduce((sum, item) => sum + item.amount, 0);
@@ -175,12 +147,7 @@ const LeaseAnalysisPage = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
             <div className="lg:col-span-2">
-                <Card>
-                    <CardHeader><CardTitle>시설별 임대율 현황</CardTitle></CardHeader>
-                    <CardContent>
-                        <Bar options={chartOptions} data={chartData} />
-                    </CardContent>
-                </Card>
+                <FinancialSummary incomeData={incomeItems} expenseData={expenseItems} />
             </div>
             <div>
               <LeaseSimulator />
