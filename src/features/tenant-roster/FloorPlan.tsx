@@ -1,6 +1,6 @@
-
 import React, { useState, useRef } from 'react';
 import { TenantUnit } from '../../types';
+import { UNIT_STATUS } from '../../constants'; // UNIT_STATUS 상수를 가져옵니다.
 
 interface FloorPlanProps {
   units: TenantUnit[];
@@ -9,12 +9,13 @@ interface FloorPlanProps {
   floorPlanImage: string;
 }
 
+// 이제 getStatusColor 함수는 constants.ts의 상수를 사용하여 상태를 확인합니다.
 const getStatusColor = (status: TenantUnit['status']) => {
     switch (status) {
-        case '입주': return 'rgba(74, 222, 128, 0.6)';   // Green-400
-        case '공실': return 'rgba(248, 113, 113, 0.6)';   // Red-400
-        case '협의중': return 'rgba(251, 191, 36, 0.6)'; // Amber-400
-        case '비임대': return 'rgba(156, 163, 175, 0.6)'; // Gray-400
+        case UNIT_STATUS.OCCUPIED: return 'rgba(74, 222, 128, 0.6)';   // Green-400
+        case UNIT_STATUS.VACANT: return 'rgba(248, 113, 113, 0.6)';   // Red-400
+        case UNIT_STATUS.IN_DISCUSSION: return 'rgba(251, 191, 36, 0.6)'; // Amber-400
+        case UNIT_STATUS.NON_RENTABLE: return 'rgba(156, 163, 175, 0.6)'; // Gray-400
         default: return 'rgba(156, 163, 175, 0.5)';
     }
 };

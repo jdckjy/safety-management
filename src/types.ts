@@ -1,4 +1,3 @@
-
 // src/types.ts
 
 // ==================================================================================
@@ -170,7 +169,7 @@ export interface TenantUnit {
     contactPerson?: string;
     contactNumber?: string;
     industry?: string; 
-    svgPath?: string;
+    pathData?: string; // svgPath에서 pathData로 변경하여 일관성 확보
 }
 
 export interface GeneralActivity {
