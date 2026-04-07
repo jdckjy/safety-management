@@ -157,19 +157,26 @@ export interface TeamMember {
     isManager: boolean;
 }
 
+export type TenantUnitStatus = 'OCCUPIED' | 'VACANT' | 'IN_DISCUSSION' | 'NON_RENTABLE';
+
 export interface TenantUnit {
     id: string;
     floor: string;
     name: string;
     tenant: string;
     area: number;
-    status: string;
+    status: TenantUnitStatus;
     unitNumber?: string;
     companyName?: string;
     contactPerson?: string;
     contactNumber?: string;
     industry?: string; 
     pathData?: string; // svgPath에서 pathData로 변경하여 일관성 확보
+    rent?: number;
+    deposit?: number;
+    contractDate?: string;
+    moveInDate?: string;
+    moveOutDate?: string;
 }
 
 export interface GeneralActivity {

@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { X } from 'lucide-react';
+import { UNIT_STATUS } from '../../constants';
 
 interface UnitEditModalProps {
   isOpen: boolean;
@@ -15,7 +16,14 @@ interface UnitEditModalProps {
   floor: string;
 }
 
-const statusOptions: TenantUnitStatus[] = ['입주', '공실', '협의중', '비임대'];
+const statusMapping: Record<TenantUnitStatus, string> = {
+    [UNIT_STATUS.OCCUPIED]: '입주',
+    [UNIT_STATUS.VACANT]: '공실',
+    [UNIT_STATUS.IN_DISCUSSION]: '협의중',
+    [UNIT_STATUS.NON_RENTABLE]: '비임대',
+};
+
+const statusOptions: TenantUnitStatus[] = Object.values(UNIT_STATUS);
 
 const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, unit, floor }) => {
   const { addTenantUnit, updateTenantUnit } = useProjectData();
@@ -30,7 +38,7 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, unit, fl
                 floor: floor,
                 name: '',
                 area: 0,
-                status: '공실',
+                status: UNIT_STATUS.VACANT,
                 tenant: '',
                 rent: 0,
                 deposit: 0,
@@ -89,7 +97,7 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, unit, fl
                                 key={option} 
                                 variant={formData.status === option ? 'default' : 'outline'}
                                 onClick={() => handleChange('status', option)} >
-                                {option}
+                                {statusMapping[option]}
                             </Button>
                         ))}
                     </div>
@@ -103,11 +111,11 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, unit, fl
                 <div className="grid grid-cols-2 gap-4">
                      <div className="grid gap-2">
                         <Label htmlFor="rent">월임대료</Label>
-                        <Input id="rent" type="number" value={formData.rent || 0} onChange={(e) => handleChange('rent', parseInt(e.target.value))} />
+                        <Input id="rent" type="number" value={formData.rent || 0} onChange={(e) => handleChange('rent', parseInt(e.target.value, 10) || 0)} />
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="deposit">보증금</Label>
-                        <Input id="deposit" type="number" value={formData.deposit || 0} onChange={(e) => handleChange('deposit', parseInt(e.target.value))} />
+                        <Input id="deposit" type="number" value={formData.deposit || 0} onChange={(e) => handleChange('deposit', parseInt(e.target.value, 10) || 0)} />
                     </div>
                 </div>
 
