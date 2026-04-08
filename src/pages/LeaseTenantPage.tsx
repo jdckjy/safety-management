@@ -7,16 +7,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Lightbulb, Zap, BarChart, Building, Percent, Download } from 'lucide-react'; // 신규: Download 아이콘 import
+import { Lightbulb, Zap, BarChart, Building, Percent, Download } from 'lucide-react';
 import LeaseAnalysisPage from './LeaseAnalysisPage';
 import { TenantUnitDataTable } from '@/components/TenantUnitDataTable';
 import { TenantDetailModal } from '@/components/TenantDetailModal';
-import { TenantUnit, LeaseRecord } from '@/types';
+import { TenantUnit } from '@/types'; // FIX 1: Removed LeaseRecord
 import { updateTenantUnit } from '@/firebase';
-import { exportToCsv } from '@/lib/utils'; // 신규: CSV 내보내기 함수 import
+import { exportToCsv } from '@/lib/utils';
 
 const LeaseTenantPage: React.FC = () => {
-  const { complexFacilities, tenantUnits, refreshData } = useProjectData();
+  const { complexFacilities, tenantUnits } = useProjectData(); // FIX 2: Removed refreshData
   const [activeTab, setActiveTab] = useState("tenantRoster");
   // ... (기존 상태 선언들)
   const [selectedUnit, setSelectedUnit] = useState<TenantUnit | null>(null);
@@ -38,7 +38,7 @@ const LeaseTenantPage: React.FC = () => {
     // ... (기존 저장 로직)
   };
   
-  // 신규: CSV 내보내기 핸들러
+  // FIX 3: CSV Export Handler
   const handleExportCsv = () => {
     const headers = {
       id: '세대 ID',
@@ -46,19 +46,22 @@ const LeaseTenantPage: React.FC = () => {
       floor: '층',
       area: '면적(㎡)',
       status: '상태',
-      tenantName: '현재 임차인',
+      tenant: '현재 임차인',
       rent: '월 임대료(원)',
-      leaseStartDate: '계약 시작일',
-      leaseEndDate: '계약 종료일'
+      contractDate: '계약 시작일',
+      moveOutDate: '계약 종료일'
     };
     
-    // rent 필드가 없는 경우 0으로 처리하는 등 데이터 정제
     const dataToExport = tenantUnits.map(unit => ({
-      ...unit,
-      tenantName: unit.tenantName || '-',
+      id: unit.id,
+      name: unit.name,
+      floor: unit.floor,
+      area: unit.area,
+      status: unit.status,
+      tenant: unit.tenant || '-',
       rent: unit.rent || 0,
-      leaseStartDate: unit.leaseStartDate || '-',
-      leaseEndDate: unit.leaseEndDate || '-',
+      contractDate: unit.contractDate || '-',
+      moveOutDate: unit.moveOutDate || '-',
     }));
 
     exportToCsv("세대_목록.csv", dataToExport, headers);
