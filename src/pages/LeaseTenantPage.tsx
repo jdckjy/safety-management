@@ -11,18 +11,16 @@ import { Lightbulb, Zap, BarChart, Building, Percent, Download } from 'lucide-re
 import LeaseAnalysisPage from './LeaseAnalysisPage';
 import { TenantUnitDataTable } from '@/components/TenantUnitDataTable';
 import { TenantDetailModal } from '@/components/TenantDetailModal';
-import { TenantUnit } from '@/types'; // FIX 1: Removed LeaseRecord
+import { TenantUnit } from '@/types';
 import { updateTenantUnit } from '@/firebase';
 import { exportToCsv } from '@/lib/utils';
+import LeaseStatusSummaryPage from './LeaseStatusSummaryPage'; // Import the new component
 
 const LeaseTenantPage: React.FC = () => {
-  const { complexFacilities, tenantUnits } = useProjectData(); // FIX 2: Removed refreshData
-  const [activeTab, setActiveTab] = useState("tenantRoster");
-  // ... (기존 상태 선언들)
+  const { complexFacilities, tenantUnits } = useProjectData();
+  const [activeTab, setActiveTab] = useState("leaseStatusSummary"); // Change default tab
   const [selectedUnit, setSelectedUnit] = useState<TenantUnit | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // ... (기존 코드: commercialFacilities, leaseRateStats, handleAnalyze, formatRevenue)
 
   const handleRowClick = (unit: TenantUnit) => {
     setSelectedUnit(unit);
@@ -35,10 +33,9 @@ const LeaseTenantPage: React.FC = () => {
   };
 
   const handleSaveUnit = async (updatedUnit: TenantUnit) => {
-    // ... (기존 저장 로직)
+    // ... (Your existing save logic)
   };
-  
-  // FIX 3: CSV Export Handler
+
   const handleExportCsv = () => {
     const headers = {
       id: '세대 ID',
@@ -51,7 +48,7 @@ const LeaseTenantPage: React.FC = () => {
       contractDate: '계약 시작일',
       moveOutDate: '계약 종료일'
     };
-    
+
     const dataToExport = tenantUnits.map(unit => ({
       id: unit.id,
       name: unit.name,
@@ -71,31 +68,36 @@ const LeaseTenantPage: React.FC = () => {
     <div className="p-4 sm:p-6 md:p-8">
       <h1 className="text-2xl font-bold tracking-tight mb-6">임대 및 세대 관리</h1>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        {/* ... (TabsList 및 다른 탭들) ... */}
-        
-        <TabsContent value="tenantRoster" className="space-y-6">
-            <Card>
-              {/* ... (임대율 현황 카드) ... */}
-            </Card>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="leaseStatusSummary">주요 임대현황</TabsTrigger>
+          <TabsTrigger value="tenantRoster">Tenant Roster</TabsTrigger>
+          <TabsTrigger value="analysis">수익 분석</TabsTrigger>
+          <TabsTrigger value="recommendation">AI Tenant Recommender</TabsTrigger>
+        </TabsList>
 
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle>전체 세대 목록</CardTitle>
-                    <Button variant="outline" size="sm" onClick={handleExportCsv}>
-                        <Download className="mr-2 h-4 w-4" />
-                        CSV로 내보내기
-                    </Button>
-                </CardHeader>
-                <CardContent>
-                    <TenantUnitDataTable tenantUnits={tenantUnits} onRowClick={handleRowClick} />
-                </CardContent>
-            </Card>
+        <TabsContent value="leaseStatusSummary">
+          <LeaseStatusSummaryPage />
         </TabsContent>
 
-        {/* ... (다른 탭들 및 모달) ... */}
+        <TabsContent value="tenantRoster" className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>전체 세대 목록</CardTitle>
+              <Button variant="outline" size="sm" onClick={handleExportCsv}>
+                <Download className="mr-2 h-4 w-4" />
+                CSV로 내보내기
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <TenantUnitDataTable tenantUnits={tenantUnits} onRowClick={handleRowClick} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ... (Other TabsContent for analysis and recommendation) ... */}
       </Tabs>
 
-      <TenantDetailModal 
+      <TenantDetailModal
         isOpen={isModalOpen}
         unit={selectedUnit}
         onClose={handleCloseModal}
