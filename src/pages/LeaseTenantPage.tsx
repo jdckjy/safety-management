@@ -68,8 +68,9 @@ const LeaseTenantPage: React.FC = () => {
     <div className="p-4 sm:p-6 md:p-8">
       <h1 className="text-2xl font-bold tracking-tight mb-6">임대 및 세대 관리</h1>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="leaseStatusSummary">주요 임대현황</TabsTrigger>
+          <TabsTrigger value="tenantInfo">임차인 정보</TabsTrigger>
           <TabsTrigger value="tenantRoster">Tenant Roster</TabsTrigger>
           <TabsTrigger value="analysis">수익 분석</TabsTrigger>
           <TabsTrigger value="recommendation">AI Tenant Recommender</TabsTrigger>
@@ -77,6 +78,17 @@ const LeaseTenantPage: React.FC = () => {
 
         <TabsContent value="leaseStatusSummary">
           <LeaseStatusSummaryPage />
+        </TabsContent>
+
+        <TabsContent value="tenantInfo">
+          <Card>
+            <CardHeader>
+              <CardTitle>임차인 정보</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p>임차인 정보 탭의 내용이 여기에 표시됩니다.</p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="tenantRoster" className="space-y-6">

@@ -3,14 +3,16 @@ import React, { useState } from 'react';
 import KPIManager from './KPIManager';
 import TenantManager from './TenantManager';
 import AITenantRecommender from './AITenantRecommender';
-import LeaseAnalysisPage from '../pages/LeaseAnalysisPage'; // 수익 분석 페이지 임포트
-import LeaseStatusSummaryPage from '../pages/LeaseStatusSummaryPage'; // 주요 임대현황 페이지 임포트
-import { useProjectData } from '../providers/ProjectDataProvider';
+import LeaseAnalysisPage from '@/pages/LeaseAnalysisPage'; // 수익 분석 페이지 임포트
+import LeaseStatusSummaryPage from '@/pages/LeaseStatusSummaryPage'; // 주요 임대현황 페이지 임포트
+import { useProjectData } from '@/providers/ProjectDataProvider';
+import TenantInfoPage from '@/pages/TenantInfoPage'; // 새로운 임차인 정보 페이지 임포트
 
 // Tab configuration
 const subTabs = [
   { id: 'performance', label: 'KPI Reports' },
   { id: 'lease-status', label: '주요 임대현황' }, // New Tab
+  { id: 'tenant-info', label: '임차인 정보' }, // 새로운 탭 추가
   { id: 'roster', label: 'Tenant Roster' },
   { id: 'lease-analysis', label: '수익 분석' },
   { id: 'ai-recommender', label: 'AI Tenant Recommender' },
@@ -32,6 +34,8 @@ const LeaseRecruitment: React.FC = () => {
       return <KPIManager sectionTitle="KPI Reports" kpis={leaseKPIs} onUpdate={setLeaseKPIs} />;
     } else if (activeTabConfig.id === 'lease-status') {
       return <LeaseStatusSummaryPage />;
+    } else if (activeTabConfig.id === 'tenant-info') {
+      return <TenantInfoPage />;
     } else if (activeTabConfig.id === 'roster') {
       return <TenantManager />;
     } else if (activeTabConfig.id === 'lease-analysis') {
