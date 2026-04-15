@@ -13,7 +13,7 @@ import {
   deleteDoc,
   getDoc // getDoc 추가
 } from "firebase/firestore";
-import { IncomeItem, ExpenseItem, TenantUnit, IProjectData } from "./types"; // TenantUnit, IProjectData 타입 추가
+import { Income, Expense, TenantUnit, IProjectData } from "./types"; // TenantUnit, IProjectData 타입 추가
 
 // Firebase 구성 정보
 const firebaseConfig = {
@@ -77,17 +77,17 @@ export const updateTenantUnit = async (unitId: string, updatedUnit: TenantUnit) 
 // [수입 관련 함수]
 // ======================================================================================
 
-export const addIncome = async (item: Omit<IncomeItem, 'id'>) => {
+export const addIncome = async (item: Omit<Income, 'id'>) => {
   await addDoc(incomeCollection, { ...item, timestamp: serverTimestamp() });
 };
 
-export const getIncomes = async (): Promise<IncomeItem[]> => {
+export const getIncomes = async (): Promise<Income[]> => {
   const q = query(incomeCollection, orderBy("date", "desc"));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as IncomeItem));
+  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Income));
 };
 
-export const updateIncome = async (id: string, updates: Partial<Omit<IncomeItem, 'id'>>) => {
+export const updateIncome = async (id: string, updates: Partial<Omit<Income, 'id'>>) => {
   const docRef = doc(db, "income", id);
   await updateDoc(docRef, updates);
 };
@@ -101,17 +101,17 @@ export const deleteIncome = async (id: string) => {
 // [지출 관련 함수]
 // ======================================================================================
 
-export const addExpense = async (item: Omit<ExpenseItem, 'id'>) => {
+export const addExpense = async (item: Omit<Expense, 'id'>) => {
   await addDoc(expenseCollection, { ...item, timestamp: serverTimestamp() });
 };
 
-export const getExpenses = async (): Promise<ExpenseItem[]> => {
+export const getExpenses = async (): Promise<Expense[]> => {
   const q = query(expenseCollection, orderBy("date", "desc"));
   const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseItem));
+  return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Expense));
 };
 
-export const updateExpense = async (id: string, updates: Partial<Omit<ExpenseItem, 'id'>>) => {
+export const updateExpense = async (id: string, updates: Partial<Omit<Expense, 'id'>>) => {
   const docRef = doc(db, "expenses", id);
   await updateDoc(docRef, updates);
 };
