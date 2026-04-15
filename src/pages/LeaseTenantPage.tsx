@@ -14,11 +14,12 @@ import { TenantDetailModal } from '@/components/TenantDetailModal';
 import { TenantUnit } from '@/types';
 import { updateTenantUnit } from '@/firebase';
 import { exportToCsv } from '@/lib/utils';
-import LeaseStatusSummaryPage from './LeaseStatusSummaryPage'; // Import the new component
+import LeaseStatusSummaryPage from './LeaseStatusSummaryPage';
+import TenantInfoPage from '@/components/TenantInfoPage'; // Import the new component
 
 const LeaseTenantPage: React.FC = () => {
   const { complexFacilities, tenantUnits } = useProjectData();
-  const [activeTab, setActiveTab] = useState("leaseStatusSummary"); // Change default tab
+  const [activeTab, setActiveTab] = useState("leaseStatusSummary");
   const [selectedUnit, setSelectedUnit] = useState<TenantUnit | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -81,14 +82,7 @@ const LeaseTenantPage: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="tenantInfo">
-          <Card>
-            <CardHeader>
-              <CardTitle>임차인 정보</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p>임차인 정보 탭의 내용이 여기에 표시됩니다.</p>
-            </CardContent>
-          </Card>
+          <TenantInfoPage />
         </TabsContent>
 
         <TabsContent value="tenantRoster" className="space-y-6">

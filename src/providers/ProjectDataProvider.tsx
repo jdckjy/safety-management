@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, TenantUnit, GeneralActivity, CustomTab, MonthlyReport } from '../types';
+import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, TenantUnit, GeneralActivity, CustomTab, MonthlyReport, TenantInfo } from '../types';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { useAuth } from '../features/auth/AuthContext';
 import { Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
@@ -75,7 +75,8 @@ interface IProjectDataContext extends IProjectData {
   kpiData: (KPI & { type: string; icon: React.ReactNode; color: string; })[];
   navigationState: NavigationState;
   isDataLoaded: boolean;
-  customTabs: CustomTab[]; 
+  customTabs: CustomTab[];
+  tenantInfo: TenantInfo[];
   setData: React.Dispatch<React.SetStateAction<IProjectData>>;
   addActivityToKpi: (kpiId: string, newActivity: Omit<Activity, 'id' | 'status' | 'tasks'>) => Promise<Activity>;
   updateActivityInKpi: (kpiId: string, updatedActivity: Activity) => void;
@@ -104,6 +105,7 @@ interface IProjectDataContext extends IProjectData {
   addTenantUnit: (newUnit: Omit<TenantUnit, 'id' | 'pathData'>) => void;
   updateTenantUnit: (updatedUnit: TenantUnit) => void;
   deleteTenantUnit: (unitId: string) => void;
+  setTenantInfo: React.Dispatch<React.SetStateAction<TenantInfo[]>>;
   addGeneralActivity: (newActivity: Omit<GeneralActivity, 'id'>) => void;
   updateGeneralActivity: (updatedActivity: GeneralActivity) => void;
   deleteGeneralActivity: (activityId: string) => void;
@@ -122,6 +124,7 @@ const initialData: IProjectData = {
   complexFacilities: initialComplexFacilities,
   teamMembers: initialTeamMembers,
   tenantUnits: initialTenantUnits,
+  tenantInfo: [],
   generalActivities: [],
   customTabs: [], 
   monthly_reports: [],
@@ -198,6 +201,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
             complexFacilities: firestoreData.complexFacilities?.length ? firestoreData.complexFacilities : initialComplexFacilities,
             teamMembers: firestoreData.teamMembers?.length ? firestoreData.teamMembers : initialTeamMembers,
             tenantUnits: firestoreData.tenantUnits?.length ? firestoreData.tenantUnits : initialTenantUnits,
+            tenantInfo: firestoreData.tenantInfo || [],
             generalActivities: firestoreData.generalActivities || [],
             customTabs: firestoreData.customTabs || [], 
             monthly_reports: reports, 
@@ -349,7 +353,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   
   const value: IProjectDataContext = {
-    ...data, kpiData, navigationState, isDataLoaded, customTabs: data.customTabs || [], setData, addActivityToKpi, updateActivityInKpi, deleteActivityFromKpi, 
+    ...data, kpiData, navigationState, isDataLoaded, customTabs: data.customTabs || [], tenantInfo: data.tenantInfo || [], setData, addActivityToKpi, updateActivityInKpi, deleteActivityFromKpi, 
     addTask, updateTask, deleteTask, addCommentToTask, navigateTo, setSelectedMonth,
     setSafetyKPIs: (kpis) => setData(p => ({...p, safetyKPIs: typeof kpis === 'function' ? kpis(p.safetyKPIs) : kpis})),
     setLeaseKPIs: (kpis) => setData(p => ({...p, leaseKPIs: typeof kpis === 'function' ? kpis(p.leaseKPIs) : kpis})),
@@ -362,6 +366,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     setTeamMembers: (members) => setData(p => ({...p, teamMembers: typeof members === 'function' ? members(p.teamMembers) : members})),
     addTeamMember, updateTeamMember, deleteTeamMember,
     setTenantUnits: (units) => setData(p => ({...p, tenantUnits: typeof units === 'function' ? units(p.tenantUnits) : units})),
+    setTenantInfo: (info) => setData(p => ({...p, tenantInfo: typeof info === 'function' ? info(p.tenantInfo) : info})),
     addTenantUnit, updateTenantUnit, deleteTenantUnit,
     addGeneralActivity, updateGeneralActivity, deleteGeneralActivity,
     addMonthlyReport,

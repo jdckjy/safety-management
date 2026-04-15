@@ -57,6 +57,19 @@ export interface TeamActivity {
 // 기존 프로젝트 타입 (수정됨)
 // ==================================================================================
 
+export type CompanySize = '대기업' | '중견' | '중소' | '스타트업';
+export type BusinessCategory = '의료' | '교육' | '연구' | '근생' | '기타';
+
+export interface TenantInfo {
+  id: string; // Use businessRegistrationNumber as a unique ID
+  companyName: string; // 업체(기관)명
+  businessRegistrationNumber: string; // 사업자등록번호
+  representativeName: string; // 대표자명
+  contact: string; // 담당자 연락처
+  businessCategory: BusinessCategory; // 업종 카테고리
+  companySize: CompanySize; // 기업 규모
+}
+
 export interface IProjectData {
   safetyKPIs: KPI[];
   leaseKPIs: KPI[];
@@ -67,6 +80,7 @@ export interface IProjectData {
   complexFacilities: ComplexFacility[];
   teamMembers: TeamMember[];
   tenantUnits: TenantUnit[];
+  tenantInfo: TenantInfo[];
   generalActivities: GeneralActivity[];
   customTabs: CustomTab[];
   monthly_reports: MonthlyReport[];
@@ -146,6 +160,13 @@ export interface ComplexFacility {
   name: string;
   area: number;
   category: 'public' | 'commercial' | 'office' | 'residential' | 'special';
+  buildingArea?: number;
+  buildingCoverageRatio?: number;
+  grossFloorArea?: number;
+  floorAreaRatio?: number;
+  mainUse?: string;
+  height?: number;
+  remarks?: string;
 }
 
 export interface TeamMember {
