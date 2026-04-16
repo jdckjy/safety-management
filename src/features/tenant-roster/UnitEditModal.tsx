@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { TenantUnit, TenantUnitStatus } from '../../types';
+import { TenantUnit, TenantUnitStatus, TenantInfo } from '../../types';
 import { useProjectData } from '../../providers/ProjectDataProvider';
 import Modal from '../../components/ui/Modal'; 
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { X } from 'lucide-react';
 import { UNIT_STATUS } from '../../constants';
 
@@ -24,22 +25,26 @@ const statusMapping: Record<TenantUnitStatus, string> = {
 };
 
 const statusOptions: TenantUnitStatus[] = Object.values(UNIT_STATUS);
+const NO_TENANT_VALUE = '__NONE__'; // Special value for "no tenant" option
 
 const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, unit, floor }) => {
-  const { addTenantUnit, updateTenantUnit } = useProjectData();
+  const { addTenantUnit, updateTenantUnit, tenantInfo } = useProjectData();
   const [formData, setFormData] = useState<Partial<TenantUnit>>({});
 
   useEffect(() => {
     if (isOpen) {
         if (unit) {
-            setFormData(unit);
+            setFormData({
+                ...unit,
+                status: unit.status || UNIT_STATUS.VACANT,
+            });
         } else {
             setFormData({
                 floor: floor,
                 name: '',
                 area: 0,
                 status: UNIT_STATUS.VACANT,
-                tenant: '',
+                tenant: undefined, // Use undefined for no tenant
                 rent: 0,
                 deposit: 0,
                 contractDate: '',
@@ -51,10 +56,15 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, unit, fl
   }, [isOpen, unit, floor]);
 
   const handleSave = () => {
-    if (formData.id) {
-        updateTenantUnit(formData as TenantUnit);
+    const dataToSave = { ...formData };
+    if (dataToSave.tenant === NO_TENANT_VALUE) {
+        dataToSave.tenant = undefined;
+    }
+
+    if (dataToSave.id) {
+        updateTenantUnit(dataToSave as TenantUnit);
     } else {
-        addTenantUnit(formData as Omit<TenantUnit, 'id'>);
+        addTenantUnit(dataToSave as Omit<TenantUnit, 'id'>);
     }
     onClose();
   };
@@ -62,6 +72,17 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, unit, fl
   const handleChange = (field: keyof TenantUnit, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  const handleTenantChange = (value: string) => {
+      if (value === NO_TENANT_VALUE) {
+          handleChange('tenant', undefined);
+      } else {
+          handleChange('tenant', value);
+      }
+  }
+
+  // Defend against null/undefined tenants prop and filter out items with falsy IDs.
+  const safeTenants = (tenantInfo || []).filter(t => t && t.id);
 
   if (!isOpen) return null;
 
@@ -93,7 +114,7 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, unit, fl
                     <Label>상태</Label>
                     <div className="flex gap-2">
                         {statusOptions.map(option => (
-                            <Button 
+                           option && <Button 
                                 key={option} 
                                 variant={formData.status === option ? 'default' : 'outline'}
                                 onClick={() => handleChange('status', option)} >
@@ -105,7 +126,19 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, unit, fl
 
                 <div className="grid gap-2">
                     <Label htmlFor="tenant">임차인</Label>
-                    <Input id="tenant" value={formData.tenant || ''} onChange={(e) => handleChange('tenant', e.target.value)} />
+                    <Select value={formData.tenant || NO_TENANT_VALUE} onValueChange={handleTenantChange}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="임차인을 선택하세요" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={NO_TENANT_VALUE}>없음</SelectItem>
+                            {safeTenants.map((info: TenantInfo) => (
+                                info.id && <SelectItem key={info.id} value={info.id}>
+                                    {info.companyName}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

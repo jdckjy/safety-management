@@ -62,7 +62,7 @@ export const EditTenantInfoModal: React.FC<Props> = ({ isOpen, onClose, tenant, 
             </div>
             <div className="space-y-2">
               <Label htmlFor="businessCategory">업종</Label>
-              <Select onValueChange={(value) => handleSelectChange('businessCategory', value)} value={formData.businessCategory}>
+              <Select onValueChange={(value) => handleSelectChange('businessCategory', value)} value={formData.businessCategory ?? ''}>
                 <SelectTrigger className="bg-gray-50">
                   <SelectValue placeholder="업종 선택" />
                 </SelectTrigger>
@@ -77,7 +77,7 @@ export const EditTenantInfoModal: React.FC<Props> = ({ isOpen, onClose, tenant, 
             </div>
             <div className="space-y-2">
               <Label htmlFor="companySize">기업 규모</Label>
-              <Select onValueChange={(value) => handleSelectChange('companySize', value)} value={formData.companySize}>
+              <Select onValueChange={(value) => handleSelectChange('companySize', value)} value={formData.companySize ?? ''}>
                 <SelectTrigger className="bg-gray-50">
                   <SelectValue placeholder="기업 규모 선택" />
                 </SelectTrigger>
