@@ -3,16 +3,16 @@ import React, { useState } from 'react';
 import KPIManager from './KPIManager';
 import TenantManager from './TenantManager';
 import AITenantRecommender from './AITenantRecommender';
-import LeaseAnalysisPage from '@/pages/LeaseAnalysisPage'; // 수익 분석 페이지 임포트
-import LeaseStatusSummaryPage from '@/pages/LeaseStatusSummaryPage'; // 주요 임대현황 페이지 임포트
+import LeaseAnalysisPage from '@/pages/LeaseAnalysisPage';
+import LeaseStatusSummaryPage from '@/pages/LeaseStatusSummaryPage';
 import { useProjectData } from '@/providers/ProjectDataProvider';
-import TenantInfoPage from '@/pages/TenantInfoPage'; // 새로운 임차인 정보 페이지 임포트
+import TenantInfoView from '@/features/tenant-info/TenantInfoView';
 
 // Tab configuration
 const subTabs = [
   { id: 'performance', label: 'KPI Reports' },
-  { id: 'lease-status', label: '주요 임대현황' }, // New Tab
-  { id: 'tenant-info', label: '임차인 정보' }, // 새로운 탭 추가
+  { id: 'lease-status', label: '주요 임대현황' },
+  { id: 'tenant-info', label: '임차인 정보' },
   { id: 'roster', label: 'Tenant Roster' },
   { id: 'lease-analysis', label: '수익 분석' },
   { id: 'ai-recommender', label: 'AI Tenant Recommender' },
@@ -24,26 +24,28 @@ const LeaseRecruitment: React.FC = () => {
     setLeaseKPIs,
   } = useProjectData();
   
-  const [activeTab, setActiveTab] = useState(subTabs[0].id);
+  const [activeTab, setActiveTab] = useState('tenant-info');
 
   const renderActiveComponent = () => {
     const activeTabConfig = subTabs.find(tab => tab.id === activeTab);
     if (!activeTabConfig) return null;
 
-    if (activeTabConfig.id === 'performance') {
-      return <KPIManager sectionTitle="KPI Reports" kpis={leaseKPIs} onUpdate={setLeaseKPIs} />;
-    } else if (activeTabConfig.id === 'lease-status') {
-      return <LeaseStatusSummaryPage />;
-    } else if (activeTabConfig.id === 'tenant-info') {
-      return <TenantInfoPage />;
-    } else if (activeTabConfig.id === 'roster') {
-      return <TenantManager />;
-    } else if (activeTabConfig.id === 'lease-analysis') {
-      return <LeaseAnalysisPage />;
-    } else if (activeTabConfig.id === 'ai-recommender') {
+    switch (activeTabConfig.id) {
+      case 'performance':
+        return <KPIManager sectionTitle="KPI Reports" kpis={leaseKPIs} onUpdate={setLeaseKPIs} />;
+      case 'lease-status':
+        return <LeaseStatusSummaryPage />;
+      case 'tenant-info':
+        return <TenantInfoView />;
+      case 'roster':
+        return <TenantManager />;
+      case 'lease-analysis':
+        return <LeaseAnalysisPage />;
+      case 'ai-recommender':
         return <AITenantRecommender />;
+      default:
+        return null;
     }
-    return null;
   };
 
   return (

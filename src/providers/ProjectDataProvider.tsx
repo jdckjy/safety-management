@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, TenantUnit, GeneralActivity, CustomTab, MonthlyReport, TenantInfo } from '../types';
+import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, TenantUnit, GeneralActivity, CustomTab, MonthlyReport, TenantInfo, Contract, Attachment } from '../types';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { useAuth } from '../features/auth/AuthContext';
 import { Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
@@ -8,6 +8,8 @@ import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '../constants';
 import { initialComplexFacilities } from '../data/initial-complex-facilities';
 import { initialTeamMembers } from '../data/initial-team-members';
 import { initialTenantUnits } from '../data/tenantUnits';
+import { initialContracts } from '../data/initial-contracts';
+import { initialAttachments } from '../data/initial-attachments';
 import rawFebruaryReportData from '../data/2026-02-report.json';
 
 // Raw JSON 데이터 구조에 대한 임시 인터페이스
@@ -77,6 +79,8 @@ interface IProjectDataContext extends IProjectData {
   isDataLoaded: boolean;
   customTabs: CustomTab[];
   tenantInfo: TenantInfo[];
+  contracts: Contract[];
+  attachments: Attachment[];
   setData: React.Dispatch<React.SetStateAction<IProjectData>>;
   addActivityToKpi: (kpiId: string, newActivity: Omit<Activity, 'id' | 'status' | 'tasks'>) => Promise<Activity>;
   updateActivityInKpi: (kpiId: string, updatedActivity: Activity) => void;
@@ -106,7 +110,9 @@ interface IProjectDataContext extends IProjectData {
   updateTenantUnit: (updatedUnit: TenantUnit) => void;
   deleteTenantUnit: (unitId: string) => void;
   setTenantInfo: React.Dispatch<React.SetStateAction<TenantInfo[]>>;
-  updateTenantInfo: (updatedInfo: TenantInfo) => void; // 임차인 정보 수정 함수 추가
+  addTenant: (newTenant: TenantInfo) => void;
+  updateTenant: (updatedTenant: TenantInfo) => void;
+  deleteTenant: (tenantId: string) => void;
   addGeneralActivity: (newActivity: Omit<GeneralActivity, 'id'>) => void;
   updateGeneralActivity: (updatedActivity: GeneralActivity) => void;
   deleteGeneralActivity: (activityId: string) => void;
@@ -126,6 +132,8 @@ const initialData: IProjectData = {
   teamMembers: initialTeamMembers,
   tenantUnits: initialTenantUnits,
   tenantInfo: [],
+  contracts: initialContracts,
+  attachments: initialAttachments,
   generalActivities: [],
   customTabs: [], 
   monthly_reports: [],
@@ -203,6 +211,8 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
             teamMembers: firestoreData.teamMembers?.length ? firestoreData.teamMembers : initialTeamMembers,
             tenantUnits: firestoreData.tenantUnits?.length ? firestoreData.tenantUnits : initialTenantUnits,
             tenantInfo: firestoreData.tenantInfo || [],
+            contracts: firestoreData.contracts || initialContracts,
+            attachments: firestoreData.attachments || initialAttachments,
             generalActivities: firestoreData.generalActivities || [],
             customTabs: firestoreData.customTabs || [], 
             monthly_reports: reports, 
@@ -344,7 +354,23 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     const addTenantUnit = useCallback((newUnit: Omit<TenantUnit, 'id' | 'pathData'>) => setData(prev => ({ ...prev, tenantUnits: [...prev.tenantUnits, { ...newUnit, id: `unit-${Date.now()}`, pathData: '' }] })), []);
     const updateTenantUnit = useCallback((updatedUnit: TenantUnit) => setData(prev => ({ ...prev, tenantUnits: prev.tenantUnits.map(u => u.id === updatedUnit.id ? updatedUnit : u) })), []);
     const deleteTenantUnit = useCallback((unitId: string) => setData(prev => ({ ...prev, tenantUnits: prev.tenantUnits.filter(u => u.id !== unitId) })), []);
-    const updateTenantInfo = useCallback((updatedInfo: TenantInfo) => setData(prev => ({ ...prev, tenantInfo: (prev.tenantInfo || []).map(info => info.id === updatedInfo.id ? updatedInfo : info) })), []);
+    
+    const addTenant = useCallback((newTenant: TenantInfo) => {
+        setData(prev => ({ ...prev, tenantInfo: [...(prev.tenantInfo || []), newTenant] }));
+    }, []);
+
+    const updateTenant = useCallback((updatedTenant: TenantInfo) => {
+        setData(prev => ({ ...prev, tenantInfo: (prev.tenantInfo || []).map(t => t.id === updatedTenant.id ? updatedTenant : t) }));
+    }, []);
+
+    const deleteTenant = useCallback((tenantId: string) => {
+        setData(prev => ({
+        ...prev,
+        tenantInfo: (prev.tenantInfo || []).filter(t => t.id !== tenantId),
+        contracts: (prev.contracts || []).filter(c => c.tenantId !== tenantId),
+        attachments: (prev.attachments || []).filter(a => a.tenantId !== tenantId),
+        }));
+    }, []);
   
     const kpiData = useMemo(() => [
         ...(data.safetyKPIs || []).map(k => ({ ...k, type: '안전 관리', icon: <Shield size={16}/>, color: 'text-pink-500' })),
@@ -355,7 +381,12 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   
   const value: IProjectDataContext = {
-    ...data, kpiData, navigationState, isDataLoaded, customTabs: data.customTabs || [], tenantInfo: data.tenantInfo || [], setData, addActivityToKpi, updateActivityInKpi, deleteActivityFromKpi, 
+    ...data, kpiData, navigationState, isDataLoaded, 
+    customTabs: data.customTabs || [], 
+    tenantInfo: data.tenantInfo || [], 
+    contracts: data.contracts || [],
+    attachments: data.attachments || [],
+    setData, addActivityToKpi, updateActivityInKpi, deleteActivityFromKpi, 
     addTask, updateTask, deleteTask, addCommentToTask, navigateTo, setSelectedMonth,
     setSafetyKPIs: (kpis) => setData(p => ({...p, safetyKPIs: typeof kpis === 'function' ? kpis(p.safetyKPIs) : kpis})),
     setLeaseKPIs: (kpis) => setData(p => ({...p, leaseKPIs: typeof kpis === 'function' ? kpis(p.leaseKPIs) : kpis})),
@@ -369,7 +400,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     addTeamMember, updateTeamMember, deleteTeamMember,
     setTenantUnits: (units) => setData(p => ({...p, tenantUnits: typeof units === 'function' ? units(p.tenantUnits) : units})),
     setTenantInfo: (info) => setData(p => ({...p, tenantInfo: typeof info === 'function' ? info(p.tenantInfo) : info})),
-    updateTenantInfo, // 함수 전달
+    addTenant, updateTenant, deleteTenant,
     addTenantUnit, updateTenantUnit, deleteTenantUnit,
     addGeneralActivity, updateGeneralActivity, deleteGeneralActivity,
     addMonthlyReport,
