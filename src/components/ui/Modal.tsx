@@ -19,13 +19,22 @@ const sizeClasses = {
 
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, size = 'xl' }) => {
   useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      window.addEventListener('keydown', handleEsc);
     }
+
     return () => {
       document.body.style.overflow = 'auto';
+      window.removeEventListener('keydown', handleEsc);
     };
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   if (!isOpen) {
     return null;
@@ -38,14 +47,27 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, size = 'xl' })
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-start pt-20 z-50 animate-fade-in"
-      onClick={handleBackdropClick}
-    >
-      <div className={`bg-white rounded-2xl shadow-2xl w-full animate-slide-up-fade-in ${sizeClasses[size]}`}>
-        {children}
+    <>
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 z-40"
+        onClick={onClose}
+      />
+
+      {/* Modal Centering Container */}
+      <div
+        className="fixed inset-0 z-50 flex justify-center items-start pt-20 overflow-y-auto"
+        onClick={handleBackdropClick}
+      >
+        {/* Modal Panel */}
+        <div 
+          className={`bg-white rounded-lg shadow-xl w-full m-4 ${sizeClasses[size]}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {children}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

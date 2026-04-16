@@ -87,92 +87,94 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, unit, fl
   if (!isOpen) return null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose}>
-        <div className="bg-white rounded-lg shadow-xl">
-            <div className="p-6">
-                <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-bold">{unit ? "호실 정보 수정" : "신규 호실 추가"}</h2>
-                    <Button variant="ghost" size="icon" onClick={onClose}>
-                        <X className="h-5 w-5" />
-                    </Button>
-                </div>
-            </div>
-
-            <div className="p-6 pt-0 grid gap-6">
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="grid gap-2">
-                        <Label htmlFor="name">호실명</Label>
-                        <Input id="name" value={formData.name || ''} onChange={(e) => handleChange('name', e.target.value)} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="area">면적(m²)</Label>
-                        <Input id="area" type="number" value={formData.area || 0} onChange={(e) => handleChange('area', parseFloat(e.target.value))} />
-                    </div>
-                </div>
-
-                <div className="grid gap-2">
-                    <Label>상태</Label>
-                    <div className="flex gap-2">
-                        {statusOptions.map(option => (
-                           option && <Button 
-                                key={option} 
-                                variant={formData.status === option ? 'default' : 'outline'}
-                                onClick={() => handleChange('status', option)} >
-                                {statusMapping[option]}
-                            </Button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="grid gap-2">
-                    <Label htmlFor="tenant">임차인</Label>
-                    <Select value={formData.tenant || NO_TENANT_VALUE} onValueChange={handleTenantChange}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="임차인을 선택하세요" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={NO_TENANT_VALUE}>없음</SelectItem>
-                            {safeTenants.map((info: TenantInfo) => (
-                                info.id && <SelectItem key={info.id} value={info.id}>
-                                    {info.companyName}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                     <div className="grid gap-2">
-                        <Label htmlFor="rent">월임대료</Label>
-                        <Input id="rent" type="number" value={formData.rent || 0} onChange={(e) => handleChange('rent', parseInt(e.target.value, 10) || 0)} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="deposit">보증금</Label>
-                        <Input id="deposit" type="number" value={formData.deposit || 0} onChange={(e) => handleChange('deposit', parseInt(e.target.value, 10) || 0)} />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                    <div className="grid gap-2">
-                        <Label htmlFor="contractDate">계약일</Label>
-                        <Input id="contractDate" type="date" value={formData.contractDate || ''} onChange={(e) => handleChange('contractDate', e.target.value)} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="moveInDate">입주일</Label>
-                        <Input id="moveInDate" type="date" value={formData.moveInDate || ''} onChange={(e) => handleChange('moveInDate', e.target.value)} />
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="moveOutDate">만기일</Label>
-                        <Input id="moveOutDate" type="date" value={formData.moveOutDate || ''} onChange={(e) => handleChange('moveOutDate', e.target.value)} />
-                    </div>
-                </div>
-            </div>
-
-            <div className="p-6 flex justify-end gap-2">
-                <Button variant="outline" onClick={onClose}>취소</Button>
-                <Button onClick={handleSave}>저장</Button>
+    <Modal isOpen={isOpen} onClose={onClose} size="2xl">
+        {/* The Modal component now handles all backdrop, centering, and panel styling */}
+        {/* This content is placed inside the styled panel by the Modal component */}
+        
+        <div className="p-6">
+            <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold">{unit ? "호실 정보 수정" : "신규 호실 추가"}</h2>
+                <Button variant="ghost" size="icon" onClick={onClose}>
+                    <X className="h-5 w-5" />
+                </Button>
             </div>
         </div>
+
+        <div className="p-6 pt-0 grid gap-6">
+            <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="name">호실명</Label>
+                    <Input id="name" value={formData.name || ''} onChange={(e) => handleChange('name', e.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="area">면적(m²)</Label>
+                    <Input id="area" type="number" value={formData.area || 0} onChange={(e) => handleChange('area', parseFloat(e.target.value))} />
+                </div>
+            </div>
+
+            <div className="grid gap-2">
+                <Label>상태</Label>
+                <div className="flex gap-2">
+                    {statusOptions.map(option => (
+                       option && <Button 
+                            key={option} 
+                            variant={formData.status === option ? 'default' : 'outline'}
+                            onClick={() => handleChange('status', option)} >
+                            {statusMapping[option]}
+                        </Button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="grid gap-2">
+                <Label htmlFor="tenant">임차인</Label>
+                <Select value={formData.tenant || NO_TENANT_VALUE} onValueChange={handleTenantChange}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="임차인을 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value={NO_TENANT_VALUE}>없음</SelectItem>
+                        {safeTenants.map((info: TenantInfo) => (
+                            info.id && <SelectItem key={info.id} value={info.id}>
+                                {info.companyName}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                 <div className="grid gap-2">
+                    <Label htmlFor="rent">월임대료</Label>
+                    <Input id="rent" type="number" value={formData.rent || 0} onChange={(e) => handleChange('rent', parseInt(e.target.value, 10) || 0)} />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="deposit">보증금</Label>
+                    <Input id="deposit" type="number" value={formData.deposit || 0} onChange={(e) => handleChange('deposit', parseInt(e.target.value, 10) || 0)} />
+                </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="contractDate">계약일</Label>
+                    <Input id="contractDate" type="date" value={formData.contractDate || ''} onChange={(e) => handleChange('contractDate', e.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="moveInDate">입주일</Label>
+                    <Input id="moveInDate" type="date" value={formData.moveInDate || ''} onChange={(e) => handleChange('moveInDate', e.target.value)} />
+                </div>
+                <div className="grid gap-2">
+                    <Label htmlFor="moveOutDate">만기일</Label>
+                    <Input id="moveOutDate" type="date" value={formData.moveOutDate || ''} onChange={(e) => handleChange('moveOutDate', e.target.value)} />
+                </div>
+            </div>
+        </div>
+
+        <div className="p-6 flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>취소</Button>
+            <Button onClick={handleSave}>저장</Button>
+        </div>
+        
     </Modal>
   );
 };
