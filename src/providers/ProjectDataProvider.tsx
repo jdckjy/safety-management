@@ -106,6 +106,7 @@ interface IProjectDataContext extends IProjectData {
   updateTenantUnit: (updatedUnit: TenantUnit) => void;
   deleteTenantUnit: (unitId: string) => void;
   setTenantInfo: React.Dispatch<React.SetStateAction<TenantInfo[]>>;
+  updateTenantInfo: (updatedInfo: TenantInfo) => void; // 임차인 정보 수정 함수 추가
   addGeneralActivity: (newActivity: Omit<GeneralActivity, 'id'>) => void;
   updateGeneralActivity: (updatedActivity: GeneralActivity) => void;
   deleteGeneralActivity: (activityId: string) => void;
@@ -343,6 +344,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     const addTenantUnit = useCallback((newUnit: Omit<TenantUnit, 'id' | 'pathData'>) => setData(prev => ({ ...prev, tenantUnits: [...prev.tenantUnits, { ...newUnit, id: `unit-${Date.now()}`, pathData: '' }] })), []);
     const updateTenantUnit = useCallback((updatedUnit: TenantUnit) => setData(prev => ({ ...prev, tenantUnits: prev.tenantUnits.map(u => u.id === updatedUnit.id ? updatedUnit : u) })), []);
     const deleteTenantUnit = useCallback((unitId: string) => setData(prev => ({ ...prev, tenantUnits: prev.tenantUnits.filter(u => u.id !== unitId) })), []);
+    const updateTenantInfo = useCallback((updatedInfo: TenantInfo) => setData(prev => ({ ...prev, tenantInfo: (prev.tenantInfo || []).map(info => info.id === updatedInfo.id ? updatedInfo : info) })), []);
   
     const kpiData = useMemo(() => [
         ...(data.safetyKPIs || []).map(k => ({ ...k, type: '안전 관리', icon: <Shield size={16}/>, color: 'text-pink-500' })),
@@ -367,6 +369,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     addTeamMember, updateTeamMember, deleteTeamMember,
     setTenantUnits: (units) => setData(p => ({...p, tenantUnits: typeof units === 'function' ? units(p.tenantUnits) : units})),
     setTenantInfo: (info) => setData(p => ({...p, tenantInfo: typeof info === 'function' ? info(p.tenantInfo) : info})),
+    updateTenantInfo, // 함수 전달
     addTenantUnit, updateTenantUnit, deleteTenantUnit,
     addGeneralActivity, updateGeneralActivity, deleteGeneralActivity,
     addMonthlyReport,

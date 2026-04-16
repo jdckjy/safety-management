@@ -59,6 +59,13 @@ export interface TeamActivity {
 
 export type CompanySize = '대기업' | '중견' | '중소' | '스타트업';
 export type BusinessCategory = '의료' | '교육' | '연구' | '근생' | '기타';
+export type AcquisitionChannel = '직접 유치' | '유관기관 소개' | '온라인' | '기타';
+
+export interface Attachment {
+  name: string;
+  url: string;
+  type: '계약서' | '사업자등록증' | '기타';
+}
 
 export interface TenantInfo {
   id: string; // Use businessRegistrationNumber as a unique ID
@@ -68,6 +75,15 @@ export interface TenantInfo {
   contact: string; // 담당자 연락처
   businessCategory: BusinessCategory; // 업종 카테고리
   companySize: CompanySize; // 기업 규모
+
+  // 성과 및 행정 정보 (Performance & Admin)
+  residentEmployees?: { // 상주 인원수
+    male: number;
+    female: number;
+  };
+  businessDescription?: string; // 주요 사업 내용
+  attachments?: Attachment[]; // 첨부 파일
+  acquisitionChannel?: AcquisitionChannel; // 유치 경로
 }
 
 export interface IProjectData {
@@ -133,14 +149,14 @@ export interface HotSpot {
   description: string;
   location: string;
   imageUrl: string;
-  status: string; 
+  status: string;
 }
 
 export interface Facility {
   id: string;
   name: string;
   description: string;
-  status: string; 
+  status: string;
   imageUrl?: string;
 }
 
@@ -179,6 +195,7 @@ export interface TeamMember {
 }
 
 export type TenantUnitStatus = 'OCCUPIED' | 'VACANT' | 'IN_DISCUSSION' | 'NON_RENTABLE';
+export type ContractStatus = '입주예정' | '정상' | '만료임박' | '퇴거' | '연체';
 
 export interface TenantUnit {
     id: string;
@@ -191,13 +208,21 @@ export interface TenantUnit {
     companyName?: string;
     contactPerson?: string;
     contactNumber?: string;
-    industry?: string; 
+    industry?: string;
     pathData?: string; // svgPath에서 pathData로 변경하여 일관성 확보
     rent?: number;
     deposit?: number;
     contractDate?: string;
     moveInDate?: string;
     moveOutDate?: string;
+
+    // 시스템 관리 속성 (System Metadata)
+    contractStatus?: ContractStatus; // 계약 상태 (자동 계산)
+    lastModified?: { // 최종 수정일 및 수정자
+      date: string; // ISO 8601 format
+      user: string;
+    };
+    remarks?: string; // 비고란
 }
 
 export interface GeneralActivity {

@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { Textarea } from '../../components/ui/textarea'; // Textarea import 추가
 import { X } from 'lucide-react';
 import { UNIT_STATUS } from '../../constants';
 
@@ -44,12 +45,13 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, unit, fl
                 name: '',
                 area: 0,
                 status: UNIT_STATUS.VACANT,
-                tenant: undefined, // Use undefined for no tenant
+                tenant: undefined,
                 rent: 0,
                 deposit: 0,
                 contractDate: '',
                 moveInDate: '',
                 moveOutDate: '',
+                remarks: '', // remarks 초기값 추가
             });
         }
     }
@@ -81,16 +83,12 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, unit, fl
       }
   }
 
-  // Defend against null/undefined tenants prop and filter out items with falsy IDs.
   const safeTenants = (tenantInfo || []).filter(t => t && t.id);
 
   if (!isOpen) return null;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="2xl">
-        {/* The Modal component now handles all backdrop, centering, and panel styling */}
-        {/* This content is placed inside the styled panel by the Modal component */}
-        
         <div className="p-6">
             <div className="flex justify-between items-center">
                 <h2 className="text-xl font-bold">{unit ? "호실 정보 수정" : "신규 호실 추가"}</h2>
@@ -167,6 +165,17 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, unit, fl
                     <Label htmlFor="moveOutDate">만기일</Label>
                     <Input id="moveOutDate" type="date" value={formData.moveOutDate || ''} onChange={(e) => handleChange('moveOutDate', e.target.value)} />
                 </div>
+            </div>
+
+            {/* 비고란(Textarea) 추가 */}
+            <div className="grid gap-2">
+                <Label htmlFor="remarks">비고</Label>
+                <Textarea 
+                    id="remarks"
+                    value={formData.remarks || ''}
+                    onChange={(e) => handleChange('remarks', e.target.value)}
+                    placeholder="특약 사항이나 민원 이력 등 정형화하기 어려운 내용을 입력하세요."
+                />
             </div>
         </div>
 

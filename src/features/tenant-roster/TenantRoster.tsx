@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { useProjectData } from '../../providers/ProjectDataProvider';
 import { TenantUnit } from '../../types';
 import UnitEditModal from './UnitEditModal';
+import TenantInfoEditModal from './TenantInfoEditModal'; // 새로 만든 모달 import
 import FloorPlan from './FloorPlan';
 import UnitDetailPanel from './UnitDetailPanel';
 import { Button } from '../../components/ui/button';
@@ -18,8 +19,15 @@ const TenantRoster: React.FC = () => {
   const { tenantUnits, deleteTenantUnit } = useProjectData();
   const [selectedFloor, setSelectedFloor] = useState('1F');
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // 호실 수정 모달 상태
+  const [isUnitModalOpen, setUnitModalOpen] = useState(false);
   const [editingUnit, setEditingUnit] = useState<Partial<TenantUnit> | null>(null);
+
+  // 임차인 수정 모달 상태 (새로 추가)
+  const [isTenantModalOpen, setTenantModalOpen] = useState(false);
+  const [editingTenantId, setEditingTenantId] = useState<string | null>(null);
+
   const [isDrafterMode, setDrafterMode] = useState(false);
 
   const floorPlanImages: { [key: string]: string } = {
@@ -32,26 +40,19 @@ const TenantRoster: React.FC = () => {
     const calculateRate = (units: TenantUnit[]) => {
       if (!units || units.length === 0) return { rate: 0, occupied: 0, totalRentable: 0 };
       const roundToTwo = (num: number) => parseFloat(num.toFixed(2));
-
-      // 산식: 입주 / (입주 + 공실 + 협의중)
       const rentableStatuses: string[] = [UNIT_STATUS.OCCUPIED, UNIT_STATUS.VACANT, UNIT_STATUS.IN_DISCUSSION];
-
       const occupiedArea = roundToTwo(
         units
           .filter(u => u.status === UNIT_STATUS.OCCUPIED)
           .reduce((sum, u) => sum + u.area, 0)
       );
-
       const totalRentableArea = roundToTwo(
         units
           .filter(u => rentableStatuses.includes(u.status))
           .reduce((sum, u) => sum + u.area, 0)
       );
-      
       if (totalRentableArea === 0) return { rate: 0, occupied: occupiedArea, totalRentable: 0 };
-
       const rate = (occupiedArea / totalRentableArea) * 100;
-
       return {
         rate: roundToTwo(rate),
         occupied: occupiedArea,
@@ -86,17 +87,24 @@ const TenantRoster: React.FC = () => {
     setSelectedUnitId(prevId => (prevId === unitId ? null : unitId));
   };
 
-  const handleEdit = (unit: TenantUnit) => {
+  // 호실 수정 핸들러
+  const handleEditUnit = (unit: TenantUnit) => {
     setEditingUnit(unit);
-    setIsModalOpen(true);
+    setUnitModalOpen(true);
   };
 
-  const handleAddNew = () => {
+  // 임차인 수정 핸들러 (새로 추가)
+  const handleEditTenant = (tenantId: string) => {
+    setEditingTenantId(tenantId);
+    setTenantModalOpen(true);
+  }
+
+  const handleAddNewUnit = () => {
     setEditingUnit(null);
-    setIsModalOpen(true);
+    setUnitModalOpen(true);
   };
 
-  const handleDelete = (unitId: string) => {
+  const handleDeleteUnit = (unitId: string) => {
     if (window.confirm('정말로 이 유닛을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
       if (selectedUnitId === unitId) {
         setSelectedUnitId(null);
@@ -111,14 +119,19 @@ const TenantRoster: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col p-4 gap-4">
+      {/* 모달창 렌더링 */}
       <UnitEditModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        isOpen={isUnitModalOpen} 
+        onClose={() => setUnitModalOpen(false)} 
         unit={editingUnit}
         floor={selectedFloor}
       />
+      <TenantInfoEditModal
+        isOpen={isTenantModalOpen}
+        onClose={() => setTenantModalOpen(false)}
+        tenantId={editingTenantId}
+      />
       
-      {/* 최종 디자인: 정보는 한 줄에 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-3">
@@ -160,7 +173,7 @@ const TenantRoster: React.FC = () => {
           ))}
         </div>
         <div className="flex space-x-2">
-          <Button onClick={handleAddNew} variant="default">신규 유닛 추가</Button>
+          <Button onClick={handleAddNewUnit} variant="default">신규 유닛 추가</Button>
           <Button onClick={() => setDrafterMode(true)} variant="secondary">도면 편집</Button>
         </div>
       </div>
@@ -179,8 +192,9 @@ const TenantRoster: React.FC = () => {
           {selectedUnit ? (
             <UnitDetailPanel 
               unit={selectedUnit} 
-              onEdit={handleEdit}
-              onDelete={handleDelete}
+              onEdit={handleEditUnit} // 이름 변경
+              onDelete={handleDeleteUnit} // 이름 변경
+              onEditTenant={handleEditTenant} // 새로 추가된 핸들러 전달
             />
           ) : (
             <div className="bg-white rounded-lg shadow-lg h-full flex items-center justify-center">
