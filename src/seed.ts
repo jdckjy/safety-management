@@ -1,8 +1,7 @@
 
-import { IAppData, Building, Lead, Activity, Unit, MonthlyReport, ReportRawData } from './types';
+import { IProjectData, Building, Lead, Activity, MonthlyReport, ReportRawData } from './types';
 import reportJson from './data/2026-02-report.json';
 
-// [✅ 최종 수정] buildings를 객체가 아닌 '배열'로 수정하여 flatMap 에러를 근본적으로 해결합니다.
 const buildings: Building[] = [
   {
     id: 'medical-service-center',
@@ -17,7 +16,6 @@ const buildings: Building[] = [
         // --- 1층 ---
         { id: 'MSC-1F-01', floor: 1, area_sqm: 744.07, status: 'occupied', tenant_name: 'KMI', usage_type: 'Office', position_x: 0, position_y: 0 },
         { id: 'MSC-1F-02', floor: 1, area_sqm: 274.05, status: 'occupied', tenant_name: 'KMI', usage_type: 'Facility', position_x: 0, position_y: 0 },
-        { id: 'MSC-1F-03', floor: 1, area_sqm: 70.47, status: 'occupied', tenant_name: 'KMI', usage_type: 'Office', position_x: 0, position_y: 0 },
         { id: 'MSC-1F-04', floor: 1, area_sqm: 39.00, status: 'occupied', tenant_name: 'JDC', usage_type: 'Office', position_x: 0, position_y: 0 },
         // --- 2층 ---
         { id: 'MSC-2F-01', floor: 2, area_sqm: 783.04, status: 'occupied', tenant_name: 'KMI', usage_type: 'Clinic', position_x: 0, position_y: 0 },
@@ -58,7 +56,6 @@ const leads: Lead[] = [
 
 const activities: Activity[] = []; // 현재는 비어있음
 
-// --- 월간 보고서 데이터 추가 ---
 const reportRawData: ReportRawData = reportJson as ReportRawData;
 
 const monthlyReports: MonthlyReport[] = [{
@@ -68,7 +65,7 @@ const monthlyReports: MonthlyReport[] = [{
   raw_data: reportRawData,
 }];
 
-export const seedData: Partial<IAppData> = {
+export const seedData: Partial<IProjectData> = {
   buildings,
   leads,
   activities,

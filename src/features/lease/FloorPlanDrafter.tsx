@@ -7,12 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from "@/components/ui/use-toast";
 
-// [핵심 수정] 올바른 경로에서 이미지 파일을 임포트합니다.
 import floor1F from '@/assets/1F.png';
 import floor2F from '@/assets/2F.png';
 import floor3F from '@/assets/3F.png';
 
-// [핵심 수정] 임포트한 이미지 변수를 사용하도록 수정합니다.
 const floorImageUrls: { [key: string]: string } = {
   '1층': floor1F,
   '2층': floor2F,
@@ -57,11 +55,45 @@ const FloorPlanDrafter: React.FC = () => {
 
   const handleSvgClick = (event: MouseEvent<SVGSVGElement>) => {
     if (status !== 'drawing' || !svgRef.current) return;
-    const svgPoint = svgRef.current.createSVGPoint();
-    svgPoint.x = event.clientX;
-    svgPoint.y = event.clientY;
-    const transformedPoint = svgPoint.matrixTransform(svgRef.current.getScreenCTM()?.inverse());
-    setCurrentPoints(prev => [...prev, { x: transformedPoint.x, y: transformedPoint.y }]);
+
+    const svg = svgRef.current;
+    const svgBounds = svg.getBoundingClientRect();
+
+    if (svgBounds.width === 0 || svgBounds.height === 0) {
+      toast({ title: "오류", description: "도면 정보를 읽는 데 실패했습니다. 다시 시도해주세요.", variant: "destructive" });
+      return;
+    }
+
+    // [최종 수정] 가장 안정적인 방법으로 viewBox 속성을 직접 파싱합니다.
+    const viewBoxAttr = svg.getAttribute('viewBox');
+    if (!viewBoxAttr) {
+        toast({ title: "오류", description: "SVG 좌표계 정보를 찾을 수 없습니다.", variant: "destructive" });
+        return;
+    }
+    const viewBoxParts = viewBoxAttr.split(' ').map(Number);
+    const viewBox = { x: viewBoxParts[0], y: viewBoxParts[1], width: viewBoxParts[2], height: viewBoxParts[3] };
+
+    if (viewBoxParts.some(isNaN) || viewBox.width === 0 || viewBox.height === 0) {
+        toast({ title: "오류", description: "SVG 좌표계가 올바르지 않습니다.", variant: "destructive" });
+        return;
+    }
+
+    const relativeX = event.clientX - svgBounds.left;
+    const relativeY = event.clientY - svgBounds.top;
+
+    const scaleX = viewBox.width / svgBounds.width;
+    const scaleY = viewBox.height / svgBounds.height;
+
+    const svgX = Math.round(relativeX * scaleX + viewBox.x);
+    const svgY = Math.round(relativeY * scaleY + viewBox.y);
+
+    if (isNaN(svgX) || isNaN(svgY)) {
+      console.error("FATAL: NaN coordinate detected after all guards.");
+      toast({ title: "치명적 오류", description: "좌표 계산 중 예상치 못한 오류가 발생했습니다. 페이지를 새로고침해주세요.", variant: "destructive" });
+      return;
+    }
+
+    setCurrentPoints(prev => [...prev, { x: svgX, y: svgY }]);
   };
 
   const handleFinishDrawing = () => {
@@ -95,7 +127,7 @@ const FloorPlanDrafter: React.FC = () => {
     toast({ title: "저장 완료", description: `유닛 [${unitId}]이(가) ${selectedFloor}에 저장되었습니다.` });
     setStatus('idle');
     setCurrentPoints([]);
-    setUnitId('');
+    setUnitId(''); 
   };
 
   const handleExport = () => {
@@ -105,9 +137,11 @@ const FloorPlanDrafter: React.FC = () => {
     console.log(exportData);
   };
 
+  const getSanitizedPoints = (points: Point[]) => 
+    points.filter(p => p && typeof p.x === 'number' && typeof p.y === 'number' && !isNaN(p.x) && !isNaN(p.y)).map(p => `${p.x},${p.y}`).join(' ');
+
   return (
     <div>
-      {/* 컨트롤 패널 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 border rounded-lg bg-gray-50">
         <div className="flex space-x-2 p-1 bg-gray-200 rounded-lg">
           {Object.keys(floorImageUrls).map(floor => (
@@ -126,18 +160,17 @@ const FloorPlanDrafter: React.FC = () => {
         </div>
       </div>
       
-      {/* 도면 컨테이너 */}
       <div className="relative w-full h-auto border rounded-md overflow-hidden" style={{ aspectRatio: '1200 / 900' }}>
         <img src={floorImageUrls[selectedFloor]} alt={`${selectedFloor} 도면`} className="absolute top-0 left-0 w-full h-full object-cover" />
         <svg ref={svgRef} className="absolute top-0 left-0 w-full h-full" viewBox="0 0 1200 900" preserveAspectRatio="xMidYMid meet" onClick={handleSvgClick}>
-          {/* 저장된 폴리곤들 표시 */}
           {drawnUnitsOnCurrentFloor.map(unit => (
-            <polygon key={unit.id} points={unit.points.map(p => `${p.x},${p.y}`).join(' ')} fill="rgba(255, 193, 7, 0.4)" stroke="rgba(255, 152, 0, 1)" strokeWidth="2" />
+            <polygon key={unit.id} points={getSanitizedPoints(unit.points)} fill="rgba(255, 193, 7, 0.4)" stroke="rgba(255, 152, 0, 1)" strokeWidth="2" />
           ))}
 
-          {/* 현재 그리는 폴리곤 표시 */}
-          <polygon points={currentPoints.map(p => `${p.x},${p.y}`).join(' ')} fill={status === 'finished' ? "rgba(76, 175, 80, 0.5)" : "rgba(59, 130, 246, 0.3)"} stroke={status === 'finished' ? "#4CAF50" : "#3B82F6"} strokeWidth="2" />
-          {currentPoints.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="5" fill="#3B82F6" stroke="white" strokeWidth="1.5" />)}
+          <polygon points={getSanitizedPoints(currentPoints)} fill={status === 'finished' ? "rgba(76, 175, 80, 0.5)" : "rgba(59, 130, 246, 0.3)"} stroke={status === 'finished' ? "#4CAF50" : "#3B82F6"} strokeWidth="2" />
+          {currentPoints.map((p, i) => 
+            p && typeof p.x === 'number' && typeof p.y === 'number' && !isNaN(p.x) && !isNaN(p.y) && <circle key={i} cx={p.x} cy={p.y} r="5" fill="#3B82F6" stroke="white" strokeWidth="1.5" />
+          )}
         </svg>
       </div>
     </div>

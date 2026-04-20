@@ -7,7 +7,7 @@ import { Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
 import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '../constants';
 import { initialComplexFacilities } from '../data/initial-complex-facilities';
 import { initialTeamMembers } from '../data/initial-team-members';
-import { initialTenantUnits } from '../data/tenantUnits';
+import { tenantUnits } from '../data/tenantUnits';
 import { initialContracts } from '../data/initial-contracts';
 import { initialAttachments } from '../data/initial-attachments';
 import rawFebruaryReportData from '../data/2026-02-report.json';
@@ -130,7 +130,7 @@ const initialData: IProjectData = {
   facilities: [], 
   complexFacilities: initialComplexFacilities,
   teamMembers: initialTeamMembers,
-  tenantUnits: initialTenantUnits,
+  tenantUnits: tenantUnits,
   tenantInfo: [],
   contracts: initialContracts,
   attachments: initialAttachments,
@@ -209,7 +209,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
             facilities: firestoreData.facilities || [],
             complexFacilities: firestoreData.complexFacilities?.length ? firestoreData.complexFacilities : initialComplexFacilities,
             teamMembers: firestoreData.teamMembers?.length ? firestoreData.teamMembers : initialTeamMembers,
-            tenantUnits: firestoreData.tenantUnits?.length ? firestoreData.tenantUnits : initialTenantUnits,
+            tenantUnits: tenantUnits, // Firestore 데이터를 무시하고 항상 로컬 파일(tenantUnits.ts)을 사용하도록 임시 수정
             tenantInfo: firestoreData.tenantInfo || [],
             contracts: firestoreData.contracts || initialContracts,
             attachments: firestoreData.attachments || initialAttachments,

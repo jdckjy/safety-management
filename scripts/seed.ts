@@ -6,18 +6,23 @@ import { doc, setDoc } from 'firebase/firestore';
 
 /**
  * Firestore 데이터베이스에 초기 데이터를 시딩(seeding)합니다.
- * 'project_data' 컬렉션의 'singleton' 문서에 전체 시드 데이터를 씁니다.
+ * [주의] 이 스크립트는 'project_data/singleton' 문서의 모든 기존 데이터를 삭제하고
+ * 'src/seed.ts' 파일에 정의된 새로운 데이터로 완전히 대체합니다.
  */
 async function seedDatabase() {
   console.log('⏳ 데이터베이스 시딩을 시작합니다...');
+  console.warn('⚠️  기존 project_data/singleton 문서의 모든 데이터가 삭제됩니다.');
 
   try {
-    // 'project_data' 컬렉션의 'singleton' 문서를 참조합니다.
     const projectDataDocRef = doc(db, "project_data", "singleton");
 
-    // 해당 문서에 seedData 객체의 모든 내용을 씁니다.
-    // 기존 데이터가 있다면 덮어쓰게 됩니다.
+    // 1. 문서를 빈 객체로 설정하여 모든 필드를 효과적으로 삭제합니다.
+    await setDoc(projectDataDocRef, {});
+    console.log('🗑️  기존 데이터 삭제 완료.');
+
+    // 2. 새로운 시드 데이터로 문서를 다시 작성합니다.
     await setDoc(projectDataDocRef, seedData);
+    console.log('✍️  새로운 데이터 쓰기 완료.');
 
     console.log('✅ 데이터베이스 시딩이 성공적으로 완료되었습니다!');
     console.log('이제 애플리케이션에서 초기 데이터를 사용할 수 있습니다.');
