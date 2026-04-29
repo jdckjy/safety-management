@@ -4,7 +4,7 @@ import { useProjectData } from '../../providers/ProjectDataProvider';
 import floor1F from '../../assets/1F.png';
 import floor2F from '../../assets/2F.png';
 import floor3F from '../../assets/3F.png';
-import { TenantUnit } from '../../types';
+import { Unit } from '../../types'; // TenantUnit에서 Unit으로 변경
 
 interface FloorPlanDrafterProps {}
 
@@ -15,7 +15,8 @@ const floorImages: { [key: string]: string } = {
 };
 
 const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
-  const { tenantUnits, updateTenantUnit } = useProjectData(); // setTenantUnits 대신 updateTenantUnit 사용
+  // tenantUnits 대신 units를 사용하고, 안전을 위해 기본값으로 빈 배열을 할당합니다.
+  const { units = [], updateUnit } = useProjectData(); 
   const [selectedFloor, setSelectedFloor] = useState('1F');
   const [points, setPoints] = useState<number[]>([]);
   const [selectedUnitId, setSelectedUnitId] = useState<string>('');
@@ -35,7 +36,7 @@ const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
       return;
     }
 
-    const selectedUnit = tenantUnits.find(u => u.id === selectedUnitId);
+    const selectedUnit = units.find(u => u.id === selectedUnitId);
     if (selectedUnit && selectedUnit.pathData) {
       const parsedPoints = selectedUnit.pathData
         .replace(/[MLZ]/g, '')
@@ -47,7 +48,7 @@ const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
     } else {
       setPoints([]);
     }
-  }, [selectedUnitId, tenantUnits]);
+  }, [selectedUnitId, units]);
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight } = e.currentTarget;
@@ -106,7 +107,7 @@ const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
         return;
     }
 
-    const unitToUpdate = tenantUnits.find(unit => unit.id === selectedUnitId);
+    const unitToUpdate = units.find(unit => unit.id === selectedUnitId);
     if (!unitToUpdate) {
         alert('선택된 유닛 정보를 찾을 수 없습니다.');
         return;
@@ -114,16 +115,17 @@ const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
 
     const pathData = `M ${points[0]} ${points[1]} ` + points.slice(2).reduce((acc, val, i) => acc + (i % 2 === 0 ? 'L ' : ' ') + val + ' ', '') + 'Z';
     
-    const updatedUnit: TenantUnit = { 
+    // TenantUnit 대신 Unit 타입 사용
+    const updatedUnit: Unit = { 
         ...unitToUpdate, 
         pathData 
     };
 
-    updateTenantUnit(updatedUnit);
-    alert('저장되었습니다! 변경사항이 데이터베이스에 반영됩니다.');
+    updateUnit(updatedUnit); // updateTenantUnit 대신 updateUnit 사용
+    alert('저장되었습니다!');
   };
   
-  const unitsForFloor = tenantUnits.filter(u => u.floor === selectedFloor);
+  const unitsForFloor = units.filter(u => u.floor === selectedFloor);
 
   return (
     <div className="p-4">
@@ -161,12 +163,12 @@ const FloorPlanDrafter: React.FC<FloorPlanDrafterProps> = () => {
           style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} 
           viewBox={`0 0 ${imageDimensions.width || 1000} ${imageDimensions.height || 700}`}
         >
-            {tenantUnits.filter(u => u.floor === selectedFloor && u.pathData && u.id !== selectedUnitId).map(unit => (
+            {units.filter(u => u.floor === selectedFloor && u.pathData && u.id !== selectedUnitId).map(unit => (
                 <path key={unit.id} d={unit.pathData} fill="rgba(0, 0, 255, 0.3)" stroke="#0000FF" strokeWidth="1" />
             ))}
             {/* Show existing path for the selected unit if not being edited */}
-            {tenantUnits.find(u => u.id === selectedUnitId)?.pathData && points.length === 0 && (
-                <path d={tenantUnits.find(u => u.id === selectedUnitId)!.pathData!} fill="rgba(255, 165, 0, 0.4)" stroke="#FFA500" strokeWidth="1" />
+            {units.find(u => u.id === selectedUnitId)?.pathData && points.length === 0 && (
+                <path d={units.find(u => u.id === selectedUnitId)!.pathData!} fill="rgba(255, 165, 0, 0.4)" stroke="#FFA500" strokeWidth="1" />
             )}
             {/* Show path being actively drawn or edited */}
             {points.length > 0 && <polyline points={points.join(' ')} fill="rgba(255, 0, 0, 0.4)" stroke="lime" strokeWidth="2"/>}

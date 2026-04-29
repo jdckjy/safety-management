@@ -1,30 +1,34 @@
 
 import React, { useState, useMemo } from 'react';
 import { useProjectData } from '../../providers/ProjectDataProvider';
-import { TenantUnit } from '../../types';
+import { Unit, TenantInfo, Contract } from '../../types';
 import UnitEditModal from './UnitEditModal';
-import TenantInfoEditModal from './TenantInfoEditModal'; // 새로 만든 모달 import
+import TenantInfoEditModal from './TenantInfoEditModal';
 import FloorPlan from './FloorPlan';
 import UnitDetailPanel from './UnitDetailPanel';
 import { Button } from '../../components/ui/button';
 import FloorPlanDrafter from '../floor-plan/FloorPlanDrafter';
 import { Card, CardContent } from "../../components/ui/card";
-import { UNIT_STATUS } from '../../constants';
 
 import floor1F from '../../assets/1F.png';
 import floor2F from '../../assets/2F.png';
 import floor3F from '../../assets/3F.png';
 
+// 컴포넌트 내부에서 사용할 확장된 유닛 데이터 타입
+export interface EnrichedUnit extends Unit {
+  tenant?: TenantInfo;
+  contract?: Contract;
+  status: 'OCCUPIED' | 'VACANT';
+}
+
 const TenantRoster: React.FC = () => {
-  const { tenantUnits, deleteTenantUnit } = useProjectData();
+  const { units, contracts, tenantInfo, deleteUnit, addUnit, updateUnit, addContract, updateContract, deleteContract } = useProjectData();
   const [selectedFloor, setSelectedFloor] = useState('1F');
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   
-  // 호실 수정 모달 상태
   const [isUnitModalOpen, setUnitModalOpen] = useState(false);
-  const [editingUnit, setEditingUnit] = useState<Partial<TenantUnit> | null>(null);
+  const [editingUnit, setEditingUnit] = useState<Partial<Unit> | null>(null);
 
-  // 임차인 수정 모달 상태 (새로 추가)
   const [isTenantModalOpen, setTenantModalOpen] = useState(false);
   const [editingTenantId, setEditingTenantId] = useState<string | null>(null);
 
@@ -35,81 +39,131 @@ const TenantRoster: React.FC = () => {
     '2F': floor2F,
     '3F': floor3F,
   };
+
+  const enrichedUnits: EnrichedUnit[] = useMemo(() => {
+    if (!units || !contracts || !tenantInfo) return [];
+
+    const contractMap = new Map(contracts.map(c => [c.unitId, c]));
+    const tenantMap = new Map(tenantInfo.map(t => [t.id, t]));
+
+    return units.map(unit => {
+      const contract = contractMap.get(unit.id);
+      const tenant = contract ? tenantMap.get(contract.tenantId) : undefined;
+      return {
+        ...unit,
+        contract,
+        tenant,
+        status: contract ? 'OCCUPIED' : 'VACANT',
+      };
+    });
+  }, [units, contracts, tenantInfo]);
   
   const leaseRateStats = useMemo(() => {
-    const calculateRate = (units: TenantUnit[]) => {
-      if (!units || units.length === 0) return { rate: 0, occupied: 0, totalRentable: 0 };
-      const roundToTwo = (num: number) => parseFloat(num.toFixed(2));
-      const rentableStatuses: string[] = [UNIT_STATUS.OCCUPIED, UNIT_STATUS.VACANT, UNIT_STATUS.IN_DISCUSSION];
-      const occupiedArea = roundToTwo(
-        units
-          .filter(u => u.status === UNIT_STATUS.OCCUPIED)
-          .reduce((sum, u) => sum + u.area, 0)
-      );
-      const totalRentableArea = roundToTwo(
-        units
-          .filter(u => rentableStatuses.includes(u.status))
-          .reduce((sum, u) => sum + u.area, 0)
-      );
+    const calculateRate = (unitList: EnrichedUnit[]) => {
+      if (unitList.length === 0) return { rate: 0, occupied: 0, totalRentable: 0 };
+      
+      const occupiedArea = unitList
+        .filter(u => u.status === 'OCCUPIED')
+        .reduce((sum, u) => {
+          const area = parseFloat(u.area_sqm as any);
+          return sum + (isNaN(area) ? 0 : area);
+        }, 0);
+      
+      const totalRentableArea = unitList.reduce((sum, u) => {
+        const area = parseFloat(u.area_sqm as any);
+        return sum + (isNaN(area) ? 0 : area);
+      }, 0);
+      
       if (totalRentableArea === 0) return { rate: 0, occupied: occupiedArea, totalRentable: 0 };
+      
       const rate = (occupiedArea / totalRentableArea) * 100;
       return {
-        rate: roundToTwo(rate),
-        occupied: occupiedArea,
-        totalRentable: totalRentableArea
+        rate: parseFloat(rate.toFixed(2)),
+        occupied: parseFloat(occupiedArea.toFixed(2)),
+        totalRentable: parseFloat(totalRentableArea.toFixed(2))
       };
     };
 
-    const allUnits = tenantUnits;
-    const floor1Units = allUnits.filter(u => u.floor === '1F');
-    const floor2Units = allUnits.filter(u => u.floor === '2F');
-    const floor3Units = allUnits.filter(u => u.floor === '3F');
+    const floor1Units = enrichedUnits.filter(u => u.floor === '1F');
+    const floor2Units = enrichedUnits.filter(u => u.floor === '2F');
+    const floor3Units = enrichedUnits.filter(u => u.floor === '3F');
 
     return {
-      total: calculateRate(allUnits),
+      total: calculateRate(enrichedUnits),
       '1F': calculateRate(floor1Units),
       '2F': calculateRate(floor2Units),
       '3F': calculateRate(floor3Units),
     };
-  }, [tenantUnits]);
+  }, [enrichedUnits]);
 
   const unitsOnSelectedFloor = useMemo(() => 
-    tenantUnits.filter(u => u.floor === selectedFloor),
-    [tenantUnits, selectedFloor]
+    enrichedUnits.filter(u => u.floor === selectedFloor),
+    [enrichedUnits, selectedFloor]
   );
 
   const selectedUnit = useMemo(() => 
-    (selectedUnitId ? tenantUnits.find(u => u.id === selectedUnitId) : null) || null,
-    [tenantUnits, selectedUnitId]
+    (selectedUnitId ? enrichedUnits.find(u => u.id === selectedUnitId) : null) || null,
+    [enrichedUnits, selectedUnitId]
   );
 
   const handleUnitSelect = (unitId: string) => {
     setSelectedUnitId(prevId => (prevId === unitId ? null : unitId));
   };
 
-  // 호실 수정 핸들러
-  const handleEditUnit = (unit: TenantUnit) => {
-    setEditingUnit(unit);
+  const handleEditUnit = (unit: Unit) => {
+    const { id, floor, name, area_sqm, pathData } = unit;
+    setEditingUnit({ id, floor, name, area_sqm, pathData });
     setUnitModalOpen(true);
   };
 
-  // 임차인 수정 핸들러 (새로 추가)
   const handleEditTenant = (tenantId: string) => {
     setEditingTenantId(tenantId);
     setTenantModalOpen(true);
   }
 
   const handleAddNewUnit = () => {
-    setEditingUnit(null);
+    setEditingUnit(null); // 새로운 유닛 추가
     setUnitModalOpen(true);
+  };
+  
+  const handleSaveUnit = (unitData: Partial<Unit>, contractData?: Partial<Contract>) => {
+    if (unitData.id) { // Existing unit
+      updateUnit(unitData as Unit);
+      
+      const existingContract = contracts.find(c => c.unitId === unitData.id);
+      
+      if (contractData && contractData.tenantId) { // Create or update contract
+        if (existingContract) {
+          updateContract({ ...existingContract, ...contractData });
+        } else {
+          addContract({ ...contractData, unitId: unitData.id } as Omit<Contract, 'id'>);
+        }
+      } else { // Remove contract if tenant is unselected
+        if (existingContract) {
+            deleteContract(existingContract.id);
+        }
+      }
+    } else { // New unit
+      const newUnit = addUnit({
+        floor: selectedFloor,
+        name: unitData.name || '새 유닛',
+        area_sqm: unitData.area_sqm || 0,
+        pathData: unitData.pathData,
+      });
+
+      if (contractData && contractData.tenantId) {
+        addContract({ ...contractData, unitId: newUnit.id } as Omit<Contract, 'id'>);
+      }
+    }
+    setUnitModalOpen(false);
   };
 
   const handleDeleteUnit = (unitId: string) => {
-    if (window.confirm('정말로 이 유닛을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+    if (window.confirm('정말로 이 유닛을 삭제하시겠습니까? 연관된 계약 정보는 삭제되지 않습니다.')) {
       if (selectedUnitId === unitId) {
         setSelectedUnitId(null);
       }
-      deleteTenantUnit(unitId);
+      deleteUnit(unitId);
     }
   };
 
@@ -119,12 +173,13 @@ const TenantRoster: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col p-4 gap-4">
-      {/* 모달창 렌더링 */}
       <UnitEditModal 
         isOpen={isUnitModalOpen} 
         onClose={() => setUnitModalOpen(false)} 
+        onSave={handleSaveUnit}
         unit={editingUnit}
         floor={selectedFloor}
+        tenantInfo={tenantInfo} // Pass tenantInfo here
       />
       <TenantInfoEditModal
         isOpen={isTenantModalOpen}
@@ -192,9 +247,9 @@ const TenantRoster: React.FC = () => {
           {selectedUnit ? (
             <UnitDetailPanel 
               unit={selectedUnit} 
-              onEdit={handleEditUnit} // 이름 변경
-              onDelete={handleDeleteUnit} // 이름 변경
-              onEditTenant={handleEditTenant} // 새로 추가된 핸들러 전달
+              onEdit={() => handleEditUnit(selectedUnit)}
+              onDelete={() => handleDeleteUnit(selectedUnit.id)}
+              onEditTenant={selectedUnit.tenant ? () => handleEditTenant(selected.tenant!.id) : undefined}
             />
           ) : (
             <div className="bg-white rounded-lg shadow-lg h-full flex items-center justify-center">

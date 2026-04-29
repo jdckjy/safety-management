@@ -1,13 +1,14 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, TenantUnit, GeneralActivity, CustomTab, MonthlyReport, TenantInfo, Contract, Attachment } from '../types';
+import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, GeneralActivity, CustomTab, MonthlyReport, TenantInfo, Contract, Attachment, Unit } from '../types';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { useAuth } from '../features/auth/AuthContext';
 import { Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
 import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '../constants';
 import { initialComplexFacilities } from '../data/initial-complex-facilities';
 import { initialTeamMembers } from '../data/initial-team-members';
-import { tenantUnits } from '../data/tenantUnits';
+import { initialUnits } from '../data/initial-units';
+import { initialTenants } from '../data/initial-tenants';
 import { initialContracts } from '../data/initial-contracts';
 import { initialAttachments } from '../data/initial-attachments';
 import rawFebruaryReportData from '../data/2026-02-report.json';
@@ -77,6 +78,7 @@ interface IProjectDataContext extends IProjectData {
   kpiData: (KPI & { type: string; icon: React.ReactNode; color: string; })[];
   navigationState: NavigationState;
   isDataLoaded: boolean;
+  units: Unit[];
   customTabs: CustomTab[];
   tenantInfo: TenantInfo[];
   contracts: Contract[];
@@ -105,18 +107,24 @@ interface IProjectDataContext extends IProjectData {
   addTeamMember: (newMember: Omit<TeamMember, 'id'>) => void;
   updateTeamMember: (updatedMember: TeamMember) => void;
   deleteTeamMember: (memberId: string) => void;
-  setTenantUnits: React.Dispatch<React.SetStateAction<TenantUnit[]>>;
-  addTenantUnit: (newUnit: Omit<TenantUnit, 'id' | 'pathData'>) => void;
-  updateTenantUnit: (updatedUnit: TenantUnit) => void;
-  deleteTenantUnit: (unitId: string) => void;
+  setUnits: React.Dispatch<React.SetStateAction<Unit[]>>;
+  addUnit: (newUnit: Omit<Unit, 'id'>) => Unit;
+  updateUnit: (updatedUnit: Unit) => void;
+  deleteUnit: (unitId: string) => void;
   setTenantInfo: React.Dispatch<React.SetStateAction<TenantInfo[]>>;
   addTenant: (newTenant: TenantInfo) => void;
-  updateTenant: (updatedTenant: TenantInfo) => void;
+  updateTenantInfo: (updatedTenant: TenantInfo) => void;
   deleteTenant: (tenantId: string) => void;
+  setContracts: React.Dispatch<React.SetStateAction<Contract[]>>;
+  addContract: (newContract: Omit<Contract, 'id'>) => void;
+  updateContract: (updatedContract: Contract) => void;
+  deleteContract: (contractId: string) => void;  
   addGeneralActivity: (newActivity: Omit<GeneralActivity, 'id'>) => void;
   updateGeneralActivity: (updatedActivity: GeneralActivity) => void;
   deleteGeneralActivity: (activityId: string) => void;
   addMonthlyReport: (newReport: MonthlyReport) => Promise<void>;
+  addAttachment: (tenantId: string, file: File) => void;
+  deleteAttachment: (attachmentId: string) => void;
 }
 
 const ProjectDataContext = createContext<IProjectDataContext | undefined>(undefined);
@@ -128,12 +136,12 @@ const initialData: IProjectData = {
   infraKPIs: [], 
   hotspots: [], 
   facilities: [], 
-  complexFacilities: initialComplexFacilities,
-  teamMembers: initialTeamMembers,
-  tenantUnits: tenantUnits,
-  tenantInfo: [],
-  contracts: initialContracts,
-  attachments: initialAttachments,
+  complexFacilities: initialComplexFacilities || [],
+  teamMembers: initialTeamMembers || [],
+  units: initialUnits || [],
+  tenantInfo: initialTenants || [],
+  contracts: initialContracts || [],
+  attachments: initialAttachments || [],
   generalActivities: [],
   customTabs: [], 
   monthly_reports: [],
@@ -207,12 +215,12 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
             infraKPIs: (firestoreData.infraKPIs || []).map(sanitizeKpi),
             hotspots: firestoreData.hotspots || [],
             facilities: firestoreData.facilities || [],
-            complexFacilities: firestoreData.complexFacilities?.length ? firestoreData.complexFacilities : initialComplexFacilities,
-            teamMembers: firestoreData.teamMembers?.length ? firestoreData.teamMembers : initialTeamMembers,
-            tenantUnits: tenantUnits, // Firestore 데이터를 무시하고 항상 로컬 파일(tenantUnits.ts)을 사용하도록 임시 수정
-            tenantInfo: firestoreData.tenantInfo || [],
-            contracts: firestoreData.contracts || initialContracts,
-            attachments: firestoreData.attachments || initialAttachments,
+            complexFacilities: (firestoreData.complexFacilities || initialComplexFacilities) || [],
+            teamMembers: (firestoreData.teamMembers || initialTeamMembers) || [],
+            units: (firestoreData.units || initialUnits) || [],
+            tenantInfo: (firestoreData.tenantInfo || initialTenants) || [],
+            contracts: (firestoreData.contracts || initialContracts) || [],
+            attachments: (firestoreData.attachments || initialAttachments) || [],
             generalActivities: firestoreData.generalActivities || [],
             customTabs: firestoreData.customTabs || [], 
             monthly_reports: reports, 
@@ -336,30 +344,34 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     const reportRef = doc(db, "monthly_reports", newReport.id);
     await setDoc(reportRef, newReport);
     setData(prev => {
-      const existing = prev.monthly_reports.find(r => r.id === newReport.id);
+      const existing = prev.monthly_reports?.find(r => r.id === newReport.id);
       if (existing) {
-        return { ...prev, monthly_reports: prev.monthly_reports.map(r => r.id === newReport.id ? newReport : r) };
+        return { ...prev, monthly_reports: prev.monthly_reports?.map(r => r.id === newReport.id ? newReport : r) };
       } else {
-        return { ...prev, monthly_reports: [...prev.monthly_reports, newReport] };
+        return { ...prev, monthly_reports: [...(prev.monthly_reports || []), newReport] };
       }
     });
   }, [db]);
 
-    const addComplexFacility = useCallback((newFacility: Omit<ComplexFacility, 'id'>) => setData(prev => ({ ...prev, complexFacilities: [...prev.complexFacilities, { ...newFacility, id: `complex-${Date.now()}` }] })), []);
-    const updateComplexFacility = useCallback((updatedFacility: ComplexFacility) => setData(prev => ({ ...prev, complexFacilities: prev.complexFacilities.map(f => f.id === updatedFacility.id ? updatedFacility : f) })), []);
-    const deleteComplexFacility = useCallback((facilityId: string) => setData(prev => ({ ...prev, complexFacilities: prev.complexFacilities.filter(f => f.id !== facilityId) })), []);
-    const addTeamMember = useCallback((newMember: Omit<TeamMember, 'id'>) => setData(prev => ({ ...prev, teamMembers: [...prev.teamMembers, { ...newMember, id: `member-${Date.now()}` }] })), []);
-    const updateTeamMember = useCallback((updatedMember: TeamMember) => setData(prev => ({ ...prev, teamMembers: prev.teamMembers.map(m => m.id === updatedMember.id ? updatedMember : m) })), []);
-    const deleteTeamMember = useCallback((memberId: string) => setData(prev => ({ ...prev, teamMembers: prev.teamMembers.filter(m => m.id !== memberId) })), []);
-    const addTenantUnit = useCallback((newUnit: Omit<TenantUnit, 'id' | 'pathData'>) => setData(prev => ({ ...prev, tenantUnits: [...prev.tenantUnits, { ...newUnit, id: `unit-${Date.now()}`, pathData: '' }] })), []);
-    const updateTenantUnit = useCallback((updatedUnit: TenantUnit) => setData(prev => ({ ...prev, tenantUnits: prev.tenantUnits.map(u => u.id === updatedUnit.id ? updatedUnit : u) })), []);
-    const deleteTenantUnit = useCallback((unitId: string) => setData(prev => ({ ...prev, tenantUnits: prev.tenantUnits.filter(u => u.id !== unitId) })), []);
+    const addComplexFacility = useCallback((newFacility: Omit<ComplexFacility, 'id'>) => setData(prev => ({ ...prev, complexFacilities: [...(prev.complexFacilities || []), { ...newFacility, id: `complex-${Date.now()}` }] })), []);
+    const updateComplexFacility = useCallback((updatedFacility: ComplexFacility) => setData(prev => ({ ...prev, complexFacilities: (prev.complexFacilities || []).map(f => f.id === updatedFacility.id ? updatedFacility : f) })), []);
+    const deleteComplexFacility = useCallback((facilityId: string) => setData(prev => ({ ...prev, complexFacilities: (prev.complexFacilities || []).filter(f => f.id !== facilityId) })), []);
+    const addTeamMember = useCallback((newMember: Omit<TeamMember, 'id'>) => setData(prev => ({ ...prev, teamMembers: [...(prev.teamMembers || []), { ...newMember, id: `member-${Date.now()}` }] })), []);
+    const updateTeamMember = useCallback((updatedMember: TeamMember) => setData(prev => ({ ...prev, teamMembers: (prev.teamMembers || []).map(m => m.id === updatedMember.id ? updatedMember : m) })), []);
+    const deleteTeamMember = useCallback((memberId: string) => setData(prev => ({ ...prev, teamMembers: (prev.teamMembers || []).filter(m => m.id !== memberId) })), []);
+    const addUnit = useCallback((newUnit: Omit<Unit, 'id'>): Unit => {
+        const newUnitWithId = { ...newUnit, id: `unit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` };
+        setData(prev => ({ ...prev, units: [...(prev.units || []), newUnitWithId] }));
+        return newUnitWithId;
+    }, []);
+    const updateUnit = useCallback((updatedUnit: Unit) => setData(prev => ({ ...prev, units: (prev.units || []).map(u => u.id === updatedUnit.id ? updatedUnit : u) })), []);
+    const deleteUnit = useCallback((unitId: string) => setData(prev => ({ ...prev, units: (prev.units || []).filter(u => u.id !== unitId) })), []);
     
     const addTenant = useCallback((newTenant: TenantInfo) => {
         setData(prev => ({ ...prev, tenantInfo: [...(prev.tenantInfo || []), newTenant] }));
     }, []);
 
-    const updateTenant = useCallback((updatedTenant: TenantInfo) => {
+    const updateTenantInfo = useCallback((updatedTenant: TenantInfo) => {
         setData(prev => ({ ...prev, tenantInfo: (prev.tenantInfo || []).map(t => t.id === updatedTenant.id ? updatedTenant : t) }));
     }, []);
 
@@ -371,6 +383,34 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
         attachments: (prev.attachments || []).filter(a => a.tenantId !== tenantId),
         }));
     }, []);
+
+    const addContract = useCallback((newContract: Omit<Contract, 'id'>) => {
+        const newContractWithId = { ...newContract, id: `contract-${Date.now()}` };
+        setData(prev => ({ ...prev, contracts: [...(prev.contracts || []), newContractWithId] }));
+    }, []);
+
+    const updateContract = useCallback((updatedContract: Contract) => {
+        setData(prev => ({ ...prev, contracts: (prev.contracts || []).map(c => c.id === updatedContract.id ? updatedContract : c) }));
+    }, []);
+
+    const deleteContract = useCallback((contractId: string) => {
+        setData(prev => ({ ...prev, contracts: (prev.contracts || []).filter(c => c.id !== contractId) }));
+    }, []);
+
+    const addAttachment = useCallback((tenantId: string, file: File) => {
+      const newAttachment: Attachment = {
+          id: `att-${Date.now()}`,
+          tenantId: tenantId,
+          fileName: file.name,
+          url: URL.createObjectURL(file), // Note: This is a temporary URL
+          uploadedAt: new Date().toISOString(),
+      };
+      setData(prev => ({ ...prev, attachments: [...(prev.attachments || []), newAttachment] }));
+  }, []);
+
+  const deleteAttachment = useCallback((attachmentId: string) => {
+      setData(prev => ({ ...prev, attachments: (prev.attachments || []).filter(a => a.id !== attachmentId) }));
+  }, []);
   
     const kpiData = useMemo(() => [
         ...(data.safetyKPIs || []).map(k => ({ ...k, type: '안전 관리', icon: <Shield size={16}/>, color: 'text-pink-500' })),
@@ -381,29 +421,57 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   
   const value: IProjectDataContext = {
-    ...data, kpiData, navigationState, isDataLoaded, 
+    ...data,
+    kpiData, 
+    navigationState, 
+    isDataLoaded, 
+    units: data.units || [],
     customTabs: data.customTabs || [], 
     tenantInfo: data.tenantInfo || [], 
     contracts: data.contracts || [],
     attachments: data.attachments || [],
-    setData, addActivityToKpi, updateActivityInKpi, deleteActivityFromKpi, 
-    addTask, updateTask, deleteTask, addCommentToTask, navigateTo, setSelectedMonth,
-    setSafetyKPIs: (kpis) => setData(p => ({...p, safetyKPIs: typeof kpis === 'function' ? kpis(p.safetyKPIs) : kpis})),
-    setLeaseKPIs: (kpis) => setData(p => ({...p, leaseKPIs: typeof kpis === 'function' ? kpis(p.leaseKPIs) : kpis})),
-    setAssetKPIs: (kpis) => setData(p => ({...p, assetKPIs: typeof kpis === 'function' ? kpis(p.assetKPIs) : kpis})),
-    setInfraKPIs: (kpis) => setData(p => ({...p, infraKPIs: typeof kpis === 'function' ? kpis(p.infraKPIs) : kpis})),
-    setHotspots: (spots) => setData(p => ({...p, hotspots: typeof spots === 'function' ? spots(p.hotspots) : spots})),
-    setFacilities: (facilities) => setData(p => ({...p, facilities: typeof facilities === 'function' ? facilities(p.facilities) : facilities})),
-    setComplexFacilities: (facilities) => setData(p => ({...p, complexFacilities: typeof facilities === 'function' ? facilities(p.complexFacilities) : facilities})),
-    addComplexFacility, updateComplexFacility, deleteComplexFacility,
-    setTeamMembers: (members) => setData(p => ({...p, teamMembers: typeof members === 'function' ? members(p.teamMembers) : members})),
-    addTeamMember, updateTeamMember, deleteTeamMember,
-    setTenantUnits: (units) => setData(p => ({...p, tenantUnits: typeof units === 'function' ? units(p.tenantUnits) : units})),
-    setTenantInfo: (info) => setData(p => ({...p, tenantInfo: typeof info === 'function' ? info(p.tenantInfo) : info})),
-    addTenant, updateTenant, deleteTenant,
-    addTenantUnit, updateTenantUnit, deleteTenantUnit,
-    addGeneralActivity, updateGeneralActivity, deleteGeneralActivity,
+    setData, 
+    addActivityToKpi, 
+    updateActivityInKpi, 
+    deleteActivityFromKpi, 
+    addTask, 
+    updateTask, 
+    deleteTask, 
+    addCommentToTask, 
+    navigateTo, 
+    setSelectedMonth,
+    setSafetyKPIs: (kpis) => setData(p => ({...p, safetyKPIs: typeof kpis === 'function' ? kpis(p.safetyKPIs || []) : kpis})),
+    setLeaseKPIs: (kpis) => setData(p => ({...p, leaseKPIs: typeof kpis === 'function' ? kpis(p.leaseKPIs || []) : kpis})),
+    setAssetKPIs: (kpis) => setData(p => ({...p, assetKPIs: typeof kpis === 'function' ? kpis(p.assetKPIs || []) : kpis})),
+    setInfraKPIs: (kpis) => setData(p => ({...p, infraKPIs: typeof kpis === 'function' ? kpis(p.infraKPIs || []) : kpis})),
+    setHotspots: (spots) => setData(p => ({...p, hotspots: typeof spots === 'function' ? spots(p.hotspots || []) : spots})),
+    setFacilities: (facilities) => setData(p => ({...p, facilities: typeof facilities === 'function' ? facilities(p.facilities || []) : facilities})),
+    setComplexFacilities: (facilities) => setData(p => ({...p, complexFacilities: typeof facilities === 'function' ? facilities(p.complexFacilities || []) : facilities})),
+    addComplexFacility, 
+    updateComplexFacility, 
+    deleteComplexFacility,
+    setTeamMembers: (members) => setData(p => ({...p, teamMembers: typeof members === 'function' ? members(p.teamMembers || []) : members})),
+    addTeamMember, 
+    updateTeamMember, 
+    deleteTeamMember,
+    setUnits: (units) => setData(p => ({...p, units: typeof units === 'function' ? units(p.units || []) : units})),
+    addUnit, 
+    updateUnit, 
+    deleteUnit,
+    setTenantInfo: (info) => setData(p => ({...p, tenantInfo: typeof info === 'function' ? info(p.tenantInfo || []) : info})),
+    addTenant, 
+    updateTenantInfo, 
+    deleteTenant,
+    setContracts: (contracts) => setData(p => ({...p, contracts: typeof contracts === 'function' ? contracts(p.contracts || []) : contracts})),
+    addContract,
+    updateContract,
+    deleteContract,
+    addGeneralActivity, 
+    updateGeneralActivity, 
+    deleteGeneralActivity,
     addMonthlyReport,
+    addAttachment,
+    deleteAttachment
   };
 
   return <ProjectDataContext.Provider value={value}>{children}</ProjectDataContext.Provider>;

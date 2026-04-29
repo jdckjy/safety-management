@@ -1,12 +1,12 @@
 
 import React from 'react';
-import { useProjectData } from '../../providers/ProjectDataProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
-import { Contract } from '../../types';
+import { Contract, Unit } from '../../types';
 
 interface TenantContractsTabProps {
-  tenantId: string;
+  contracts: Contract[];
+  units: Unit[];
 }
 
 // 숫자를 통화 형식으로 포맷하는 헬퍼 함수
@@ -14,17 +14,18 @@ const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('ko-KR', { style: 'currency', currency: 'KRW' }).format(amount);
 };
 
-const ContractCard: React.FC<{ contract: Contract }> = ({ contract }) => {
+const ContractCard: React.FC<{ contract: Contract, unit?: Unit }> = ({ contract, unit }) => {
   const today = new Date();
   const startDate = new Date(contract.startDate);
   const endDate = new Date(contract.endDate);
   const isActive = today >= startDate && today <= endDate;
+  const area = unit ? unit.area_sqm : '0';
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-md font-bold">
-          {contract.spaceName} ({contract.spaceId})
+          {unit?.name || contract.spaceName} ({contract.spaceId})
         </CardTitle>
         <Badge variant={isActive ? 'success' : 'outline'}>
           {isActive ? '계약중' : '종료'}
@@ -36,7 +37,7 @@ const ContractCard: React.FC<{ contract: Contract }> = ({ contract }) => {
           <p className="font-mono text-right">{`${contract.startDate} ~ ${contract.endDate}`}</p>
 
           <p className="text-gray-500">면적</p>
-          <p className="font-mono text-right">{contract.area} ㎡</p>
+          <p className="font-mono text-right">{parseFloat(String(area)).toFixed(2)} ㎡</p>
 
           <p className="text-gray-500">보증금</p>
           <p className="font-mono text-right">{formatCurrency(contract.deposit)}</p>
@@ -49,11 +50,13 @@ const ContractCard: React.FC<{ contract: Contract }> = ({ contract }) => {
   );
 };
 
-const TenantContractsTab: React.FC<TenantContractsTabProps> = ({ tenantId }) => {
-  const { contracts } = useProjectData();
-  const tenantContracts = contracts.filter(c => c.tenantId === tenantId);
+const TenantContractsTab: React.FC<TenantContractsTabProps> = ({ contracts, units }) => {
+  const unitsMap: { [key: string]: Unit } = (units || []).reduce((map, unit) => {
+    map[unit.id] = unit;
+    return map;
+  }, {} as { [key: string]: Unit });
 
-  if (tenantContracts.length === 0) {
+  if (contracts.length === 0) {
     return (
       <div className="text-center py-12 text-gray-500">
         <p>해당 임차인의 계약 정보가 없습니다.</p>
@@ -63,9 +66,10 @@ const TenantContractsTab: React.FC<TenantContractsTabProps> = ({ tenantId }) => 
 
   return (
     <div className="space-y-4">
-      {tenantContracts.map(contract => (
-        <ContractCard key={contract.id} contract={contract} />
-      ))}
+      {contracts.map(contract => {
+        const unit = unitsMap[contract.unitId];
+        return <ContractCard key={contract.id} contract={contract} unit={unit} />
+      })}
     </div>
   );
 };

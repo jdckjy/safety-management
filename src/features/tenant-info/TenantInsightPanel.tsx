@@ -1,24 +1,32 @@
 
 import React from 'react';
-import { useProjectData } from '../../providers/ProjectDataProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Unit, Contract } from '../../types';
 
 interface TenantInsightPanelProps {
-  tenantId: string;
+  activeContracts: Contract[];
+  totalRentableArea: number;
+  units: Unit[];
 }
 
-const TenantInsightPanel: React.FC<TenantInsightPanelProps> = ({ tenantId }) => {
-  const { contracts, tenantUnits } = useProjectData();
+const TenantInsightPanel: React.FC<TenantInsightPanelProps> = ({ activeContracts, totalRentableArea, units }) => {
 
-  // 1. Calculate the total area for the specific tenant
-  const tenantContracts = contracts.filter(c => c.tenantId === tenantId);
-  const tenantTotalArea = tenantContracts.reduce((acc, c) => acc + c.area, 0);
+  const unitsMap: { [key: string]: Unit } = (units || []).reduce((map, unit) => {
+    map[unit.id] = unit;
+    return map;
+  }, {} as { [key: string]: Unit });
 
-  // 2. Calculate the total rentable area of the entire building
-  const totalRentableArea = tenantUnits.reduce((acc, unit) => acc + unit.area, 0);
+  const tenantTotalArea = (activeContracts || []).reduce((sum, contract) => {
+    const unit = unitsMap[contract.unitId];
+    if (unit) {
+      const area = parseFloat(String(unit.area_sqm || '0'));
+      return sum + (isNaN(area) ? 0 : area);
+    }
+    return sum;
+  }, 0);
 
-  // 3. Calculate the occupancy contribution percentage
-  const occupancyContribution = totalRentableArea > 0 ? (tenantTotalArea / totalRentableArea) * 100 : 0;
+  const safeTotalRentableArea = totalRentableArea || 0;
+  const occupancyContribution = safeTotalRentableArea > 0 ? (tenantTotalArea / safeTotalRentableArea) * 100 : 0;
 
   return (
     <Card>
@@ -32,16 +40,15 @@ const TenantInsightPanel: React.FC<TenantInsightPanelProps> = ({ tenantId }) => 
             <span className="text-lg font-bold text-blue-600">{occupancyContribution.toFixed(2)}%</span>
           </div>
           <p className="text-xs text-gray-500 mb-2">
-            전체 임대 가능 면적 ({totalRentableArea.toLocaleString()} ㎡) 중 현재 임차인이 차지하는 비중입니다.
+            전체 임대 가능 면적 ({safeTotalRentableArea.toLocaleString()} ㎡) 중 현재 임차인이 차지하는 비중입니다.
           </p>
           <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-            <div 
+            <div
               className="h-full bg-blue-500"
               style={{ width: `${occupancyContribution}%` }}
             ></div>
           </div>
         </div>
-        {/* Future insights can be added here */}
       </CardContent>
     </Card>
   );

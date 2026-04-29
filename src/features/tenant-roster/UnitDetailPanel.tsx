@@ -1,37 +1,25 @@
 
 import React from 'react';
-import { TenantUnit, TenantInfo, TenantUnitStatus } from '../../types';
 import { Button } from '../../components/ui/button';
-import { useProjectData } from '../../providers/ProjectDataProvider';
 import { Pencil } from 'lucide-react';
+import { EnrichedUnit } from './TenantRoster'; // EnrichedUnit 타입을 import
 
 interface UnitDetailPanelProps {
-  unit: TenantUnit;
-  onEdit: (unit: TenantUnit) => void;
-  onDelete: (unitId: string) => void;
-  onEditTenant: (tenantId: string) => void; // 임차인 수정 핸들러 추가
+  unit: EnrichedUnit;
+  onEdit: () => void; // TenantRoster에서 이미 unit 객체를 알고 있으므로 인자 필요 없음
+  onDelete: () => void; // TenantRoster에서 이미 unit.id를 알고 있으므로 인자 필요 없음
+  onEditTenant?: () => void; // 선택 사항, tenant가 있을 때만 전달됨
 }
 
-const statusMap: { [key in TenantUnitStatus]: { text: string; className: string } } = {
-  OCCUPIED: { text: '입주', className: 'text-green-600' },
+const statusMap = {
+  OCCUPIED: { text: '계약', className: 'text-green-600' },
   VACANT: { text: '공실', className: 'text-red-600' },
-  IN_DISCUSSION: { text: '협의중', className: 'text-yellow-600' },
-  NON_RENTABLE: { text: '비임대', className: 'text-gray-500' },
 };
 
-
 const UnitDetailPanel: React.FC<UnitDetailPanelProps> = ({ unit, onEdit, onDelete, onEditTenant }) => {
-  const { tenantInfo } = useProjectData();
-
-  const tenant = React.useMemo(() => {
-    if (!unit.tenant) return null;
-    return (tenantInfo || []).find((t: TenantInfo) => t.id === unit.tenant) || null;
-  }, [unit.tenant, tenantInfo]);
-
-  const tenantName = tenant ? tenant.companyName : (unit.tenant || '-');
 
   const renderDetail = (label: string, value: React.ReactNode) => {
-    if (!value) return null; // 값이 없으면 렌더링하지 않음
+    if (value === null || value === undefined || value === '') return null;
     return (
         <div className="grid grid-cols-3 gap-4 text-sm py-3 border-b border-gray-200">
             <dt className="font-semibold text-gray-500 col-span-1">{label}</dt>
@@ -40,7 +28,8 @@ const UnitDetailPanel: React.FC<UnitDetailPanelProps> = ({ unit, onEdit, onDelet
     );
   }
   
-  const statusInfo = statusMap[unit.status] || { text: unit.status, className: 'text-gray-500' };
+  const statusInfo = statusMap[unit.status];
+  const { tenant, contract } = unit;
 
   return (
     <div className="bg-white rounded-lg shadow-lg h-full flex flex-col">
@@ -53,51 +42,41 @@ const UnitDetailPanel: React.FC<UnitDetailPanelProps> = ({ unit, onEdit, onDelet
 
       <dl className="flex-grow p-6 overflow-y-auto">
         {renderDetail('층', unit.floor)}
-        {renderDetail('면적(m²)', unit.area.toFixed(2))}
+        {renderDetail('전용 면적(m²)', unit.area_sqm.toFixed(2))}
         
-        {/* 임차인 정보 + 수정 버튼 */}
+        {/* 임차인 정보 */}
         <div className="grid grid-cols-3 gap-4 text-sm py-3 border-b border-gray-200 items-center">
             <dt className="font-semibold text-gray-500 col-span-1">임차인</dt>
             <dd className="text-gray-800 col-span-2 flex justify-between items-center">
-                <span>{tenantName}</span>
-                {tenant && (
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditTenant(tenant.id)}>
+                <span>{tenant ? tenant.companyName : '-'}</span>
+                {tenant && onEditTenant && (
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEditTenant}>
                         <Pencil className="h-4 w-4 text-gray-400" />
                     </Button>
                 )}
             </dd>
         </div>
 
-        {/* 추가된 임차인 정보 */}
-        {tenant && (
+        {/* 계약 및 임차인 상세 정보 (점유 상태일 때만 표시) */}
+        {tenant && contract && (
           <>
             {renderDetail('주요 사업', tenant.businessDescription)}
             {renderDetail(
               '상주 인원',
-              tenant.residentEmployees ? `남 ${tenant.residentEmployees.male}명 / 여 ${tenant.residentEmployees.female}명` : null
+              tenant.residentEmployees ? `남 ${tenant.residentEmployees.male}명 / 여 ${tenant.residentEmployees.female}명` : '-'
             )}
-            {renderDetail('유치 경로', tenant.acquisitionChannel)}
+             {renderDetail('계약 기간', `${contract.startDate || ''} ~ ${contract.endDate || ''}`)}
+            {renderDetail('월 임대료', contract.monthlyRent ? `${contract.monthlyRent.toLocaleString()} 원` : '-')}
+            {renderDetail('보증금', contract.deposit ? `${contract.deposit.toLocaleString()} 원` : '-')}
           </>
         )}
 
-        {renderDetail('월임대료', unit.rent ? `${unit.rent.toLocaleString()} 원` : null)}
-        {renderDetail('보증금', unit.deposit ? `${unit.deposit.toLocaleString()} 원` : null)}
-        {renderDetail('계약일', unit.contractDate)}
-        {renderDetail('입주일', unit.moveInDate)}
-        {renderDetail('만기일', unit.moveOutDate)}
-        
-        {unit.remarks && (
-            <div className="grid grid-cols-1 gap-1 text-sm py-3">
-                <dt className="font-semibold text-gray-500 col-span-1">비고</dt>
-                <dd className="text-gray-700 col-span-1 whitespace-pre-wrap bg-gray-50 p-3 rounded-md">{unit.remarks}</dd>
-            </div>
-        )}
       </dl>
 
       <div className="p-6 border-t bg-gray-50 rounded-b-lg">
         <div className="flex justify-end space-x-3">
-          <Button variant="outline" onClick={() => onEdit(unit)}>호실 정보 수정</Button>
-          <Button variant="destructive" onClick={() => onDelete(unit.id)}>삭제</Button>
+          <Button variant="outline" onClick={onEdit}>호실 정보 수정</Button>
+          <Button variant="destructive" onClick={onDelete}>삭제</Button>
         </div>
       </div>
     </div>
