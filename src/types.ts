@@ -107,6 +107,8 @@ export interface TeamMember {
     role: string;
     team: '운영' | '기술' | '보안' | '환경';
     email: string;
+    position: string;
+    photo?: string;
 }
 
 // General Activities

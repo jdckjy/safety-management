@@ -8,12 +8,12 @@ import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '../constants';
 import { initialComplexFacilities } from '../data/initial-complex-facilities';
 import { initialTeamMembers } from '../data/initial-team-members';
 import { initialUnits } from '../data/initial-units';
-import { initialTenants } from '../data/initial-tenants';
-import { initialContracts } from '../data/initial-contracts';
-import { initialAttachments } from '../data/initial-attachments';
 import rawFebruaryReportData from '../data/2026-02-report.json';
 
-// Raw JSON 데이터 구조에 대한 임시 인터페이스
+// CORRECTED: IDs of mock tenants to be removed, based on user's debug log.
+const MOCK_TENANT_IDS_TO_DELETE = ['tenant-kohw', 'tenant-ige', 'tenant-khdc'];
+
+// Raw JSON data structure interface
 interface RawReportData {
   reportDate: { year: number; month: number; };
   energyUsage: {
@@ -31,13 +31,13 @@ interface RawReportData {
   teamActivities: { id: string; teamName: string; tasks: string[]; }[];
 }
 
-// Raw 데이터를 MonthlyReport 타입으로 변환하는 함수
+// Helper function to transform raw report data
 const transformRawDataToMonthlyReport = (rawData: RawReportData): MonthlyReport => {
   return {
     id: `${rawData.reportDate.year}-${String(rawData.reportDate.month).padStart(2, '0')}`,
     year: rawData.reportDate.year,
     month: rawData.reportDate.month,
-    report_date: `${rawData.reportDate.year}-${String(rawData.reportDate.month).padStart(2, '0')}-01`, // 임의의 날짜
+    report_date: `${rawData.reportDate.year}-${String(rawData.reportDate.month).padStart(2, '0')}-01`,
     raw_data: {
       energyUsage: {
         electricityKwh: rawData.energyUsage.electricityKwh,
@@ -45,15 +45,13 @@ const transformRawDataToMonthlyReport = (rawData: RawReportData): MonthlyReport 
         gasM3: rawData.energyUsage.gasM3,
         solarGenerationKwh: rawData.energyUsage.solarGenerationKwh || { value: 0, unit: 'kWh' },
       },
-      weather: {
-        averageTemperatureC: { value: 10, unit: '°C'}
-      },
+      weather: { averageTemperatureC: { value: 10, unit: '°C'} },
       energyCosts: {
         electricity: {
           basicCharge: { value: rawData.energyCosts.electricity.baseRate.value },
           usageCharge: { value: rawData.energyCosts.electricity.energyRate.value },
           demandCharge: { value: rawData.energyCosts.electricity.climateEnvRate.value },
-          vat: { value: 0 }, // JSON에 없으므로 0으로 설정
+          vat: { value: 0 },
           fund: { value: rawData.energyCosts.electricity.powerFund.value },
           finalAmount: { value: rawData.energyCosts.electricity.finalAmount.value },
         },
@@ -61,9 +59,7 @@ const transformRawDataToMonthlyReport = (rawData: RawReportData): MonthlyReport 
           usageCharge: { value: rawData.energyCosts.water.waterSupplyRate.value },
           generalTotal: { value: rawData.energyCosts.water.generalTotal.value },
         },
-        gas: {
-          usageCharge: { value: rawData.energyCosts.gas.usageCharge.value },
-        },
+        gas: { usageCharge: { value: rawData.energyCosts.gas.usageCharge.value } },
         total: rawData.energyCosts.total,
       },
       teamActivities: rawData.teamActivities,
@@ -72,7 +68,6 @@ const transformRawDataToMonthlyReport = (rawData: RawReportData): MonthlyReport 
 };
 
 const februaryReportData: MonthlyReport = transformRawDataToMonthlyReport(rawFebruaryReportData as unknown as RawReportData);
-
 
 interface IProjectDataContext extends IProjectData {
   kpiData: (KPI & { type: string; icon: React.ReactNode; color: string; })[];
@@ -139,9 +134,9 @@ const initialData: IProjectData = {
   complexFacilities: initialComplexFacilities || [],
   teamMembers: initialTeamMembers || [],
   units: initialUnits || [],
-  tenantInfo: initialTenants || [],
-  contracts: initialContracts || [],
-  attachments: initialAttachments || [],
+  tenantInfo: [],
+  contracts: [],
+  attachments: [],
   generalActivities: [],
   customTabs: [], 
   monthly_reports: [],
@@ -188,10 +183,12 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
       setIsDataLoaded(true); 
       return;
     }
+
     const fetchData = async () => {
       setIsDataLoaded(false);
       const userDocRef = doc(db, 'users', currentUser.uid);
       const reportsCollRef = collection(db, 'monthly_reports');
+      
       try {
         const [userDocSnap, reportsSnap] = await Promise.all([
           getDoc(userDocRef),
@@ -199,60 +196,95 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
         ]);
 
         let reports: MonthlyReport[] = reportsSnap.docs.map(doc => doc.data() as MonthlyReport);
-        
         const februaryReportExists = reports.some(r => r.id === '2026-02');
         if (!februaryReportExists) {
             reports.push(februaryReportData);
         }
 
+        let finalData: IProjectData;
+
         if (userDocSnap.exists()) {
-          const firestoreData = userDocSnap.data() as Partial<IProjectData>;
-          
-          const cleanData: IProjectData = {
-            safetyKPIs: (firestoreData.safetyKPIs || []).map(sanitizeKpi),
-            leaseKPIs: (firestoreData.leaseKPIs || []).map(sanitizeKpi),
-            assetKPIs: (firestoreData.assetKPIs || []).map(sanitizeKpi),
-            infraKPIs: (firestoreData.infraKPIs || []).map(sanitizeKpi),
-            hotspots: firestoreData.hotspots || [],
-            facilities: firestoreData.facilities || [],
-            complexFacilities: (firestoreData.complexFacilities || initialComplexFacilities) || [],
-            teamMembers: (firestoreData.teamMembers || initialTeamMembers) || [],
-            units: (firestoreData.units || initialUnits) || [],
-            tenantInfo: (firestoreData.tenantInfo || initialTenants) || [],
-            contracts: (firestoreData.contracts || initialContracts) || [],
-            attachments: (firestoreData.attachments || initialAttachments) || [],
-            generalActivities: firestoreData.generalActivities || [],
-            customTabs: firestoreData.customTabs || [], 
-            monthly_reports: reports, 
-          };
-          setData(cleanData);
+            const firestoreData = userDocSnap.data() as Partial<IProjectData>;
+            let isMigrated = false;
+
+            // One-time migration logic with corrected IDs
+            const tenants = firestoreData.tenantInfo || [];
+            const contracts = firestoreData.contracts || [];
+            const attachments = firestoreData.attachments || [];
+
+            const tenantsNeedingMigration = tenants.some(t => MOCK_TENANT_IDS_TO_DELETE.includes(t.id));
+
+            if (tenantsNeedingMigration) {
+                const cleanedTenants = tenants.filter(t => !MOCK_TENANT_IDS_TO_DELETE.includes(t.id));
+                const cleanedContracts = contracts.filter(c => !MOCK_TENANT_IDS_TO_DELETE.includes(c.tenantId));
+                const cleanedAttachments = attachments.filter(a => !MOCK_TENANT_IDS_TO_DELETE.includes(a.tenantId));
+                
+                firestoreData.tenantInfo = cleanedTenants;
+                firestoreData.contracts = cleanedContracts;
+                firestoreData.attachments = cleanedAttachments;
+                
+                isMigrated = true;
+            }
+            
+            finalData = {
+                safetyKPIs: (firestoreData.safetyKPIs || []).map(sanitizeKpi),
+                leaseKPIs: (firestoreData.leaseKPIs || []).map(sanitizeKpi),
+                assetKPIs: (firestoreData.assetKPIs || []).map(sanitizeKpi),
+                infraKPIs: (firestoreData.infraKPIs || []).map(sanitizeKpi),
+                hotspots: firestoreData.hotspots || [],
+                facilities: firestoreData.facilities || [],
+                complexFacilities: firestoreData.complexFacilities || initialComplexFacilities,
+                teamMembers: firestoreData.teamMembers || initialTeamMembers,
+                units: firestoreData.units || initialUnits,
+                tenantInfo: firestoreData.tenantInfo || [],
+                contracts: firestoreData.contracts || [],
+                attachments: firestoreData.attachments || [],
+                generalActivities: firestoreData.generalActivities || [],
+                customTabs: firestoreData.customTabs || [], 
+                monthly_reports: reports,
+            };
+
+            if (isMigrated) {
+                const dataToSave = { ...finalData };
+                delete (dataToSave as Partial<IProjectData>).monthly_reports;
+                await setDoc(userDocRef, dataToSave);
+            }
+
         } else {
+          finalData = { ...initialData, monthly_reports: reports };
           await setDoc(userDocRef, initialData); 
-          setData({ ...initialData, monthly_reports: reports });
         }
+        
+        setData(finalData);
+
       } catch (error) { 
-          console.error("Error fetching data, using fallback:", error);
+          console.error("Error fetching or migrating data:", error);
           setData({ ...initialData, monthly_reports: [februaryReportData] });
+      } finally {
+          setIsDataLoaded(true);
       }
-      finally { setIsDataLoaded(true); }
     };
+
     fetchData();
   }, [currentUser, db]);
   
-    
-    useEffect(() => {
+  useEffect(() => {
     if (!isDataLoaded || !currentUser) return;
+
     const nonReportData = { ...data };
     delete (nonReportData as Partial<IProjectData>).monthly_reports;
 
     const debounceSave = setTimeout(() => {
-        try { setDoc(doc(db, 'users', currentUser.uid), nonReportData, { merge: true });
-        } catch (error) { console.error("Error saving data:", error); }
-    }, 300);
+        try {
+            setDoc(doc(db, 'users', currentUser.uid), nonReportData, { merge: true });
+        } catch (error) {
+            console.error("Error saving data:", error);
+        }
+    }, 1000);
+
     return () => clearTimeout(debounceSave);
   }, [data, currentUser, db, isDataLoaded]);
 
-  
   const updateKpiArray = useCallback((updateFn: (data: IProjectData) => IProjectData) => {
     setData(prevData => updateFn(prevData));
   }, []);

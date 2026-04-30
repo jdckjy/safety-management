@@ -57,9 +57,10 @@ const TenantDetail: React.FC<TenantDetailProps> = ({ tenantId }) => {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-1 space-y-6">
-        <Card className="flex flex-col items-center justify-center text-center p-6">
+    <div className="grid grid-cols-1 xl:grid-cols-6 gap-6 h-full">
+      {/* 좌측 (Summary) */}
+      <div className="xl:col-span-1 space-y-6">
+        <Card className="flex flex-col items-center justify-center text-center p-6 h-full">
           <img src={`https://avatar.vercel.sh/${tenant.id}.png`} alt={tenant.companyName} className="w-24 h-24 rounded-full mb-4" />
           <h2 className="text-2xl font-bold">{tenant.companyName}</h2>
           <Badge variant={activeContracts.length > 0 ? "secondary" : "outline"} className="mt-2">
@@ -76,30 +77,36 @@ const TenantDetail: React.FC<TenantDetailProps> = ({ tenantId }) => {
             </div>
           </div>
         </Card>
-        <TenantInsightPanel 
-          activeContracts={activeContracts} 
-          totalRentableArea={totalRentableArea} 
-          units={units}
-        />
       </div>
 
-      <div className="lg:col-span-2">
-        <Tabs defaultValue="basic-info">
+      {/* 중앙 (Tabs) */}
+      <div className="xl:col-span-3">
+        <Tabs defaultValue="basic-info" className="h-full flex flex-col">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="basic-info">기본정보</TabsTrigger>
             <TabsTrigger value="contracts">계약현황</TabsTrigger>
             <TabsTrigger value="documents">서류관리</TabsTrigger>
           </TabsList>
-          <TabsContent value="basic-info" className="mt-4">
+          <TabsContent value="basic-info" className="mt-4 flex-grow">
             <TenantBasicInfoTab tenant={tenant} />
           </TabsContent>
-          <TabsContent value="contracts" className="mt-4">
+          <TabsContent value="contracts" className="mt-4 flex-grow">
             <TenantContractsTab contracts={allTenantContracts} units={units} />
           </TabsContent>
-          <TabsContent value="documents" className="mt-4">
+          <TabsContent value="documents" className="mt-4 flex-grow">
             <TenantDocumentsTab tenantId={tenantId} />
           </TabsContent>
         </Tabs>
+      </div>
+
+      {/* 우측 (Insight) */}
+      <div className="xl:col-span-2 space-y-6">
+        <TenantInsightPanel 
+          tenant={tenant}
+          activeContracts={activeContracts} 
+          totalRentableArea={totalRentableArea} 
+          units={units}
+        />
       </div>
     </div>
   );
