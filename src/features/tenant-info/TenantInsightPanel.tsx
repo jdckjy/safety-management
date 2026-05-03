@@ -1,15 +1,16 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Unit, Contract } from '../../types';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
+import { Unit, Contract, TenantInfo } from '../../types';
 
 interface TenantInsightPanelProps {
+  tenant: TenantInfo;
   activeContracts: Contract[];
   totalRentableArea: number;
   units: Unit[];
 }
 
-const TenantInsightPanel: React.FC<TenantInsightPanelProps> = ({ activeContracts, totalRentableArea, units }) => {
+const TenantInsightPanel: React.FC<TenantInsightPanelProps> = ({ tenant, activeContracts, totalRentableArea, units }) => {
 
   const unitsMap: { [key: string]: Unit } = (units || []).reduce((map, unit) => {
     map[unit.id] = unit;
@@ -32,6 +33,7 @@ const TenantInsightPanel: React.FC<TenantInsightPanelProps> = ({ activeContracts
     <Card>
       <CardHeader>
         <CardTitle>인사이트</CardTitle>
+        <CardDescription>{tenant.companyName}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <div>

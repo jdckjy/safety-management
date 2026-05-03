@@ -1,20 +1,22 @@
 
 import React from 'react';
 import { useProjectData } from '../../providers/ProjectDataProvider';
-import { Card } from '../../components/ui/card';
-import { Badge } from '../../components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import TenantBasicInfoTab from './TenantBasicInfoTab';
 import TenantContractsTab from './TenantContractsTab';
 import TenantDocumentsTab from './TenantDocumentsTab';
 import TenantInsightPanel from './TenantInsightPanel';
 import { Unit } from '../../types';
+import { ArrowLeft, Edit } from 'lucide-react';
 
 interface TenantDetailProps {
   tenantId: string;
+  onBackToList: () => void;
 }
 
-const TenantDetail: React.FC<TenantDetailProps> = ({ tenantId }) => {
+const TenantDetail: React.FC<TenantDetailProps> = ({ tenantId, onBackToList }) => {
   const { tenantInfo, contracts, units, isDataLoaded } = useProjectData();
 
   if (!isDataLoaded) {
@@ -23,29 +25,15 @@ const TenantDetail: React.FC<TenantDetailProps> = ({ tenantId }) => {
 
   const tenant = (tenantInfo || []).find(t => t.id === tenantId);
   const allTenantContracts = (contracts || []).filter(c => c.tenantId === tenantId);
-
+  
   const activeContracts = allTenantContracts.filter(c => {
     try {
       return new Date(c.endDate) >= new Date();
     } catch (e) {
-      console.error(`[Data Error] 계약 ID ${c.id}의 endDate 형식이 잘못되었습니다:`, c.endDate, e);
-      return false;
+        console.error(`[Data Error] 계약 ID ${c.id}의 endDate 형식이 잘못되었습니다:`, c.endDate, e);
+        return false;
     }
   });
-
-  const unitsMap: { [key: string]: Unit } = (units || []).reduce((map, unit) => {
-    map[unit.id] = unit;
-    return map;
-  }, {} as { [key: string]: Unit });
-
-  const totalArea = (activeContracts || []).reduce((sum, contract) => {
-    const unit = unitsMap[contract.unitId];
-    if (unit) {
-      const area = parseFloat(String(unit.area_sqm || '0'));
-      return sum + (isNaN(area) ? 0 : area);
-    }
-    return sum;
-  }, 0);
 
   const totalRentableArea = (units || []).reduce((acc, unit) => {
     const area = parseFloat(String(unit.area_sqm || '0'));
@@ -53,62 +41,66 @@ const TenantDetail: React.FC<TenantDetailProps> = ({ tenantId }) => {
   }, 0);
 
   if (!tenant) {
-    return <div className="flex items-center justify-center h-full">임차인 정보를 찾을 수 없습니다.</div>;
+    return (
+        <div className="flex flex-col items-center justify-center h-full">
+            <p className="mb-4">임차인 정보를 찾을 수 없습니다.</p>
+            <Button onClick={onBackToList} variant="outline">
+                <ArrowLeft className="mr-2 h-4 w-4"/>
+                목록으로 돌아가기
+            </Button>
+        </div>
+    );
   }
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-6 gap-6 h-full">
-      {/* 좌측 (Summary) */}
-      <div className="xl:col-span-1 space-y-6">
-        <Card className="flex flex-col items-center justify-center text-center p-6 h-full">
-          <img src={`https://avatar.vercel.sh/${tenant.id}.png`} alt={tenant.companyName} className="w-24 h-24 rounded-full mb-4" />
-          <h2 className="text-2xl font-bold">{tenant.companyName}</h2>
-          <Badge variant={activeContracts.length > 0 ? "secondary" : "outline"} className="mt-2">
-            {activeContracts.length > 0 ? '계약중' : '계약만료'}
-          </Badge>
-          <div className="mt-6 w-full text-left">
-            <div className="flex justify-between py-2 border-b">
-              <span className="text-sm text-gray-500">총 점유 면적</span>
-              <span className="font-semibold">{totalArea.toFixed(2)} ㎡</span>
+    <Card className="h-full flex flex-col">
+        <CardHeader className="flex flex-row items-center justify-between border-b p-4">
+            <div className="flex items-center gap-4">
+                <Button variant="outline" size="icon" onClick={onBackToList}>
+                    <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <CardTitle className="text-xl">{tenant.companyName}</CardTitle>
             </div>
-            <div className="flex justify-between py-2">
-              <span className="text-sm text-gray-500">활성 계약 수</span>
-              <span className="font-semibold">{(activeContracts || []).length} 건</span>
+            <Button variant="outline">
+                <Edit className="mr-2 h-4 w-4" />
+                수정
+            </Button>
+        </CardHeader>
+
+        <CardContent className="flex-grow p-4 md:p-6 overflow-y-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Main Content (Tabs) */}
+                <div className="lg:col-span-2">
+                    <Tabs defaultValue="basic-info" className="w-full">
+                        <TabsList className="grid w-full grid-cols-3">
+                            <TabsTrigger value="basic-info">기본정보</TabsTrigger>
+                            <TabsTrigger value="contracts">계약현황</TabsTrigger>
+                            <TabsTrigger value="documents">서류관리</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="basic-info" className="mt-4">
+                            <TenantBasicInfoTab tenant={tenant} />
+                        </TabsContent>
+                        <TabsContent value="contracts" className="mt-4">
+                            <TenantContractsTab contracts={allTenantContracts} units={units} />
+                        </TabsContent>
+                        <TabsContent value="documents" className="mt-4">
+                            <TenantDocumentsTab tenantId={tenantId} />
+                        </TabsContent>
+                    </Tabs>
+                </div>
+
+                {/* Right Sidebar (Insight) */}
+                <div className="lg:col-span-1">
+                    <TenantInsightPanel 
+                        tenant={tenant}
+                        activeContracts={activeContracts} 
+                        totalRentableArea={totalRentableArea} 
+                        units={units}
+                    />
+                </div>
             </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* 중앙 (Tabs) */}
-      <div className="xl:col-span-3">
-        <Tabs defaultValue="basic-info" className="h-full flex flex-col">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="basic-info">기본정보</TabsTrigger>
-            <TabsTrigger value="contracts">계약현황</TabsTrigger>
-            <TabsTrigger value="documents">서류관리</TabsTrigger>
-          </TabsList>
-          <TabsContent value="basic-info" className="mt-4 flex-grow">
-            <TenantBasicInfoTab tenant={tenant} />
-          </TabsContent>
-          <TabsContent value="contracts" className="mt-4 flex-grow">
-            <TenantContractsTab contracts={allTenantContracts} units={units} />
-          </TabsContent>
-          <TabsContent value="documents" className="mt-4 flex-grow">
-            <TenantDocumentsTab tenantId={tenantId} />
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {/* 우측 (Insight) */}
-      <div className="xl:col-span-2 space-y-6">
-        <TenantInsightPanel 
-          tenant={tenant}
-          activeContracts={activeContracts} 
-          totalRentableArea={totalRentableArea} 
-          units={units}
-        />
-      </div>
-    </div>
+        </CardContent>
+    </Card>
   );
 };
 
