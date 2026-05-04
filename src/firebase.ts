@@ -10,10 +10,9 @@ import {
   serverTimestamp,
   doc,
   updateDoc,
-  deleteDoc,
-  getDoc // getDoc 추가
+  deleteDoc
 } from "firebase/firestore";
-import { Income, Expense, TenantUnit, IProjectData } from "./types"; // TenantUnit, IProjectData 타입 추가
+import { Income, Expense } from "./types";
 
 // Firebase 구성 정보
 const firebaseConfig = {
@@ -32,46 +31,7 @@ export const auth = getAuth(app);
 
 // 컬렉션 참조
 const incomeCollection = collection(db, "income");
-const expenseCollection = collection(db, "expenses");
-const projectDataDocRef = doc(db, "project_data", "singleton"); // 프로젝트 데이터 문서 참조
-
-// ======================================================================================
-// [세대(TenantUnit) 관련 함수] - 신규
-// ======================================================================================
-
-/**
- * 특정 세대(Tenant Unit)의 정보를 업데이트합니다.
- * @param unitId 업데이트할 세대의 ID
- * @param updatedUnit 업데이트할 세대의 새로운 데이터 객체
- */
-export const updateTenantUnit = async (unitId: string, updatedUnit: TenantUnit) => {
-  try {
-    // 1. 현재 프로젝트 데이터 전체를 가져옵니다.
-    const docSnap = await getDoc(projectDataDocRef);
-    if (!docSnap.exists()) {
-      throw new Error("프로젝트 데이터를 찾을 수 없습니다.");
-    }
-    const projectData = docSnap.data() as IProjectData;
-
-    // 2. tenantUnits 배열에서 해당 ID를 가진 세대를 찾습니다.
-    const unitIndex = projectData.tenantUnits.findIndex(unit => unit.id === unitId);
-    if (unitIndex === -1) {
-      throw new Error(`ID가 ${unitId}인 세대를 찾을 수 없습니다.`);
-    }
-
-    // 3. 찾은 세대의 정보를 업데이트합니다.
-    const updatedTenantUnits = [...projectData.tenantUnits];
-    updatedTenantUnits[unitIndex] = updatedUnit;
-
-    // 4. 수정된 배열로 문서를 업데이트합니다.
-    await updateDoc(projectDataDocRef, { tenantUnits: updatedTenantUnits });
-
-  } catch (error) {
-    console.error("세대 정보 업데이트 중 오류 발생:", error);
-    throw error; // 오류를 상위로 전파하여 처리할 수 있도록 함
-  }
-};
-
+const expenseCollection = collection(db, "expense"); // "expenses" -> "expense"
 
 // ======================================================================================
 // [수입 관련 함수]
@@ -99,7 +59,7 @@ export const deleteIncome = async (id: string) => {
 
 // ======================================================================================
 // [지출 관련 함수]
-// ======================================================================================
+// =====================================================================================
 
 export const addExpense = async (item: Omit<Expense, 'id'>) => {
   await addDoc(expenseCollection, { ...item, timestamp: serverTimestamp() });
@@ -112,11 +72,11 @@ export const getExpenses = async (): Promise<Expense[]> => {
 };
 
 export const updateExpense = async (id: string, updates: Partial<Omit<Expense, 'id'>>) => {
-  const docRef = doc(db, "expenses", id);
+  const docRef = doc(db, "expense", id); // "expenses" -> "expense"
   await updateDoc(docRef, updates);
 };
 
 export const deleteExpense = async (id: string) => {
-  const docRef = doc(db, "expenses", id);
+  const docRef = doc(db, "expense", id); // "expenses" -> "expense"
   await deleteDoc(docRef);
 };

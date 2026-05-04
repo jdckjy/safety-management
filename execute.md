@@ -1,23 +1,74 @@
-### 실행된 작업 기록
 
-**목표:** 초기 목업 데이터가 사용자 데이터와 섞이는 문제를 해결하여, 임대 및 세대 관리 화면에 정확한 계약 정보만 표시되도록 시스템을 수정하고, 이 과정을 문서화합니다.
+import React, { useState } from 'react';
+import KPIManager from './KPIManager';
+import TenantManager from './TenantManager';
+import AITenantRecommender from './AITenantRecommender';
+import ProfitAnalysis from '@/features/tenant-info/ProfitAnalysis'; // 기존 LeaseAnalysisPage 대신 ProfitAnalysis를 임포트
+import LeaseStatusSummaryPage from '@/pages/LeaseStatusSummaryPage';
+import { useProjectData } from '@/providers/ProjectDataProvider';
+import TenantInfoView from '@/features/tenant-info/TenantInfoView';
 
----
+// Tab configuration
+const subTabs = [
+  { id: 'performance', label: 'KPI Reports' },
+  { id: 'lease-status', label: '주요 임대현황' },
+  { id: 'tenant-info', label: '임차인 정보' },
+  { id: 'roster', label: 'Tenant Roster' },
+  { id: 'lease-analysis', label: '수익 분석' },
+  { id: 'ai-recommender', label: 'AI Tenant Recommender' },
+];
 
-- **작업 내용:** `TenantManagementPage.tsx`와 `ProjectDataProvider.tsx`를 분석하여 데이터 중복 문제를 파악하고, `research.md`와 `plan.md`를 작성하여 해결 계획을 수립했습니다.
-- **영향:** 문제의 근본 원인이 목업 데이터와 실제 사용자 데이터의 혼합임을 명확히 하고, 체계적인 해결을 위한 로드맵을 마련했습니다. `research.md`에는 상세 분석을, `plan.md`에는 실행 계획을 구체적으로 문서화하여 추적 가능성을 높였습니다.
+const LeaseRecruitment: React.FC = () => {
+  const {
+    leaseKPIs,
+    setLeaseKPIs,
+  } = useProjectData();
+  
+  // 기본 활성 탭을 '수익 분석'으로 변경
+  const [activeTab, setActiveTab] = useState('lease-analysis');
 
----
+  const renderActiveComponent = () => {
+    const activeTabConfig = subTabs.find(tab => tab.id === activeTab);
+    if (!activeTabConfig) return null;
 
-- **작업 내용:** `initial-tenants.ts`와 `initial-contracts.ts` 파일의 내용을 빈 배열 `[]`로 수정했습니다.
-- **영향:** 신규 사용자가 가입할 때 더 이상 목업 데이터가 Firestore에 저장되지 않도록 하여, 데이터 오염의 근본 원인을 차단했습니다. 이로써 모든 신규 사용자는 깨끗한 데이터 환경에서 시작하게 됩니다.
+    switch (activeTabConfig.id) {
+      case 'performance':
+        return <KPIManager sectionTitle="KPI Reports" kpis={leaseKPIs} onUpdate={setLeaseKPIs} />;
+      case 'lease-status':
+        return <LeaseStatusSummaryPage />;
+      case 'tenant-info':
+        return <TenantInfoView />;
+      case 'roster':
+        return <TenantManager />;
+      case 'lease-analysis':
+        return <ProfitAnalysis />; // ProfitAnalysis 컴포넌트를 렌더링하도록 수정
+      case 'ai-recommender':
+        return <AITenantRecommender />;
+      default:
+        return null;
+    }
+  };
 
----
+  return (
+    <div className="space-y-4">
+      {/* Tab Navigation */}
+      <div className="inline-flex bg-white p-1.5 rounded-full shadow-sm border border-gray-100 self-start">
+        {subTabs.map(tab => (
+          <button 
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)} 
+            className={`px-6 py-2.5 rounded-full text-xs font-bold transition-all ${activeTab === tab.id ? 'bg-blue-500 text-white shadow-md' : 'text-gray-400 hover:text-blue-500'}`}>
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-- **작업 내용:** `ProjectDataProvider.tsx`의 `fetchData` 함수를 수정하여, Firestore에서 `tenantInfo`, `contracts` 등의 데이터를 로드할 때 데이터가 없는 경우 로컬 목업 데이터 대신 빈 배열 `[]`을 사용하도록 변경했습니다.
-- **영향:** Firestore를 유일한 데이터 소스(Single Source of Truth)로 사용하도록 강제하여, 로컬 목업 데이터와의 의존성을 완전히 제거하고 데이터 로딩 로직의 명확성과 일관성을 확보했습니다.
+      {/* Tab Content */}
+      <div>
+        {renderActiveComponent()}
+      </div>
+    </div>
+  );
+};
 
----
-
-- **작업 내용:** `npx tsx scripts/migration-v2.ts` 명령어를 사용하여 기존 Firestore 문서에 저장된 목업 데이터를 제거하는 마이그레이션 스크립트를 실행했습니다.
-- **영향:** 이 스크립트 실행으로 모든 기존 사용자들의 데이터베이스에서 오래된 목업 데이터가 성공적으로 제거되었습니다. 이로써 모든 사용자는 이제 자신들의 정확한 데이터만을 보게 되며, 시스템의 데이터 무결성이 완전히 복원되었습니다.
+export default LeaseRecruitment;

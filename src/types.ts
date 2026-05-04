@@ -182,3 +182,22 @@ export interface Attachment {
   url: string;
   uploadedAt: string;
 }
+
+// Financial Types - [복원] 삭제되었던 Income 및 Expense 타입을 다시 추가합니다.
+export interface Income {
+  id: string;
+  date: string;
+  category: string;
+  description: string;
+  amount: number;
+  source: string;
+}
+
+export interface Expense {
+  id: string;
+  date: string;
+  category: string;
+  description: string;
+  amount: number;
+  source: string;
+}

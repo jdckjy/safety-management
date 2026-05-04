@@ -1,27 +1,61 @@
 
 import React, { useState, useMemo } from 'react';
 import { useProjectData } from '@/providers/ProjectDataProvider';
-import { getOptimalTenantRecommendations, Recommendation } from '@/services/aiTenantRecommender';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Lightbulb, Zap, BarChart, Building, Percent, Download } from 'lucide-react';
-import LeaseAnalysisPage from './LeaseAnalysisPage';
-import { TenantUnitDataTable } from '@/components/TenantUnitDataTable';
-import { TenantDetailModal } from '@/components/TenantDetailModal';
-import { TenantUnit } from '@/types';
-import { updateTenantUnit } from '@/firebase';
+import { Download } from 'lucide-react';
+import { Unit, TenantInfo, Contract } from '@/types';
 import { exportToCsv } from '@/lib/utils';
+
 import LeaseStatusSummaryPage from './LeaseStatusSummaryPage';
-import TenantInfoPage from '@/components/TenantInfoPage'; // Import the new component
+import TenantInfoPage from './TenantInfoPage';
+import ProfitAnalysis from '@/features/tenant-info/ProfitAnalysis';
+import AITenantRecommender from '@/components/AITenantRecommender';
+import { TenantUnitDataTable } from '@/components/TenantUnitDataTable';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { TenantDetailModal } from '@/components/TenantDetailModal';
+
+export interface TenantUnit extends Unit {
+  status: '임대중' | '공실';
+  tenant: string | null;
+  rent: number | null;
+  contractDate: string | null;
+  moveOutDate: string | null;
+  tenantInfo: TenantInfo | null;
+  contract: Contract | null;
+}
 
 const LeaseTenantPage: React.FC = () => {
-  const { complexFacilities, tenantUnits } = useProjectData();
-  const [activeTab, setActiveTab] = useState("leaseStatusSummary");
+  const { units, tenantInfo, contracts, updateUnit } = useProjectData();
+  // Set the default active tab to 'profitAnalysis' as requested
+  const [activeTab, setActiveTab] = useState("profitAnalysis"); 
   const [selectedUnit, setSelectedUnit] = useState<TenantUnit | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const tenantUnits = useMemo((): TenantUnit[] => {
+    const tenantMap = new Map<string, TenantInfo>(tenantInfo.map(t => [t.id, t]));
+    const contractMap = new Map<string, Contract>();
+    contracts.forEach(c => {
+        contractMap.set(c.unitId, c);
+    });
+
+    return units.map(unit => {
+      const contract = contractMap.get(unit.id);
+      const tenant = contract ? tenantMap.get(contract.tenantId) : undefined;
+      const status = tenant ? '임대중' : '공실';
+
+      return {
+        ...unit,
+        status,
+        tenant: tenant ? tenant.companyName : null,
+        rent: contract ? contract.monthlyRent : null,
+        contractDate: contract ? contract.startDate : null,
+        moveOutDate: contract ? contract.endDate : null,
+        tenantInfo: tenant || null,
+        contract: contract || null,
+      };
+    });
+  }, [units, tenantInfo, contracts]);
 
   const handleRowClick = (unit: TenantUnit) => {
     setSelectedUnit(unit);
@@ -33,8 +67,11 @@ const LeaseTenantPage: React.FC = () => {
     setSelectedUnit(null);
   };
 
-  const handleSaveUnit = async (updatedUnit: TenantUnit) => {
-    // ... (Your existing save logic)
+  const handleSaveUnit = async (updatedUnit: Unit) => {
+    if (updatedUnit) {
+      await updateUnit(updatedUnit);
+      handleCloseModal();
+    }
   };
 
   const handleExportCsv = () => {
@@ -42,7 +79,7 @@ const LeaseTenantPage: React.FC = () => {
       id: '세대 ID',
       name: '세대 이름',
       floor: '층',
-      area: '면적(㎡)',
+      area_sqm: '면적(㎡)',
       status: '상태',
       tenant: '현재 임차인',
       rent: '월 임대료(원)',
@@ -54,7 +91,7 @@ const LeaseTenantPage: React.FC = () => {
       id: unit.id,
       name: unit.name,
       floor: unit.floor,
-      area: unit.area,
+      area_sqm: unit.area_sqm,
       status: unit.status,
       tenant: unit.tenant || '-',
       rent: unit.rent || 0,
@@ -68,12 +105,14 @@ const LeaseTenantPage: React.FC = () => {
   return (
     <div className="p-4 sm:p-6 md:p-8">
       <h1 className="text-2xl font-bold tracking-tight mb-6">임대 및 세대 관리</h1>
+      {/* Correctly assign values and set the active tab */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="leaseStatusSummary">주요 임대현황</TabsTrigger>
           <TabsTrigger value="tenantInfo">임차인 정보</TabsTrigger>
           <TabsTrigger value="tenantRoster">Tenant Roster</TabsTrigger>
-          <TabsTrigger value="analysis">수익 분석</TabsTrigger>
+          {/* Correctly add the 'profitAnalysis' tab */}
+          <TabsTrigger value="profitAnalysis">수익 분석</TabsTrigger>
           <TabsTrigger value="recommendation">AI Tenant Recommender</TabsTrigger>
         </TabsList>
 
@@ -99,16 +138,23 @@ const LeaseTenantPage: React.FC = () => {
             </CardContent>
           </Card>
         </TabsContent>
+        
+        {/* Add the TabsContent for the new ProfitAnalysis component */}
+        <TabsContent value="profitAnalysis">
+          <ProfitAnalysis />
+        </TabsContent>
 
-        {/* ... (Other TabsContent for analysis and recommendation) ... */}
+        <TabsContent value="recommendation">
+           <AITenantRecommender />
+        </TabsContent>
       </Tabs>
 
-      <TenantDetailModal
+      {selectedUnit && <TenantDetailModal
         isOpen={isModalOpen}
         unit={selectedUnit}
         onClose={handleCloseModal}
-        onSave={handleSaveUnit}
-      />
+        onSave={(updatedUnit) => handleSaveUnit(updatedUnit as Unit)}
+      />}
     </div>
   );
 };

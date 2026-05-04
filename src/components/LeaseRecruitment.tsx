@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import KPIManager from './KPIManager';
 import TenantManager from './TenantManager';
 import AITenantRecommender from './AITenantRecommender';
-import LeaseAnalysisPage from '@/pages/LeaseAnalysisPage';
+import ProfitAnalysis from '@/features/tenant-info/ProfitAnalysis'; // 기존 LeaseAnalysisPage 대신 ProfitAnalysis를 임포트
 import LeaseStatusSummaryPage from '@/pages/LeaseStatusSummaryPage';
 import { useProjectData } from '@/providers/ProjectDataProvider';
 import TenantInfoView from '@/features/tenant-info/TenantInfoView';
@@ -24,7 +24,8 @@ const LeaseRecruitment: React.FC = () => {
     setLeaseKPIs,
   } = useProjectData();
   
-  const [activeTab, setActiveTab] = useState('tenant-info');
+  // 기본 활성 탭을 '수익 분석'으로 변경
+  const [activeTab, setActiveTab] = useState('lease-analysis');
 
   const renderActiveComponent = () => {
     const activeTabConfig = subTabs.find(tab => tab.id === activeTab);
@@ -40,7 +41,7 @@ const LeaseRecruitment: React.FC = () => {
       case 'roster':
         return <TenantManager />;
       case 'lease-analysis':
-        return <LeaseAnalysisPage />;
+        return <ProfitAnalysis />; // ProfitAnalysis 컴포넌트를 렌더링하도록 수정
       case 'ai-recommender':
         return <AITenantRecommender />;
       default:
