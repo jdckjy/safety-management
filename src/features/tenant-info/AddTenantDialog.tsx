@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '../../components/ui/dialog';
 import { Input } from '../../components/ui/input';
@@ -28,6 +28,21 @@ const AddTenantDialog: React.FC<AddTenantDialogProps> = ({ isOpen, onClose, onAd
 
   const { tenantInfo } = useProjectData();
 
+  useEffect(() => {
+    if (isOpen) {
+      // Reset form fields when the dialog is opened
+      setCompanyName('');
+      setBusinessRegistrationNumber('');
+      setRepresentativeName('');
+      setContact('');
+      setBusinessCategory('기타');
+      setCompanySize('중소');
+      setBusinessDescription('');
+      setAcquisitionChannel('기타');
+      setErrors({});
+    }
+  }, [isOpen]);
+
   const validate = () => {
     const newErrors: { [key: string]: string } = {};
     if (!companyName) newErrors.companyName = '업체명은 필수입니다.';
@@ -49,7 +64,7 @@ const AddTenantDialog: React.FC<AddTenantDialogProps> = ({ isOpen, onClose, onAd
     if (!validate()) return;
 
     const newTenant: TenantInfo = {
-      id: businessRegistrationNumber,
+      id: businessRegistrationNumber, // Using BRN as a unique ID
       companyName,
       businessRegistrationNumber,
       representativeName,
@@ -93,7 +108,7 @@ const AddTenantDialog: React.FC<AddTenantDialogProps> = ({ isOpen, onClose, onAd
           </div>
           <div className="space-y-2">
             <Label htmlFor="companySize">기업 규모</Label>
-            <Select onValueChange={(value) => setCompanySize(value as CompanySize)} defaultValue={companySize}>
+            <Select onValueChange={(value) => setCompanySize(value as CompanySize)} value={companySize}>
                 <SelectTrigger className="bg-gray-50">
                     <SelectValue placeholder="기업 규모 선택" />
                 </SelectTrigger>
@@ -107,7 +122,7 @@ const AddTenantDialog: React.FC<AddTenantDialogProps> = ({ isOpen, onClose, onAd
           </div>
           <div className="space-y-2">
             <Label htmlFor="businessCategory">업종</Label>
-            <Select onValueChange={(value) => setBusinessCategory(value as BusinessCategory)} defaultValue={businessCategory}>
+            <Select onValueChange={(value) => setBusinessCategory(value as BusinessCategory)} value={businessCategory}>
                 <SelectTrigger className="bg-gray-50">
                     <SelectValue placeholder="업종 선택" />
                 </SelectTrigger>
@@ -126,7 +141,7 @@ const AddTenantDialog: React.FC<AddTenantDialogProps> = ({ isOpen, onClose, onAd
           </div>
           <div className="space-y-2">
             <Label htmlFor="acquisitionChannel">유치 경로</Label>
-            <Select onValueChange={(value) => setAcquisitionChannel(value as AcquisitionChannel)} defaultValue={acquisitionChannel}>
+            <Select onValueChange={(value) => setAcquisitionChannel(value as AcquisitionChannel)} value={acquisitionChannel}>
                 <SelectTrigger className="bg-gray-50">
                     <SelectValue placeholder="유치 경로 선택" />
                 </SelectTrigger>

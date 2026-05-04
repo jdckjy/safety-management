@@ -171,9 +171,9 @@ export interface TenantInfo {
   businessDescription?: string;
 }
 
-export type BusinessCategory = 'IT' | 'Service' | 'Manufacturing' | 'Retail' | 'Education' | 'Other';
-export type CompanySize = 'Small' | 'Medium' | 'Large' | 'Enterprise';
-export type AcquisitionChannel = 'Website' | 'Referral' | 'Direct' | 'Brokerage' | 'Other';
+export type BusinessCategory = '의료' | '교육' | '연구' | '근생' | '기타';
+export type CompanySize = '대기업' | '중견' | '중소' | '스타트업';
+export type AcquisitionChannel = '직접 유치' | '유관기관 소개' | '온라인' | '기타';
 
 export interface Attachment {
   id: string;
