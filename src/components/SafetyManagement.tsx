@@ -17,30 +17,31 @@ const SafetyManagement: React.FC = () => {
     setSafetyKPIs,
     complexFacilities,
     hotspots,
-    setHotspots
+    addHotspot, // Use the new function from the context
+    updateHotspot, // Use the new function from the context
+    deleteHotspot, // Use the new function from the context
   } = useProjectData();
   
   const [activeSubTab, setActiveSubTab] = useState(subTabs[0].id);
 
+  // The handle functions now directly call the context methods
   const handleAddHotspot = (newHotspotData: Omit<HotSpot, 'id'>) => {
-    const newHotspot: HotSpot = { ...newHotspotData, id: Date.now().toString() };
-    setHotspots(prev => [...prev, newHotspot]);
+    addHotspot(newHotspotData);
   };
 
   const handleUpdateHotspot = (updatedHotspot: HotSpot) => {
-    setHotspots(prev => prev.map(h => h.id === updatedHotspot.id ? updatedHotspot : h));
+    updateHotspot(updatedHotspot);
   };
 
   const handleDeleteHotspot = (hotspotId: string) => {
-    setHotspots(prev => prev.filter(h => h.id !== hotspotId));
+    deleteHotspot(hotspotId);
   };
   
-  // Correctly transform complexFacilities to the Facility[] structure.
   const facilitiesForMap: Facility[] = complexFacilities.map((cf: ComplexFacility) => ({
     id: cf.id,
     name: cf.name,
-    type: cf.category, // Map category from ComplexFacility to type in Facility
-    status: cf.status,   // Map status from ComplexFacility to status in Facility
+    type: cf.category,
+    status: cf.status,
   }));
 
   const renderActiveComponent = () => {
@@ -51,7 +52,7 @@ const SafetyManagement: React.FC = () => {
       return <KPIManager sectionTitle="Safety Index" kpis={safetyKPIs} onUpdate={setSafetyKPIs} />;
     } else if (activeTabConfig.id === 'monitoring') {
       return <HotSpotMap 
-        facilities={facilitiesForMap} // Pass the correctly transformed data
+        facilities={facilitiesForMap}
         hotspots={hotspots}
         onAddHotspot={handleAddHotspot}
         onUpdateHotspot={handleUpdateHotspot}

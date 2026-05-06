@@ -93,6 +93,9 @@ interface IProjectDataContext extends IProjectData {
   setAssetKPIs: React.Dispatch<React.SetStateAction<KPI[]>>;
   setInfraKPIs: React.Dispatch<React.SetStateAction<KPI[]>>;
   setHotspots: React.Dispatch<React.SetStateAction<HotSpot[]>>;
+  addHotspot: (newHotspot: Omit<HotSpot, 'id'>) => void;
+  updateHotspot: (updatedHotspot: HotSpot) => void;
+  deleteHotspot: (hotspotId: string) => void;
   setFacilities: React.Dispatch<React.SetStateAction<Facility[]>>;
   setComplexFacilities: React.Dispatch<React.SetStateAction<ComplexFacility[]>>;
   addComplexFacility: (newFacility: Omit<ComplexFacility, 'id'>) => void;
@@ -400,6 +403,18 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     }, []);
     const updateUnit = useCallback((updatedUnit: Unit) => setData(prev => ({ ...prev, units: (prev.units || []).map(u => u.id === updatedUnit.id ? updatedUnit : u) })), []);
     const deleteUnit = useCallback((unitId: string) => setData(prev => ({ ...prev, units: (prev.units || []).filter(u => u.id !== unitId) })), []);
+
+    const addHotspot = useCallback((newHotspot: Omit<HotSpot, 'id'>) => {
+        setData(prev => ({ ...prev, hotspots: [...(prev.hotspots || []), { ...newHotspot, id: `hs-${Date.now()}` }] }));
+    }, []);
+
+    const updateHotspot = useCallback((updatedHotspot: HotSpot) => {
+        setData(prev => ({ ...prev, hotspots: (prev.hotspots || []).map(h => h.id === updatedHotspot.id ? updatedHotspot : h) }));
+    }, []);
+
+    const deleteHotspot = useCallback((hotspotId: string) => {
+        setData(prev => ({ ...prev, hotspots: (prev.hotspots || []).filter(h => h.id !== hotspotId) }));
+    }, []);
     
     const addTenant = useCallback((newTenant: TenantInfo) => {
         setData(prev => ({ ...prev, tenantInfo: [...(prev.tenantInfo || []), newTenant] }));
@@ -479,6 +494,9 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     setAssetKPIs: (kpis) => setData(p => ({...p, assetKPIs: typeof kpis === 'function' ? kpis(p.assetKPIs || []) : kpis})),
     setInfraKPIs: (kpis) => setData(p => ({...p, infraKPIs: typeof kpis === 'function' ? kpis(p.infraKPIs || []) : kpis})),
     setHotspots: (spots) => setData(p => ({...p, hotspots: typeof spots === 'function' ? spots(p.hotspots || []) : spots})),
+    addHotspot,
+    updateHotspot,
+    deleteHotspot,
     setFacilities: (facilities) => setData(p => ({...p, facilities: typeof facilities === 'function' ? facilities(p.facilities || []) : facilities})),
     setComplexFacilities: (facilities) => setData(p => ({...p, complexFacilities: typeof facilities === 'function' ? facilities(p.complexFacilities || []) : facilities})),
     addComplexFacility, 
