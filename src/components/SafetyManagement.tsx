@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import KPIManager from './KPIManager';
 import HotSpotMap from './HotSpotMap';
 import { useProjectData } from '../providers/ProjectDataProvider';
-import { HotSpot } from '../types';
+import { HotSpot, Facility, ComplexFacility } from '../types';
 
 // Tab configuration
 const subTabs = [
@@ -15,7 +15,7 @@ const SafetyManagement: React.FC = () => {
   const {
     safetyKPIs,
     setSafetyKPIs,
-    facilities,
+    complexFacilities,
     hotspots,
     setHotspots
   } = useProjectData();
@@ -34,6 +34,14 @@ const SafetyManagement: React.FC = () => {
   const handleDeleteHotspot = (hotspotId: string) => {
     setHotspots(prev => prev.filter(h => h.id !== hotspotId));
   };
+  
+  // Correctly transform complexFacilities to the Facility[] structure.
+  const facilitiesForMap: Facility[] = complexFacilities.map((cf: ComplexFacility) => ({
+    id: cf.id,
+    name: cf.name,
+    type: cf.category, // Map category from ComplexFacility to type in Facility
+    status: cf.status,   // Map status from ComplexFacility to status in Facility
+  }));
 
   const renderActiveComponent = () => {
     const activeTabConfig = subTabs.find(tab => tab.id === activeSubTab);
@@ -43,7 +51,7 @@ const SafetyManagement: React.FC = () => {
       return <KPIManager sectionTitle="Safety Index" kpis={safetyKPIs} onUpdate={setSafetyKPIs} />;
     } else if (activeTabConfig.id === 'monitoring') {
       return <HotSpotMap 
-        facilities={facilities}
+        facilities={facilitiesForMap} // Pass the correctly transformed data
         hotspots={hotspots}
         onAddHotspot={handleAddHotspot}
         onUpdateHotspot={handleUpdateHotspot}
@@ -60,8 +68,7 @@ const SafetyManagement: React.FC = () => {
           <button 
             key={tab.id}
             onClick={() => setActiveSubTab(tab.id)} 
-            className={`px-6 py-2.5 rounded-full text-xs font-bold transition-all ${activeSubTab === tab.id ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:text-black'}`}
-          >
+            className={`px-6 py-2.5 rounded-full text-xs font-bold transition-all ${activeSubTab === tab.id ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:text-black'}`}>
             {tab.label}
           </button>
         ))}

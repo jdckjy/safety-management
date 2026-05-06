@@ -252,7 +252,9 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
 
         } else {
           finalData = { ...initialData, monthly_reports: reports };
-          await setDoc(userDocRef, initialData); 
+          const dataToSaveForNewUser = { ...initialData };
+          delete (dataToSaveForNewUser as Partial<IProjectData>).monthly_reports;
+          await setDoc(userDocRef, dataToSaveForNewUser); 
         }
         
         setData(finalData);
