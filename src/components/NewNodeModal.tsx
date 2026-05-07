@@ -26,32 +26,46 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [responseType, setResponseType] = useState<'정기' | '긴급'>('정기');
   const [riskLevel, setRiskLevel] = useState<HotSpot['riskLevel']>('low');
-  const [details, setDetails] = useState('');
+  const [description, setDescription] = useState('');
 
   const isEditing = !!editingHotspot;
 
   useEffect(() => {
-    if (isEditing) {
-      const facility = facilities.find(f => f.id === editingHotspot.facilityId) || null;
-      setSelectedFacility(facility);
-      setResponseType(editingHotspot.responseType);
-      setRiskLevel(editingHotspot.riskLevel);
-      setDetails(editingHotspot.details);
-    } else {
-      setSelectedFacility(null);
-      setResponseType('정기');
-      setRiskLevel('low');
-      setDetails('');
+    if (isOpen) {
+        if (isEditing && editingHotspot) {
+            const facility = facilities.find(f => f.id === editingHotspot.facilityId) || null;
+            setSelectedFacility(facility);
+            setResponseType(editingHotspot.responseType as '정기' | '긴급');
+            setRiskLevel(editingHotspot.riskLevel as HotSpot['riskLevel']);
+            setDescription(editingHotspot.description);
+            setSearchTerm(facility?.name || '');
+        } else {
+            setSearchTerm('');
+            setSelectedFacility(null);
+            setResponseType('정기');
+            setRiskLevel('low');
+            setDescription('');
+        }
     }
-  }, [editingHotspot, facilities, isOpen]);
+  }, [editingHotspot, facilities, isOpen, isEditing]);
 
-  const filteredFacilities = useMemo(() =>
-    facilities.filter(f =>
-      f.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      f.category.toLowerCase().includes(searchTerm.toLowerCase())
-    ),
-    [facilities, searchTerm]
-  );
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    console.log(`[Debug] 시설물 검색 입력: "${value}"`);
+    setSearchTerm(value);
+  };
+
+  const filteredFacilities = useMemo(() => {
+    if (!searchTerm) return facilities;
+    console.log('[Debug] 필터링 시작. 검색어:', searchTerm);
+    return facilities.filter(f => {
+      if (!f || typeof f.name !== 'string') {
+        console.error('[Debug] 오류: 유효하지 않은 시설물 데이터입니다.', f);
+        return false;
+      }
+      return f.name.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+  }, [facilities, searchTerm]);
 
   if (!isOpen) return null;
 
@@ -66,12 +80,12 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
       return;
     }
 
-    const hotspotData = {
+    const hotspotData: NewHotSpotData = {
+      title: selectedFacility.name,
+      description: description,
       facilityId: selectedFacility.id,
-      facilityName: selectedFacility.name,
       responseType,
       riskLevel,
-      details,
       position: finalLocation,
     };
 
@@ -103,13 +117,13 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
             <label className="text-xs font-bold text-gray-500">시설물 검색</label>
             <div className="relative mt-2">
               <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input type="text" placeholder="시설 명칭 입력..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-gray-50 rounded-lg pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" />
+              <input type="text" placeholder="시설 명칭 입력..." value={searchTerm} onChange={handleSearchChange} className="w-full bg-gray-50 rounded-lg pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900" />
             </div>
             <div className="mt-4 border border-gray-200 rounded-lg h-60 overflow-y-auto">
               {filteredFacilities.map(facility => (
-                <div key={facility.id} onClick={() => setSelectedFacility(facility)} className={`px-4 py-3 cursor-pointer ${selectedFacility?.id === facility.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                <div key={facility.id} onClick={() => { setSelectedFacility(facility); setSearchTerm(facility.name); }} className={`px-4 py-3 cursor-pointer ${selectedFacility?.id === facility.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
                   <p className="font-bold text-sm text-gray-800">{facility.name}</p>
-                  <p className="text-xs text-gray-500">{facility.category}</p>
+                  <p className="text-xs text-gray-500">{facility.type} - {facility.status}</p>
                 </div>
               ))}
             </div>
@@ -136,7 +150,7 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
             </div>
             <div>
               <label className="text-xs font-bold text-gray-500">상황 요약 및 보고</label>
-              <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={5} placeholder="현장 보고 사항 및 상세 내용을 입력하세요..." className="w-full mt-2 bg-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200 text-gray-900" />
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={5} placeholder="현장 보고 사항 및 상세 내용을 입력하세요..." className="w-full mt-2 bg-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 border border-gray-200 text-gray-900" />
             </div>
           </div>
         </div>

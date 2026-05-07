@@ -47,13 +47,13 @@ export const SearchProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
 
           (kpi.activities || []).forEach(activity => {
-              if(activity.name && activity.name.toLowerCase().includes(normalizedQuery)){
-                  newResults.push({ type: 'activity', id: activity.id, title: activity.name, path: [kpi.type, kpi.title] });
+              if(activity.title && activity.title.toLowerCase().includes(normalizedQuery)){
+                  newResults.push({ type: 'activity', id: activity.id, title: activity.title, path: [kpi.type, kpi.title] });
               }
 
               (activity.tasks || []).forEach(task => {
                   if(task.name && task.name.toLowerCase().includes(normalizedQuery)){
-                      newResults.push({ type: 'task', id: task.id, title: task.name, path: [kpi.type, kpi.title, activity.name] });
+                      newResults.push({ type: 'task', id: task.id, title: task.name, path: [kpi.type, kpi.title, activity.title] });
                   }
               });
           });

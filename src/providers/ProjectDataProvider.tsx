@@ -169,6 +169,30 @@ const sanitizeKpi = (partialKpi: Partial<KPI>): KPI => {
   return { ...defaults, ...partialKpi, id, activities };
 };
 
+const sanitizeFacility = (partialFacility: Partial<Facility>): Facility => {
+    console.log("Sanitizing facility:", partialFacility);
+    if (typeof partialFacility?.name !== 'string') {
+        console.error("Facility name is not a string:", partialFacility.name);
+    }
+    const defaults: Facility = {
+        id: 0,
+        name: '이름 없음',
+        type: '타입 미지정',
+        status: '상태 미지정',
+    };
+
+    const id = partialFacility.id || Date.now();
+
+    return {
+        ...defaults,
+        ...partialFacility,
+        id,
+        name: String(partialFacility.name || defaults.name),
+        type: String(partialFacility.type || defaults.type),
+        status: String(partialFacility.status || defaults.status),
+    };
+};
+
 export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
   const db = getFirestore();
@@ -208,6 +232,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
 
         if (userDocSnap.exists()) {
             const firestoreData = userDocSnap.data() as Partial<IProjectData>;
+            console.log("Raw facilities from firestore:", firestoreData.facilities);
             let isMigrated = false;
 
             // One-time migration logic with corrected IDs
@@ -235,7 +260,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
                 assetKPIs: (firestoreData.assetKPIs || []).map(sanitizeKpi),
                 infraKPIs: (firestoreData.infraKPIs || []).map(sanitizeKpi),
                 hotspots: firestoreData.hotspots || [],
-                facilities: firestoreData.facilities || [],
+                facilities: (firestoreData.facilities || []).filter(f => f && typeof f === 'object').map(sanitizeFacility),
                 complexFacilities: firestoreData.complexFacilities || initialComplexFacilities,
                 teamMembers: firestoreData.teamMembers || initialTeamMembers,
                 units: firestoreData.units || initialUnits,

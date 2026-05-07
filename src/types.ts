@@ -1,5 +1,145 @@
+import { ReactNode } from 'react';
 
-// General Project Data Structure
+// 기본 인터페이스
+export interface Comment {
+  id: string;
+  author: string;
+  timestamp: string;
+  content: string;
+}
+
+export interface Task {
+  id: string;
+  name: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  assignees: string[];
+  records: any[];
+  comments: Comment[];
+}
+
+export interface Activity {
+  id: string;
+  title: string;
+  description: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  tasks: Task[];
+}
+
+export interface KPI {
+  id: string;
+  title: string;
+  description: string;
+  current: number;
+  target: number;
+  previous: number;
+  unit: string;
+  activities: Activity[];
+}
+
+export interface HotSpot {
+  id: string; 
+  title: string;
+  description: string;
+  riskLevel: string;
+  responseType: string;
+  position: { lat: number; lng: number };
+  facilityId: number;
+}
+
+export interface Facility {
+  id: number;
+  name: string;
+  type: string;
+  status: string;
+}
+
+export interface ComplexFacility {
+  id: string;
+  name: string;
+  type: string;
+  category: string; // 'category' 속성 추가
+  location: string;
+  manager?: string;
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  email: string;
+  phone?: string;
+}
+
+export interface Unit {
+  id: string;
+  unitNumber: string;
+  floor: number;
+  area: number;
+  tenantId?: string;
+}
+
+export interface TenantInfo {
+  id: string;
+  name: string;
+  businessName: string;
+  contact: string;
+  leaseStartDate: string;
+  leaseEndDate: string;
+}
+
+export interface Contract {
+  id: string;
+  tenantId: string;
+  type: string;
+  startDate: string;
+  endDate: string;
+  rent: number;
+  status: string;
+}
+
+export interface Attachment {
+  id: string;
+  tenantId: string;
+  fileName: string;
+  url: string;
+  uploadedAt: string;
+}
+
+export interface GeneralActivity {
+    id: string;
+    date: string;
+    category: string;
+    name: string; // 'title'을 'name'으로 변경
+    description: string;
+    participants: string[];
+}
+
+export interface CustomTab {
+  id: string;
+  title: string;
+}
+
+export interface MonthlyReport {
+  id: string;
+  year: number;
+  month: number;
+  report_date: string;
+  raw_data: any;
+}
+
+// 네비게이션 상태
+export interface NavigationState {
+  menuKey: string;
+  selectedMonth: number;
+  [key: string]: any;
+}
+
+// 최상위 데이터 구조
 export interface IProjectData {
   safetyKPIs: KPI[];
   leaseKPIs: KPI[];
@@ -16,188 +156,4 @@ export interface IProjectData {
   generalActivities: GeneralActivity[];
   customTabs: CustomTab[];
   monthly_reports: MonthlyReport[];
-}
-
-// Key Performance Indicators
-export interface KPI {
-  id: string;
-  title: string;
-  description: string;
-  current: number;
-  target: number;
-  unit: string;
-  previous: number;
-  activities: Activity[];
-}
-
-export interface Activity {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  status: string;
-  assignees: string[];
-  cost: number;
-  tasks: Task[];
-}
-
-export interface Task {
-  id: string;
-  name: string;
-  startDate: string;
-  endDate: string;
-  status: string;
-  assignees: string[];
-  records: Record[];
-  comments: Comment[];
-}
-
-export interface Record {
-  id: string;
-  date: string;
-  content: string;
-}
-
-export interface Comment {
-  id: string;
-  author: string;
-  timestamp: string;
-  content: string;
-}
-
-// Hotspots and Facilities
-export interface HotSpot {
-  id: string;
-  name: string;
-  location: string;
-  description: string;
-}
-
-export interface Facility {
-  id: string;
-  name: string;
-  type: string;
-  status: string;
-}
-
-// Navigation
-export interface NavigationState {
-  menuKey: string;
-  selectedKpiId?: string;
-  selectedActivityId?: string;
-  selectedTaskId?: string;
-  selectedMonth: number;
-}
-
-// Complex Facilities
-export interface ComplexFacility {
-    id: string;
-    name: string;
-    category: '전기' | '기계' | '소방' | '건축' | '기타';
-    status: '정상' | '주의' | '이상' | '점검중';
-    location: string;
-    manager: string;
-    lastInspection: string;
-}
-
-// Team Management
-export interface TeamMember {
-    id: string;
-    name: string;
-    role: string;
-    team: '운영' | '기술' | '보안' | '환경';
-    email: string;
-    position: string;
-    photo?: string;
-}
-
-// General Activities
-export interface GeneralActivity {
-    id: string;
-    description: string;
-    date: string;
-    participants: string[];
-}
-
-// Custom Tabs
-export interface CustomTab {
-    id: string;
-    title: string;
-    content: string; // Could be markdown, JSON, etc.
-}
-
-// Monthly Reports
-export interface MonthlyReport {
-    id: string;
-    year: number;
-    month: number;
-    report_date: string;
-    raw_data: any; // Can be defined more strictly if the structure is known
-}
-
-// Tenant and Leasing Information
-export interface Unit {
-  id: string;
-  floor: string;
-  name: string;
-  area_sqm: number;
-  pathData?: string; 
-}
-
-export interface Contract {
-  id: string;
-  unitId: string;
-  tenantId: string;
-  startDate: string;
-  endDate: string;
-  deposit: number;
-  monthlyRent: number;
-  area: number;
-  moveInDate: string;
-  remarks: string;
-  spaceName: string;
-  spaceId: string;
-}
-
-export interface TenantInfo {
-  id: string;
-  companyName: string;
-  representativeName: string;
-  businessRegistrationNumber: string;
-  contact: string;
-  businessCategory: BusinessCategory;
-  companySize: CompanySize;
-  acquisitionChannel: AcquisitionChannel;
-  businessDescription?: string;
-}
-
-export type BusinessCategory = '의료' | '교육' | '연구' | '근생' | '기타';
-export type CompanySize = '대기업' | '중견' | '중소' | '스타트업';
-export type AcquisitionChannel = '직접 유치' | '유관기관 소개' | '온라인' | '기타';
-
-export interface Attachment {
-  id: string;
-  tenantId: string;
-  fileName: string;
-  url: string;
-  uploadedAt: string;
-}
-
-// Financial Types - [복원] 삭제되었던 Income 및 Expense 타입을 다시 추가합니다.
-export interface Income {
-  id: string;
-  date: string;
-  category: string;
-  description: string;
-  amount: number;
-  source: string;
-}
-
-export interface Expense {
-  id: string;
-  date: string;
-  category: string;
-  description: string;
-  amount: number;
-  source: string;
 }
