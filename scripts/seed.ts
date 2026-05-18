@@ -1,37 +1,43 @@
 
-// scripts/seed.ts
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../src/firebase';
-import { seedData } from '../src/seed';
-import { doc, setDoc } from 'firebase/firestore';
 
-/**
- * Firestore 데이터베이스에 초기 데이터를 시딩(seeding)합니다.
- * [주의] 이 스크립트는 'project_data/singleton' 문서의 모든 기존 데이터를 삭제하고
- * 'src/seed.ts' 파일에 정의된 새로운 데이터로 완전히 대체합니다.
- */
-async function seedDatabase() {
-  console.log('⏳ 데이터베이스 시딩을 시작합니다...');
-  console.warn('⚠️  기존 project_data/singleton 문서의 모든 데이터가 삭제됩니다.');
+async function inspectContractAndUnitData() {
+  console.log("'contracts'와 'units' 데이터 구조를 확인합니다...");
 
+  const docRef = doc(db, 'project_data', 'singleton');
+  
   try {
-    const projectDataDocRef = doc(db, "project_data", "singleton");
+    const docSnap = await getDoc(docRef);
 
-    // 1. 문서를 빈 객체로 설정하여 모든 필드를 효과적으로 삭제합니다.
-    await setDoc(projectDataDocRef, {});
-    console.log('🗑️  기존 데이터 삭제 완료.');
+    if (!docSnap.exists()) {
+      console.error('오류: project_data/singleton 문서를 찾을 수 없습니다.');
+      return;
+    }
 
-    // 2. 새로운 시드 데이터로 문서를 다시 작성합니다.
-    await setDoc(projectDataDocRef, seedData);
-    console.log('✍️  새로운 데이터 쓰기 완료.');
+    const data = docSnap.data();
 
-    console.log('✅ 데이터베이스 시딩이 성공적으로 완료되었습니다!');
-    console.log('이제 애플리케이션에서 초기 데이터를 사용할 수 있습니다.');
+    // contracts 배열이 있는지 확인하고 출력
+    if (data.contracts) {
+      console.log('====== contracts 데이터 ======');
+      console.log(JSON.stringify(data.contracts, null, 2));
+    } else {
+      console.log('contracts 데이터가 존재하지 않습니다.');
+    }
 
-  } catch (error) { 
-    console.error('❌ 데이터베이스 시딩 중 오류가 발생했습니다:', error);
-    process.exit(1); // 오류 발생 시 스크립트 실행 중단
+    // buildings 배열 및 그 안의 units 배열이 있는지 확인하고 출력
+    if (data.buildings && data.buildings[0] && data.buildings[0].units) {
+      console.log('\n====== buildings[0].units 데이터 ======');
+      console.log(JSON.stringify(data.buildings[0].units, null, 2));
+    } else {
+      console.log('\nbuildings[0].units 데이터가 존재하지 않습니다.');
+    }
+
+    console.log('\n데이터 구조 확인 완료.');
+
+  } catch (error) {
+    console.error('데이터 확인 중 오류가 발생했습니다:', error);
   }
 }
 
-// 시딩 함수를 실행합니다.
-seedDatabase();
+inspectContractAndUnitData();

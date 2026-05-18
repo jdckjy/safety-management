@@ -10,8 +10,6 @@ import { initialTeamMembers } from '../data/initial-team-members';
 import { initialUnits } from '../data/initial-units';
 import rawFebruaryReportData from '../data/2026-02-report.json';
 
-// CORRECTED: IDs of mock tenants to be removed, based on user's debug log.
-const MOCK_TENANT_IDS_TO_DELETE = ['tenant-kohw', 'tenant-ige', 'tenant-khdc'];
 
 // Raw JSON data structure interface
 interface RawReportData {
@@ -232,28 +230,21 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
 
         if (userDocSnap.exists()) {
             const firestoreData = userDocSnap.data() as Partial<IProjectData>;
-            console.log("Raw facilities from firestore:", firestoreData.facilities);
             let isMigrated = false;
 
-            // One-time migration logic with corrected IDs
-            const tenants = firestoreData.tenantInfo || [];
-            const contracts = firestoreData.contracts || [];
-            const attachments = firestoreData.attachments || [];
+            // Enhanced Orphaned/Corrupted data cleanup logic
+            const allUnits = firestoreData.units || initialUnits;
+            const validUnits = allUnits.filter(u => u && u.id && u.name);
+            const validUnitIds = new Set(validUnits.map(u => u.id));
 
-            const tenantsNeedingMigration = tenants.some(t => MOCK_TENANT_IDS_TO_DELETE.includes(t.id));
+            const allContracts = firestoreData.contracts || [];
+            const validContracts = allContracts.filter(c => validUnitIds.has(c.unitId));
 
-            if (tenantsNeedingMigration) {
-                const cleanedTenants = tenants.filter(t => !MOCK_TENANT_IDS_TO_DELETE.includes(t.id));
-                const cleanedContracts = contracts.filter(c => !MOCK_TENANT_IDS_TO_DELETE.includes(c.tenantId));
-                const cleanedAttachments = attachments.filter(a => !MOCK_TENANT_IDS_TO_DELETE.includes(a.tenantId));
-                
-                firestoreData.tenantInfo = cleanedTenants;
-                firestoreData.contracts = cleanedContracts;
-                firestoreData.attachments = cleanedAttachments;
-                
+            if (validContracts.length < allContracts.length || validUnits.length < allUnits.length) {
+                console.log(`[Data Cleanup] Removing ${allContracts.length - validContracts.length} orphaned contracts and ${allUnits.length - validUnits.length} corrupted units.`);
                 isMigrated = true;
             }
-            
+
             finalData = {
                 safetyKPIs: (firestoreData.safetyKPIs || []).map(sanitizeKpi),
                 leaseKPIs: (firestoreData.leaseKPIs || []).map(sanitizeKpi),
@@ -263,9 +254,9 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
                 facilities: (firestoreData.facilities || []).filter(f => f && typeof f === 'object').map(sanitizeFacility),
                 complexFacilities: firestoreData.complexFacilities || initialComplexFacilities,
                 teamMembers: firestoreData.teamMembers || initialTeamMembers,
-                units: firestoreData.units || initialUnits,
+                units: validUnits, // Use cleaned units
                 tenantInfo: firestoreData.tenantInfo || [],
-                contracts: firestoreData.contracts || [],
+                contracts: validContracts, // Use cleaned contracts
                 attachments: firestoreData.attachments || [],
                 generalActivities: firestoreData.generalActivities || [],
                 customTabs: firestoreData.customTabs || [], 
@@ -276,6 +267,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
                 const dataToSave = { ...finalData };
                 delete (dataToSave as Partial<IProjectData>).monthly_reports;
                 await setDoc(userDocRef, dataToSave);
+                 console.log("[Data Cleanup] Successfully saved cleaned data to Firestore.");
             }
 
         } else {
@@ -427,7 +419,13 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
         return newUnitWithId;
     }, []);
     const updateUnit = useCallback((updatedUnit: Unit) => setData(prev => ({ ...prev, units: (prev.units || []).map(u => u.id === updatedUnit.id ? updatedUnit : u) })), []);
-    const deleteUnit = useCallback((unitId: string) => setData(prev => ({ ...prev, units: (prev.units || []).filter(u => u.id !== unitId) })), []);
+    const deleteUnit = useCallback((unitId: string) => {
+      setData(prev => ({
+        ...prev,
+        units: (prev.units || []).filter(u => u.id !== unitId),
+        contracts: (prev.contracts || []).filter(c => c.unitId !== unitId),
+      }));
+    }, []);
 
     const addHotspot = useCallback((newHotspot: Omit<HotSpot, 'id'>) => {
         setData(prev => ({ ...prev, hotspots: [...(prev.hotspots || []), { ...newHotspot, id: `hs-${Date.now()}` }] }));

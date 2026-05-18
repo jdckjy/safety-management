@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback } from 'react';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'sheetjs-style';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';

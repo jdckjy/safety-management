@@ -64,15 +64,9 @@ const TenantRoster: React.FC = () => {
       
       const occupiedArea = unitList
         .filter(u => u.status === 'OCCUPIED')
-        .reduce((sum, u) => {
-          const area = parseFloat(u.area_sqm as any);
-          return sum + (isNaN(area) ? 0 : area);
-        }, 0);
+        .reduce((sum, u) => sum + u.area_sqm, 0);
       
-      const totalRentableArea = unitList.reduce((sum, u) => {
-        const area = parseFloat(u.area_sqm as any);
-        return sum + (isNaN(area) ? 0 : area);
-      }, 0);
+      const totalRentableArea = unitList.reduce((sum, u) => sum + u.area_sqm, 0);
       
       if (totalRentableArea === 0) return { rate: 0, occupied: occupiedArea, totalRentable: 0 };
       
@@ -102,7 +96,7 @@ const TenantRoster: React.FC = () => {
   );
 
   const selectedUnit = useMemo(() => 
-    (selectedUnitId ? enrichedUnits.find(u => u.id === selectedUnitId) : null) || null,
+    (selectedUnitId ? enrichedUnits.find(u => u.id === selectedUnitId) : null),
     [enrichedUnits, selectedUnitId]
   );
 
@@ -122,11 +116,11 @@ const TenantRoster: React.FC = () => {
   }
 
   const handleAddNewUnit = () => {
-    setEditingUnit(null); // 새로운 유닛 추가
+    setEditingUnit({ name: '새 유닛', area_sqm: 0, pathData: ''}); // 새로운 유닛 추가
     setUnitModalOpen(true);
   };
   
-  const handleSaveUnit = (unitData: Partial<Unit>, contractData?: Partial<Contract>) => {
+  const handleSaveUnit = (unitData: Partial<Unit>, contractData?: Partial<Contract> & { tenantId: string }) => {
     if (unitData.id) { // Existing unit
       updateUnit(unitData as Unit);
       
@@ -148,8 +142,8 @@ const TenantRoster: React.FC = () => {
         floor: selectedFloor,
         name: unitData.name || '새 유닛',
         area_sqm: unitData.area_sqm || 0,
-        pathData: unitData.pathData,
-      });
+        pathData: unitData.pathData || '',
+      } as Omit<Unit, 'id'>);
 
       if (contractData && contractData.tenantId) {
         addContract({ ...contractData, unitId: newUnit.id } as Omit<Contract, 'id'>);
@@ -159,7 +153,11 @@ const TenantRoster: React.FC = () => {
   };
 
   const handleDeleteUnit = (unitId: string) => {
-    if (window.confirm('정말로 이 유닛을 삭제하시겠습니까? 연관된 계약 정보는 삭제되지 않습니다.')) {
+    if (window.confirm('정말로 이 유닛을 삭제하시겠습니까? 연관된 계약 정보도 함께 삭제됩니다.')) {
+      const contractToDelete = contracts.find(c => c.unitId === unitId);
+      if (contractToDelete) {
+        deleteContract(contractToDelete.id);
+      }
       if (selectedUnitId === unitId) {
         setSelectedUnitId(null);
       }
@@ -173,19 +171,19 @@ const TenantRoster: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col p-4 gap-4">
-      <UnitEditModal 
+      {isUnitModalOpen && <UnitEditModal 
         isOpen={isUnitModalOpen} 
         onClose={() => setUnitModalOpen(false)} 
         onSave={handleSaveUnit}
         unit={editingUnit}
         floor={selectedFloor}
         tenantInfo={tenantInfo} // Pass tenantInfo here
-      />
-      <TenantInfoEditModal
+      />}
+      {isTenantModalOpen && <TenantInfoEditModal
         isOpen={isTenantModalOpen}
         onClose={() => setTenantModalOpen(false)}
         tenantId={editingTenantId}
-      />
+      />}
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
@@ -249,7 +247,7 @@ const TenantRoster: React.FC = () => {
               unit={selectedUnit} 
               onEdit={() => handleEditUnit(selectedUnit)}
               onDelete={() => handleDeleteUnit(selectedUnit.id)}
-              onEditTenant={selectedUnit.tenant ? () => handleEditTenant(selected.tenant!.id) : undefined}
+              onEditTenant={selectedUnit.tenant ? () => handleEditTenant(selectedUnit.tenant!.id) : undefined}
             />
           ) : (
             <div className="bg-white rounded-lg shadow-lg h-full flex items-center justify-center">
