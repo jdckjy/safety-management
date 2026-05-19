@@ -5,41 +5,37 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import { UNIT_STATUS } from '@/constants';
 
 const LeaseStatusWidget: React.FC = () => {
-  const { tenantUnits } = useProjectData();
+  const { units } = useProjectData();
 
   const leaseRateStats = useMemo(() => {
-    const units = tenantUnits || [];
-    if (units.length === 0) return { rate: 0, occupied: 0, vacant: 0, totalRentable: 0 };
+    const allUnits = units || [];
+    if (allUnits.length === 0) return { rate: 0, occupied: 0, vacant: 0, totalRentable: 0 };
 
-    const occupiedArea = units
-      .filter(u => u.status === UNIT_STATUS.OCCUPIED)
-      .reduce((sum, u) => sum + u.area, 0);
+    const occupiedArea = allUnits
+      .filter(u => u.status === 'occupied')
+      .reduce((sum, u) => sum + u.area_sqm, 0);
 
-    const inDiscussionArea = units
-      .filter(u => u.status === UNIT_STATUS.IN_DISCUSSION)
-      .reduce((sum, u) => sum + u.area, 0);
-      
-    const vacantArea = units
-      .filter(u => u.status === UNIT_STATUS.VACANT)
-      .reduce((sum, u) => sum + u.area, 0);
+    const vacantArea = allUnits
+      .filter(u => u.status === 'vacant' || u.status === 'under-renovation')
+      .reduce((sum, u) => sum + u.area_sqm, 0);
 
-    const totalRentableArea = occupiedArea + inDiscussionArea + vacantArea;
+    const totalRentableArea = occupiedArea + vacantArea;
     
-    if (totalRentableArea === 0) return { rate: 0, occupied: occupiedArea, vacant: vacantArea + inDiscussionArea, totalRentable: totalRentableArea };
+    if (totalRentableArea === 0) return { rate: 0, occupied: occupiedArea, vacant: vacantArea, totalRentable: totalRentableArea };
 
     const rate = (occupiedArea / totalRentableArea) * 100;
 
     return {
       rate: parseFloat(rate.toFixed(1)),
       occupied: occupiedArea,
-      vacant: vacantArea + inDiscussionArea,
+      vacant: vacantArea,
       totalRentable: totalRentableArea
     };
-  }, [tenantUnits]);
+  }, [units]);
 
   const chartData = [
     { name: '임대', value: leaseRateStats.occupied },
-    { name: '공실/협의중', value: leaseRateStats.vacant },
+    { name: '공실/리모델링', value: leaseRateStats.vacant },
   ];
 
   const COLORS = ['#4f46e5', '#e0e7ff']; // indigo-600, indigo-100
@@ -104,7 +100,7 @@ const LeaseStatusWidget: React.FC = () => {
             <div className="flex justify-between items-center text-sm">
               <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-indigo-100"></div>
-                  <span className="text-gray-600">공실/협의중</span>
+                  <span className="text-gray-600">공실/리모델링</span>
               </div>
               <span className="font-semibold text-gray-800">{leaseRateStats.vacant.toLocaleString()} m²</span>
            </div>
