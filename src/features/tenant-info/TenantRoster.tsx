@@ -15,7 +15,7 @@ const TenantRoster: React.FC = () => {
       return sum + (unit?.area_sqm || 0);
     }, 0);
 
-    const totalRent = tenantContracts.reduce((sum, contract) => sum + (contract.monthlyRent || 0), 0);
+    const totalRent = tenantContracts.reduce((sum, contract) => sum + (contract.rent || 0), 0);
     
     const averageRentPerSqm = totalArea > 0 ? totalRent / totalArea : 0;
 
@@ -59,8 +59,8 @@ const TenantRoster: React.FC = () => {
               return (
                 <TableRow key={tenant.id}>
                   <TableCell>{index + 1}</TableCell>
-                  <TableCell className="font-medium">{tenant.companyName}</TableCell>
-                  <TableCell>{tenant.representativeName}</TableCell>
+                  <TableCell className="font-medium">{tenant.businessName}</TableCell>
+                  <TableCell>{tenant.ownerName}</TableCell>
                   <TableCell>{totalArea.toFixed(2)} ㎡</TableCell>
                   <TableCell>{totalRent.toLocaleString()} 원</TableCell>
                   <TableCell>{averageRentPerSqm.toLocaleString('ko-KR', { style: 'currency', currency: 'KRW' })} / ㎡</TableCell>

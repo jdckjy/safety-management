@@ -229,16 +229,36 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
         let finalData: IProjectData;
 
         if (userDocSnap.exists()) {
-            const firestoreData = userDocSnap.data() as Partial<IProjectData>;
+            const firestoreData = userDocSnap.data() as any;
             let isMigrated = false;
 
-            // Enhanced Orphaned/Corrupted data cleanup logic
-            const allUnits = firestoreData.units || initialUnits;
-            const validUnits = allUnits.filter(u => u && u.id && u.name);
-            const validUnitIds = new Set(validUnits.map(u => u.id));
+            // [MIGRATION] area to area_sqm for units
+            let allUnits = firestoreData.units || initialUnits;
+            const migratedUnits = allUnits.map((u: any) => {
+              if (u && typeof u.area !== 'undefined' && typeof u.area_sqm === 'undefined') {
+                isMigrated = true;
+                const { area, ...rest } = u;
+                return { ...rest, area_sqm: area };
+              }
+              return u;
+            });
 
+            // [MIGRATION] area to area_sqm for complexFacilities
+            let allComplexFacilities = firestoreData.complexFacilities || initialComplexFacilities;
+            const migratedComplexFacilities = allComplexFacilities.map((f: any) => {
+              if (f && typeof f.area !== 'undefined' && typeof f.area_sqm === 'undefined') {
+                isMigrated = true;
+                const { area, ...rest } = f;
+                return { ...rest, area_sqm: area };
+              }
+              return f;
+            });
+
+
+            const validUnits = migratedUnits.filter((u: Unit) => u && u.id && u.unitNumber && typeof u.area_sqm === 'number');
+            const validUnitIds = new Set(validUnits.map((u: Unit) => u.id));
             const allContracts = firestoreData.contracts || [];
-            const validContracts = allContracts.filter(c => validUnitIds.has(c.unitId));
+            const validContracts = allContracts.filter((c: Contract) => c.unitId && validUnitIds.has(c.unitId));
 
             if (validContracts.length < allContracts.length || validUnits.length < allUnits.length) {
                 console.log(`[Data Cleanup] Removing ${allContracts.length - validContracts.length} orphaned contracts and ${allUnits.length - validUnits.length} corrupted units.`);
@@ -251,12 +271,12 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
                 assetKPIs: (firestoreData.assetKPIs || []).map(sanitizeKpi),
                 infraKPIs: (firestoreData.infraKPIs || []).map(sanitizeKpi),
                 hotspots: firestoreData.hotspots || [],
-                facilities: (firestoreData.facilities || []).filter(f => f && typeof f === 'object').map(sanitizeFacility),
-                complexFacilities: firestoreData.complexFacilities || initialComplexFacilities,
+                facilities: (firestoreData.facilities || []).filter((f: Facility) => f && typeof f === 'object').map(sanitizeFacility),
+                complexFacilities: migratedComplexFacilities,
                 teamMembers: firestoreData.teamMembers || initialTeamMembers,
-                units: validUnits, // Use cleaned units
+                units: validUnits,
                 tenantInfo: firestoreData.tenantInfo || [],
-                contracts: validContracts, // Use cleaned contracts
+                contracts: validContracts,
                 attachments: firestoreData.attachments || [],
                 generalActivities: firestoreData.generalActivities || [],
                 customTabs: firestoreData.customTabs || [], 
@@ -264,10 +284,11 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
             };
 
             if (isMigrated) {
+                console.log("[Data Migration] Data structure change detected. Saving updated data to Firestore.");
                 const dataToSave = { ...finalData };
                 delete (dataToSave as Partial<IProjectData>).monthly_reports;
                 await setDoc(userDocRef, dataToSave);
-                 console.log("[Data Cleanup] Successfully saved cleaned data to Firestore.");
+                 console.log("[Data Migration] Successfully saved migrated data to Firestore.");
             }
 
         } else {
