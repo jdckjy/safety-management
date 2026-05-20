@@ -1,44 +1,51 @@
 
 import React, { useMemo } from 'react';
 import { useProjectData } from '@/providers/ProjectDataProvider';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
-import { UNIT_STATUS } from '@/constants';
+import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const LeaseStatusWidget: React.FC = () => {
-  const { units } = useProjectData();
+  const { units, contracts } = useProjectData();
 
   const leaseRateStats = useMemo(() => {
     const allUnits = units || [];
-    if (allUnits.length === 0) return { rate: 0, occupied: 0, vacant: 0, totalRentable: 0 };
+    const allContracts = contracts || [];
+
+    if (allUnits.length === 0) {
+      return { rate: 0, occupied: 0, vacant: 0, totalRentable: 0 };
+    }
+
+    const contractedUnitIds = new Set(allContracts.map(c => c.unitId));
 
     const occupiedArea = allUnits
-      .filter(u => u.status === 'occupied')
-      .reduce((sum, u) => sum + u.area_sqm, 0);
+      .filter(u => contractedUnitIds.has(u.id))
+      .reduce((sum, u) => sum + (u.area_sqm || 0), 0);
 
-    const vacantArea = allUnits
-      .filter(u => u.status === 'vacant' || u.status === 'under-renovation')
-      .reduce((sum, u) => sum + u.area_sqm, 0);
-
-    const totalRentableArea = occupiedArea + vacantArea;
-    
-    if (totalRentableArea === 0) return { rate: 0, occupied: occupiedArea, vacant: vacantArea, totalRentable: totalRentableArea };
-
-    const rate = (occupiedArea / totalRentableArea) * 100;
+    const totalRentableArea = allUnits.reduce((sum, u) => sum + (u.area_sqm || 0), 0);
+    const vacantArea = totalRentableArea - occupiedArea;
+    const rate = totalRentableArea > 0 ? (occupiedArea / totalRentableArea) * 100 : 0;
 
     return {
       rate: parseFloat(rate.toFixed(1)),
-      occupied: occupiedArea,
-      vacant: vacantArea,
-      totalRentable: totalRentableArea
+      occupied: parseFloat(occupiedArea.toFixed(2)),
+      vacant: parseFloat(vacantArea.toFixed(2)),
+      totalRentable: parseFloat(totalRentableArea.toFixed(2)),
     };
-  }, [units]);
+  }, [units, contracts]);
 
-  const chartData = [
-    { name: '임대', value: leaseRateStats.occupied },
+  const data = [
+    { name: '임대 면적', value: leaseRateStats.occupied },
     { name: '공실/리모델링', value: leaseRateStats.vacant },
   ];
 
-  const COLORS = ['#4f46e5', '#e0e7ff']; // indigo-600, indigo-100
+  // 업무진척도와 동일한 색상 팔레트 적용 (파란색 계열)
+  const OCCUPIED_COLOR = '#3B82F6'; // 진한 파랑
+  const VACANT_COLOR = '#DBEAFE';   // 연한 파랑 (배경색)
+
+  // 데이터가 없을 경우 배경만 표시
+  if (leaseRateStats.totalRentable === 0) {
+    data[0].value = 0;
+    data[1].value = 1;
+  }
 
   return (
     <div className="bg-white p-6 rounded-2xl shadow-md h-full flex flex-col">
@@ -53,7 +60,7 @@ const LeaseStatusWidget: React.FC = () => {
                 </filter>
               </defs>
               <Pie
-                data={chartData}
+                data={data}
                 cx="50%"
                 cy="50%"
                 innerRadius={60}
@@ -65,50 +72,40 @@ const LeaseStatusWidget: React.FC = () => {
                 stroke="none"
                 filter="url(#shadow)"
               >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
+                <Cell key="cell-occupied" fill={OCCUPIED_COLOR} />
+                <Cell key="cell-vacant" fill={VACANT_COLOR} />
               </Pie>
-              <Tooltip 
-                cursor={{fill: 'transparent'}}
-                formatter={(value: number) => [`${value.toLocaleString()} m²`, '면적']}
-                contentStyle={{ 
-                  background: 'rgba(31, 41, 55, 0.9)', 
-                  border: 'none', 
-                  borderRadius: '8px', 
-                  color: 'white',
-                  fontSize: '12px'
-                }}
-                labelStyle={{ fontWeight: 'bold' }}
-              />
             </PieChart>
           </ResponsiveContainer>
           <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
-            <span className="text-4xl font-bold text-gray-800">{leaseRateStats.rate}<span className="text-2xl text-gray-500">%</span></span>
+            <span className="text-4xl font-bold text-gray-800">{leaseRateStats.rate.toFixed(0)}<span className="text-2xl text-gray-500">%</span></span>
             <span className="text-sm text-gray-500">임대율</span>
           </div>
         </div>
         
         <div className="w-full mt-6 space-y-3">
-           <div className="flex justify-between items-center text-sm">
-              <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full bg-indigo-600"></div>
-                  <span className="text-gray-600">임대 면적</span>
-              </div>
-              <span className="font-semibold text-gray-800">{leaseRateStats.occupied.toLocaleString()} m²</span>
-           </div>
-            <div className="flex justify-between items-center text-sm">
-              <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-full bg-indigo-100"></div>
-                  <span className="text-gray-600">공실/리모델링</span>
-              </div>
-              <span className="font-semibold text-gray-800">{leaseRateStats.vacant.toLocaleString()} m²</span>
-           </div>
-           <div className="border-t border-gray-200 my-3"></div>
-            <div className="flex justify-between items-center text-sm font-bold">
-              <span className="text-gray-800">총 임대가능 면적</span>
-              <span className="text-gray-800">{leaseRateStats.totalRentable.toLocaleString()} m²</span>
-           </div>
+          <div className="flex justify-between items-center text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: OCCUPIED_COLOR }}></div>
+              <span className="text-gray-600">임대 면적</span>
+            </div>
+            <span className="font-semibold text-gray-800">{leaseRateStats.occupied.toLocaleString()} m²</span>
+          </div>
+
+          <div className="flex justify-between items-center text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: VACANT_COLOR }}></div>
+              <span className="text-gray-600">공실/리모델링</span>
+            </div>
+            <span className="font-semibold text-gray-800">{leaseRateStats.vacant.toLocaleString()} m²</span>
+          </div>
+
+          <div className="border-t border-gray-200 my-3"></div>
+
+          <div className="flex justify-between items-center text-sm font-bold">
+            <span className="text-gray-800">총 임대가능 면적</span>
+            <span className="text-gray-800">{leaseRateStats.totalRentable.toLocaleString()} m²</span>
+          </div>
         </div>
       </div>
     </div>

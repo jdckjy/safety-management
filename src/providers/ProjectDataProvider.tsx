@@ -143,6 +143,26 @@ const initialData: IProjectData = {
   monthly_reports: [],
 };
 
+// A safe version of initialData that is used ONLY for new user document creation.
+const newUserInitialData: IProjectData = {
+  safetyKPIs: [],
+  leaseKPIs: [],
+  assetKPIs: [],
+  infraKPIs: [],
+  hotspots: [],
+  facilities: [],
+  complexFacilities: initialComplexFacilities || [],
+  teamMembers: initialTeamMembers || [],
+  units: initialUnits || [],
+  tenantInfo: [],
+  contracts: [],
+  attachments: [],
+  generalActivities: [],
+  customTabs: [],
+  monthly_reports: [],
+};
+
+
 const sanitizeKpi = (partialKpi: Partial<KPI>): KPI => {
   const defaults: Omit<KPI, 'id'> = { title: '이름 없음 - 수정 필요', description: '', current: 0, target: 100, unit: '%', activities: [], previous: 0 };
   const id = partialKpi.id || `kpi-${Date.now()}-${Math.random()}`;
@@ -167,30 +187,6 @@ const sanitizeKpi = (partialKpi: Partial<KPI>): KPI => {
   return { ...defaults, ...partialKpi, id, activities };
 };
 
-const sanitizeFacility = (partialFacility: Partial<Facility>): Facility => {
-    console.log("Sanitizing facility:", partialFacility);
-    if (typeof partialFacility?.name !== 'string') {
-        console.error("Facility name is not a string:", partialFacility.name);
-    }
-    const defaults: Facility = {
-        id: 0,
-        name: '이름 없음',
-        type: '타입 미지정',
-        status: '상태 미지정',
-    };
-
-    const id = partialFacility.id || Date.now();
-
-    return {
-        ...defaults,
-        ...partialFacility,
-        id,
-        name: String(partialFacility.name || defaults.name),
-        type: String(partialFacility.type || defaults.type),
-        status: String(partialFacility.status || defaults.status),
-    };
-};
-
 export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { currentUser } = useAuth();
   const db = getFirestore();
@@ -204,12 +200,14 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   useEffect(() => {
     if (!currentUser) {
+      console.log("[Auth] No user, clearing data and showing initial static state.");
       setData(initialData);
       setIsDataLoaded(true); 
       return;
     }
 
     const fetchData = async () => {
+      console.log(`[Data] User ${currentUser.uid} found, fetching data from Firestore...`);
       setIsDataLoaded(false);
       const userDocRef = doc(db, 'users', currentUser.uid);
       const reportsCollRef = collection(db, 'monthly_reports');
@@ -229,81 +227,51 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
         let finalData: IProjectData;
 
         if (userDocSnap.exists()) {
+            console.log("[Data] Existing user document found. Loading data from Firestore.");
             const firestoreData = userDocSnap.data() as any;
-            let isMigrated = false;
-
-            // [MIGRATION] area to area_sqm for units
-            let allUnits = firestoreData.units || initialUnits;
-            const migratedUnits = allUnits.map((u: any) => {
-              if (u && typeof u.area !== 'undefined' && typeof u.area_sqm === 'undefined') {
-                isMigrated = true;
-                const { area, ...rest } = u;
-                return { ...rest, area_sqm: area };
-              }
-              return u;
-            });
-
-            // [MIGRATION] area to area_sqm for complexFacilities
-            let allComplexFacilities = firestoreData.complexFacilities || initialComplexFacilities;
-            const migratedComplexFacilities = allComplexFacilities.map((f: any) => {
-              if (f && typeof f.area !== 'undefined' && typeof f.area_sqm === 'undefined') {
-                isMigrated = true;
-                const { area, ...rest } = f;
-                return { ...rest, area_sqm: area };
-              }
-              return f;
-            });
-
-
-            const validUnits = migratedUnits.filter((u: Unit) => u && u.id && u.unitNumber && typeof u.area_sqm === 'number');
-            const validUnitIds = new Set(validUnits.map((u: Unit) => u.id));
-            const allContracts = firestoreData.contracts || [];
-            const validContracts = allContracts.filter((c: Contract) => c.unitId && validUnitIds.has(c.unitId));
-
-            if (validContracts.length < allContracts.length || validUnits.length < allUnits.length) {
-                console.log(`[Data Cleanup] Removing ${allContracts.length - validContracts.length} orphaned contracts and ${allUnits.length - validUnits.length} corrupted units.`);
-                isMigrated = true;
-            }
-
+            
+            // For existing users, we strictly load from Firestore or default to an empty state.
+            // We NEVER fallback to initialData to prevent overwriting user's data.
             finalData = {
                 safetyKPIs: (firestoreData.safetyKPIs || []).map(sanitizeKpi),
                 leaseKPIs: (firestoreData.leaseKPIs || []).map(sanitizeKpi),
                 assetKPIs: (firestoreData.assetKPIs || []).map(sanitizeKpi),
                 infraKPIs: (firestoreData.infraKPIs || []).map(sanitizeKpi),
                 hotspots: firestoreData.hotspots || [],
-                facilities: (firestoreData.facilities || []).filter((f: Facility) => f && typeof f === 'object').map(sanitizeFacility),
-                complexFacilities: migratedComplexFacilities,
-                teamMembers: firestoreData.teamMembers || initialTeamMembers,
-                units: validUnits,
+                facilities: firestoreData.facilities || [],
+                complexFacilities: firestoreData.complexFacilities || [],
+                teamMembers: firestoreData.teamMembers || [],
+                units: firestoreData.units || [],
                 tenantInfo: firestoreData.tenantInfo || [],
-                contracts: validContracts,
+                contracts: firestoreData.contracts || [],
                 attachments: firestoreData.attachments || [],
                 generalActivities: firestoreData.generalActivities || [],
                 customTabs: firestoreData.customTabs || [], 
                 monthly_reports: reports,
             };
 
-            if (isMigrated) {
-                console.log("[Data Migration] Data structure change detected. Saving updated data to Firestore.");
-                const dataToSave = { ...finalData };
-                delete (dataToSave as Partial<IProjectData>).monthly_reports;
-                await setDoc(userDocRef, dataToSave);
-                 console.log("[Data Migration] Successfully saved migrated data to Firestore.");
-            }
-
         } else {
-          finalData = { ...initialData, monthly_reports: reports };
-          const dataToSaveForNewUser = { ...initialData };
+          console.log("[Data] New user detected. Initializing new document with default data.");
+          // For new users, we populate the document with the initial boilerplate data.
+          finalData = { ...newUserInitialData, monthly_reports: reports };
+          const dataToSaveForNewUser = { ...newUserInitialData };
           delete (dataToSaveForNewUser as Partial<IProjectData>).monthly_reports;
           await setDoc(userDocRef, dataToSaveForNewUser); 
+          console.log("[Data] New user document created in Firestore.");
         }
         
+        console.log("[Data] Final data processed. Setting application state.", { 
+          units: finalData.units.length,
+          complexFacilities: finalData.complexFacilities.length
+        });
         setData(finalData);
 
       } catch (error) { 
-          console.error("Error fetching or migrating data:", error);
+          console.error("[Data] Error fetching data:", error);
+          // In case of error, load a minimal, safe state.
           setData({ ...initialData, monthly_reports: [februaryReportData] });
       } finally {
+          console.log("[Data] Data loading process finished.");
           setIsDataLoaded(true);
       }
     };
@@ -311,21 +279,33 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     fetchData();
   }, [currentUser, db]);
   
+  // This useEffect handles saving data back to Firestore.
+  // It is debounced to avoid excessive writes.
   useEffect(() => {
-    if (!isDataLoaded || !currentUser) return;
+    if (!isDataLoaded || !currentUser) {
+        return; // Don't save if data isn't loaded or there's no user
+    }
 
+    // Create a copy of the data, excluding monthly_reports which are saved separately.
     const nonReportData = { ...data };
     delete (nonReportData as Partial<IProjectData>).monthly_reports;
 
     const debounceSave = setTimeout(() => {
+        if (!currentUser) return; // Final check for user before writing
+        console.log(`[Data Save] Debounced save triggered for user ${currentUser.uid}.`);
         try {
+            // Use setDoc with merge:true to update or create the document.
             setDoc(doc(db, 'users', currentUser.uid), nonReportData, { merge: true });
+            console.log("[Data Save] Successfully requested save to Firestore.");
         } catch (error) {
-            console.error("Error saving data:", error);
+            console.error("[Data Save] Error saving data:", error);
         }
-    }, 1000);
+    }, 1000); // 1-second debounce period
 
-    return () => clearTimeout(debounceSave);
+    // Cleanup function to cancel the timeout if the component unmounts or data changes again.
+    return () => {
+        clearTimeout(debounceSave);
+    };
   }, [data, currentUser, db, isDataLoaded]);
 
   const updateKpiArray = useCallback((updateFn: (data: IProjectData) => IProjectData) => {
