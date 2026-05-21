@@ -1,3 +1,4 @@
+
 import { LucideIcon } from "lucide-react";
 
 export interface KPI {
@@ -47,13 +48,16 @@ export interface Comment {
 }
 
 export interface HotSpot {
-    id: string;
-    name: string;
-    floor: string;
-    x: number;
-    y: number;
-    description: string;
+  id: string;
+  title: string;
+  description: string;
+  facilityId: number;
+  responseType: '정기' | '긴급';
+  riskLevel: 'low' | 'medium' | 'high';
+  position: { lat: number; lng: number };
+  attachments?: string[]; // Array of image URLs
 }
+
 
 export interface Facility {
     id: number;

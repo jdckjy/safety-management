@@ -3,12 +3,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import { LatLngExpression, LatLng, Map as LeafletMap } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Crosshair, Navigation, Activity, Edit, Trash2 } from 'lucide-react';
+import { Crosshair, Navigation, Activity, Edit, Trash2, Paperclip, X } from 'lucide-react';
 import L from 'leaflet';
 import NewNodeModal from './NewNodeModal';
 import { Facility, HotSpot } from '../types';
 
-// --- 타입 정의 ---
+type ModalData = (Omit<HotSpot, 'id' | 'attachments'> | HotSpot) & { attachments?: (File | string)[] };
+
 interface HotSpotMapProps {
   facilities: Facility[];
   hotspots: HotSpot[];
@@ -17,18 +18,16 @@ interface HotSpotMapProps {
   onDeleteHotspot: (hotspotId: string) => void;
 }
 
-// --- 컴포넌트 ---
-
-// 위험도에 따른 마커 스타일 설정
 const riskLevelConfig = {
   low: { color: 'bg-blue-500', pulse: false, name: '낮음' },
   medium: { color: 'bg-amber-500', pulse: false, name: '중간' },
   high: { color: 'bg-red-500', pulse: true, name: '높음' },
 };
 
-const createCustomDivIcon = (riskLevel: string) => {
-  const config = riskLevelConfig[riskLevel as keyof typeof riskLevelConfig] || riskLevelConfig.low;
+const createCustomDivIcon = (riskLevel: HotSpot['riskLevel'], hasAttachment: boolean) => {
+  const config = riskLevelConfig[riskLevel] || riskLevelConfig.low;
   const pulseHtml = config.pulse ? '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>' : '';
+  const attachmentIcon = hasAttachment ? '<div class="absolute -top-1 -right-1 w-4 h-4 bg-gray-800 rounded-full flex items-center justify-center border-2 border-white"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-white"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.59a2 2 0 0 1-2.83-2.83l.79-.79"></path></svg></div>' : '';
 
   return L.divIcon({
     html: `
@@ -37,6 +36,7 @@ const createCustomDivIcon = (riskLevel: string) => {
         <div class="relative flex items-center justify-center w-5 h-5 rounded-full ${config.color} border-2 border-white shadow-md">
            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="text-white"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </div>
+        ${attachmentIcon}
       </div>
     `,
     className: '', 
@@ -46,24 +46,14 @@ const createCustomDivIcon = (riskLevel: string) => {
   });
 };
 
-// 지도 이벤트 및 상태 관리를 위한 헬퍼 컴포넌트
 const MapController: React.FC<{ 
   onMapClick: (latlng: LatLng) => void;
   onMouseMove: (e: L.LeafletMouseEvent) => void;
   onZoomEnd: (zoom: number) => void;
 }> = ({ onMapClick, onMouseMove, onZoomEnd }) => {
   const map = useMap();
-  
-  useEffect(() => {
-    onZoomEnd(map.getZoom());
-  }, [map, onZoomEnd]);
-
-  useMapEvents({
-    click(e) { onMapClick(e.latlng); },
-    mousemove: onMouseMove,
-    zoomend: () => onZoomEnd(map.getZoom()),
-  });
-
+  useEffect(() => { onZoomEnd(map.getZoom()); }, [map, onZoomEnd]);
+  useMapEvents({ click(e) { onMapClick(e.latlng); }, mousemove: onMouseMove, zoomend: () => onZoomEnd(map.getZoom()) });
   return null;
 };
 
@@ -74,18 +64,13 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ facilities, hotspots, onAddHots
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newNodeCoords, setNewNodeCoords] = useState<LatLng | null>(null);
   const [editingHotspot, setEditingHotspot] = useState<HotSpot | null>(null);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string | null>(null);
   
   const mapRef = useRef<LeafletMap>(null);
-  
   const initialPosition: LatLngExpression = [33.285186, 126.560624]; 
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (mapRef.current) {
-        mapRef.current.invalidateSize();
-      }
-    }, 100);
-
+    const timer = setTimeout(() => { mapRef.current?.invalidateSize(); }, 100);
     return () => clearTimeout(timer);
   }, []);
 
@@ -108,11 +93,31 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ facilities, hotspots, onAddHots
     }
   };
 
-  const handleRegister = (data: Omit<HotSpot, 'id'> | HotSpot) => {
-    if ('id' in data) {
-      onUpdateHotspot(data as HotSpot);
+  const handleRegister = (data: ModalData) => {
+    const { attachments, ...restData } = data;
+
+    let newAttachmentUrls: string[] = [];
+    let existingAttachmentUrls: string[] = [];
+
+    if (attachments && Array.isArray(attachments)) {
+      const filesToUpload = attachments.filter((a): a is File => a instanceof File);
+      existingAttachmentUrls = attachments.filter((a): a is string => typeof a === 'string');
+
+      // Create blob URLs for new files
+      newAttachmentUrls = filesToUpload.map(file => URL.createObjectURL(file));
+    }
+
+    const allAttachmentUrls = [...existingAttachmentUrls, ...newAttachmentUrls];
+
+    const hotspotPayload = { 
+        ...restData,
+        attachments: allAttachmentUrls 
+    };
+
+    if ('id' in hotspotPayload && hotspotPayload.id) {
+        onUpdateHotspot(hotspotPayload as HotSpot);
     } else {
-      onAddHotspot(data as Omit<HotSpot, 'id'>);
+        onAddHotspot(hotspotPayload as Omit<HotSpot, 'id'>);
     }
     setIsModalOpen(false);
   };
@@ -127,12 +132,13 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ facilities, hotspots, onAddHots
         )}
         
         {hotspots.map(spot => {
-          const config = riskLevelConfig[spot.riskLevel as keyof typeof riskLevelConfig] || riskLevelConfig.low;
+          const config = riskLevelConfig[spot.riskLevel] || riskLevelConfig.low;
+          const hasAttachment = spot.attachments && spot.attachments.length > 0;
           return (
             <Marker 
               key={spot.id} 
               position={spot.position} 
-              icon={createCustomDivIcon(spot.riskLevel)}
+              icon={createCustomDivIcon(spot.riskLevel, hasAttachment)}
             >
               <Popup>
                 <div className="bg-slate-800 text-white p-1 rounded-lg shadow-lg border border-slate-700 w-64">
@@ -144,6 +150,21 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ facilities, hotspots, onAddHots
                         <span className="font-semibold text-gray-400">위험도:</span> 
                         <span className={`ml-1 ${config.color.replace('bg-', 'text-')}`}>{config.name}</span>
                       </p>
+                      {hasAttachment && (
+                          <div className="mt-2 pt-2 border-t border-slate-600">
+                            <p className="text-sm font-semibold text-gray-400 mb-2 flex items-center"><Paperclip size={12} className="mr-1" />첨부파일</p>
+                            <div className="flex gap-2 flex-wrap">
+                              {spot.attachments?.map((url, index) => (
+                                <button 
+                                  key={index} 
+                                  onClick={() => setSelectedImageUrl(url)}
+                                  className="w-12 h-12 rounded bg-slate-700 bg-cover bg-center cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
+                                  title={url.split('/').pop()}
+                                  style={{backgroundImage: `url(${url})`}} />
+                              ))}
+                            </div>
+                          </div>
+                      )}
                   </div>
                   <div className="flex justify-end gap-2 bg-slate-700/50 p-2 rounded-b-md">
                       <button onClick={(e) => handleEditClick(e, spot)} className="flex items-center gap-1 text-xs px-2 py-1 bg-gray-600 hover:bg-gray-500 rounded"><Edit size={12}/>수정</button>
@@ -162,6 +183,28 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ facilities, hotspots, onAddHots
         />
       </MapContainer>
 
+      {selectedImageUrl && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[3000] cursor-pointer"
+          onClick={() => setSelectedImageUrl(null)}
+        >
+          <div className="relative">
+            <img 
+              src={selectedImageUrl} 
+              alt="Enlarged view" 
+              className="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()} // Prevent closing modal when clicking on the image itself
+            />
+            <button 
+              onClick={() => setSelectedImageUrl(null)} 
+              className="absolute -top-4 -right-4 text-white bg-slate-800/50 rounded-full p-2 hover:bg-slate-700 transition-colors"
+            >
+              <X size={24} />
+            </button>
+          </div>
+        </div>
+      )}
+
       <NewNodeModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -171,10 +214,6 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ facilities, hotspots, onAddHots
         editingHotspot={editingHotspot}
       />
 
-      {/* --- UI 오버레이 --- */}
-      <div className="absolute top-6 left-6 z-[1000] flex items-center gap-4 pointer-events-none">
-        {/* ... (기존 UI) ... */}
-      </div>
       <div className="absolute top-6 right-6 z-[1000] flex items-center gap-4 pointer-events-none">
         <div className="bg-slate-900/80 backdrop-blur-xl p-3 rounded-xl border border-white/20 text-xs flex items-center gap-6">
             <div className="flex items-center gap-2"><Crosshair size={14} /><span>X: {mouseCoords?.lng.toFixed(4)}, Y: {mouseCoords?.lat.toFixed(4)}</span></div>
