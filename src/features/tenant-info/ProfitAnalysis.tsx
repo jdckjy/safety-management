@@ -31,23 +31,37 @@ const ProfitAnalysis: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
 
-  const combinedTransactions = useMemo(() => {
-    return [...transactions, ...stagedTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [transactions, stagedTransactions]);
+  useEffect(() => {
+    setSelectedMonth('all');
+  }, [selectedYear]);
 
   const availableYears = useMemo(() => {
     const years = new Set(transactions.map(t => new Date(t.date).getFullYear()));
     return ['all', ...Array.from(years).sort((a, b) => b - a)];
   }, [transactions]);
 
-  const filteredTransactions = useMemo(() => {
+  const yearFilteredTransactions = useMemo(() => {
     if (selectedYear === 'all') {
       return transactions;
     }
     const year = parseInt(selectedYear, 10);
     return transactions.filter(t => !isNaN(year) && new Date(t.date).getFullYear() === year);
   }, [transactions, selectedYear]);
+
+  const availableMonths = useMemo(() => {
+    if (selectedYear === 'all') return [];
+    const months = new Set(yearFilteredTransactions.map(t => new Date(t.date).toISOString().slice(5, 7)));
+    return ['all', ...Array.from(months).sort()];
+  }, [yearFilteredTransactions, selectedYear]);
+
+  const filteredTransactions = useMemo(() => {
+    if (selectedMonth === 'all') {
+      return yearFilteredTransactions;
+    }
+    return yearFilteredTransactions.filter(t => new Date(t.date).toISOString().slice(5, 7) === selectedMonth);
+  }, [yearFilteredTransactions, selectedMonth]);
 
   const { incomeTransactions, expenseTransactions } = useMemo(() => {
     const income = filteredTransactions.filter(t => t.type === 'income');
@@ -236,7 +250,7 @@ const ProfitAnalysis: React.FC = () => {
   }, [filteredTransactions]);
 
   const monthlyData = useMemo(() => {
-    const data = filteredTransactions.reduce((acc, curr) => {
+    const data = yearFilteredTransactions.reduce((acc, curr) => {
       const month = new Date(curr.date).toISOString().slice(0, 7);
       if (!acc[month]) {
         acc[month] = { month, income: 0, expense: 0 };
@@ -246,7 +260,7 @@ const ProfitAnalysis: React.FC = () => {
       return acc;
     }, {} as Record<string, { month: string; income: number; expense: number }>);
     return Object.values(data).sort((a, b) => a.month.localeCompare(b.month));
-  }, [filteredTransactions]);
+  }, [yearFilteredTransactions]);
 
   return (
     <div className="container mx-auto p-4 space-y-8">
@@ -262,7 +276,7 @@ const ProfitAnalysis: React.FC = () => {
         </TabsList>
 
         <TabsContent value="analysis" className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
             <div className="w-[180px]">
               <Select value={selectedYear} onValueChange={setSelectedYear}>
                 <SelectTrigger>
@@ -277,6 +291,22 @@ const ProfitAnalysis: React.FC = () => {
                 </SelectContent>
               </Select>
             </div>
+            {selectedYear !== 'all' && (
+              <div className="w-[120px]">
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="월 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableMonths.map(month => (
+                      <SelectItem key={month} value={String(month)}>
+                        {month === 'all' ? '전체 월' : `${month}월`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           {loading && <div className="text-center py-4">데이터를 불러오는 중...</div>}
@@ -289,22 +319,30 @@ const ProfitAnalysis: React.FC = () => {
             </Card>
           )}
 
-          {!loading && transactions.length > 0 && filteredTransactions.length === 0 && (
+          {!loading && transactions.length > 0 && yearFilteredTransactions.length === 0 && selectedYear !== 'all' && (
             <Card>
                 <CardContent className="p-6 text-center">
                   <p className="text-muted-foreground">{selectedYear}년에는 데이터가 없습니다.</p>
                 </CardContent>
             </Card>
           )}
-
-          {filteredTransactions.length > 0 && (
+          
+          {yearFilteredTransactions.length > 0 && (
             <>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <SummaryCard title="총 수입" value={summary.totalIncome} />
-                <SummaryCard title="총 지출" value={summary.totalExpense} />
-                <SummaryCard title="순이익" value={netProfit} />
-                <SummaryCard title="총 거래 건수" value={filteredTransactions.length} isCurrency={false} />
-              </div>
+              {selectedMonth !== 'all' && filteredTransactions.length === 0 ? (
+                <Card>
+                  <CardContent className="p-6 text-center">
+                    <p className="text-muted-foreground">{selectedYear}년 {selectedMonth}월에는 데이터가 없습니다.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <SummaryCard title="총 수입" value={summary.totalIncome} />
+                  <SummaryCard title="총 지출" value={summary.totalExpense} />
+                  <SummaryCard title="순이익" value={netProfit} />
+                  <SummaryCard title="총 거래 건수" value={filteredTransactions.length} isCurrency={false} />
+                </div>
+              )}
 
               <Tabs defaultValue="categories">
                 <TabsList>
@@ -312,12 +350,24 @@ const ProfitAnalysis: React.FC = () => {
                   <TabsTrigger value="monthly">월별 추이</TabsTrigger>
                 </TabsList>
                 <TabsContent value="categories" className="grid gap-4 md:grid-cols-2">
-                  <ChartCard title="지출 카테고리 (상위 5개)">
-                    <CategoryPieChart data={categoryData.expense.slice(0, 5)} />
-                  </ChartCard>
-                  <ChartCard title="수입 카테고리 (상위 5개)">
-                    <CategoryPieChart data={categoryData.income.slice(0, 5)} />
-                  </ChartCard>
+                  {filteredTransactions.length > 0 ? (
+                    <>
+                      <ChartCard title="지출 카테고리 (상위 5개)">
+                        <CategoryPieChart data={categoryData.expense.slice(0, 5)} />
+                      </ChartCard>
+                      <ChartCard title="수입 카테고리 (상위 5개)">
+                        <CategoryPieChart data={categoryData.income.slice(0, 5)} />
+                      </ChartCard>
+                    </>
+                  ) : (
+                    <div className="md:col-span-2">
+                      <Card>
+                        <CardContent className="p-6 text-center">
+                          <p className="text-muted-foreground">표시할 카테고리 데이터가 없습니다.</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  )}
                 </TabsContent>
                 <TabsContent value="monthly">
                   <ChartCard title="월별 수입 및 지출">
@@ -325,11 +375,13 @@ const ProfitAnalysis: React.FC = () => {
                   </ChartCard>
                 </TabsContent>
               </Tabs>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <TransactionTable title="지출 내역" data={expenseTransactions} showType={false} />
-                <TransactionTable title="수입 내역" data={incomeTransactions} showType={false} />
-              </div>
+              
+              {filteredTransactions.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <TransactionTable title="지출 내역" data={expenseTransactions} showType={false} />
+                  <TransactionTable title="수입 내역" data={incomeTransactions} showType={false} />
+                </div>
+              )}
             </>
           )}
         </TabsContent>
