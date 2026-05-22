@@ -37,17 +37,17 @@ const ProfitAnalysis: React.FC = () => {
   }, [transactions, stagedTransactions]);
 
   const availableYears = useMemo(() => {
-    const years = new Set(combinedTransactions.map(t => new Date(t.date).getFullYear()));
+    const years = new Set(transactions.map(t => new Date(t.date).getFullYear()));
     return ['all', ...Array.from(years).sort((a, b) => b - a)];
-  }, [combinedTransactions]);
+  }, [transactions]);
 
   const filteredTransactions = useMemo(() => {
     if (selectedYear === 'all') {
-      return combinedTransactions;
+      return transactions;
     }
     const year = parseInt(selectedYear, 10);
-    return combinedTransactions.filter(t => !isNaN(year) && new Date(t.date).getFullYear() === year);
-  }, [combinedTransactions, selectedYear]);
+    return transactions.filter(t => !isNaN(year) && new Date(t.date).getFullYear() === year);
+  }, [transactions, selectedYear]);
 
   const { incomeTransactions, expenseTransactions } = useMemo(() => {
     const income = filteredTransactions.filter(t => t.type === 'income');
@@ -250,108 +250,120 @@ const ProfitAnalysis: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4 space-y-8">
-      <header className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">수익 분석 대시보드</h1>
-          <p className="text-muted-foreground">엑셀 파일을 업로드하여 수입/지출 내역을 분석하고 관리하세요.</p>
-        </div>
-        <div className="w-[180px]">
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger>
-              <SelectValue placeholder="연도 선택" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableYears.map(year => (
-                <SelectItem key={year} value={String(year)}>
-                  {year === 'all' ? '전체 연도' : `${year}년`}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <header>
+        <h1 className="text-3xl font-bold mb-2">수익 분석 대시보드</h1>
+        <p className="text-muted-foreground">엑셀 파일을 업로드하여 수입/지출 내역을 분석하고 관리하세요.</p>
       </header>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>데이터 관리</CardTitle>
-          <CardDescription>엑셀 파일을 업로드하거나 모든 데이터를 초기화할 수 있습니다.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center space-x-4">
-          <Input id="excel-upload" type="file" accept=".xlsx, .xls" onChange={handleFileChange} ref={fileInputRef} className="max-w-sm" disabled={loading} />
-          <Button onClick={handleClearAllData} variant="destructive" disabled={loading}>모든 데이터 삭제</Button>
-        </CardContent>
-        {error && <CardFooter><p className="text-red-500 mt-2">오류: {error}</p></CardFooter>}
-      </Card>
 
-      {stagedTransactions.length > 0 && (
-        <Card className="border-blue-500 border-2">
-          <CardHeader>
-            <CardTitle>미리보기 및 저장</CardTitle>
-            <CardDescription>{stagedTransactions.length}개의 새로운 거래 내역을 저장할 준비가 되었습니다. 아래에서 내용을 확인하세요.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <TransactionTable title="저장 대기중인 데이터" data={stagedTransactions} />
-          </CardContent>
-          <CardFooter className="flex justify-end space-x-2">
-            <Button onClick={handleSaveStagedTransactions} variant="default" disabled={loading}>저장</Button>
-            <Button onClick={handleClearStaged} variant="outline" disabled={loading}>취소</Button>
-          </CardFooter>
-        </Card>
-      )}
+      <Tabs defaultValue="analysis" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="analysis">데이터 조회</TabsTrigger>
+          <TabsTrigger value="management">데이터 관리</TabsTrigger>
+        </TabsList>
 
-      {loading && <div className="text-center py-4">데이터를 처리하는 중...</div>}
+        <TabsContent value="analysis" className="space-y-4">
+          <div className="flex justify-end">
+            <div className="w-[180px]">
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger>
+                  <SelectValue placeholder="연도 선택" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map(year => (
+                    <SelectItem key={year} value={String(year)}>
+                      {year === 'all' ? '전체 연도' : `${year}년`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-      {!loading && combinedTransactions.length === 0 && (
-        <Card>
-          <CardContent className="p-6 text-center">
-            <p className="text-muted-foreground">데이터가 없습니다. 엑셀 파일을 업로드하여 분석을 시작하세요.</p>
-          </CardContent>
-        </Card>
-      )}
+          {loading && <div className="text-center py-4">데이터를 불러오는 중...</div>}
 
-      {!loading && combinedTransactions.length > 0 && filteredTransactions.length === 0 && (
-        <Card>
-            <CardContent className="p-6 text-center">
-              <p className="text-muted-foreground">{selectedYear}년에는 데이터가 없습니다.</p>
+          {!loading && transactions.length === 0 && (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <p className="text-muted-foreground">데이터가 없습니다. '데이터 관리' 탭에서 엑셀 파일을 업로드하여 분석을 시작하세요.</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {!loading && transactions.length > 0 && filteredTransactions.length === 0 && (
+            <Card>
+                <CardContent className="p-6 text-center">
+                  <p className="text-muted-foreground">{selectedYear}년에는 데이터가 없습니다.</p>
+                </CardContent>
+            </Card>
+          )}
+
+          {filteredTransactions.length > 0 && (
+            <>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <SummaryCard title="총 수입" value={summary.totalIncome} />
+                <SummaryCard title="총 지출" value={summary.totalExpense} />
+                <SummaryCard title="순이익" value={netProfit} />
+                <SummaryCard title="총 거래 건수" value={filteredTransactions.length} isCurrency={false} />
+              </div>
+
+              <Tabs defaultValue="categories">
+                <TabsList>
+                  <TabsTrigger value="categories">카테고리별 분석</TabsTrigger>
+                  <TabsTrigger value="monthly">월별 추이</TabsTrigger>
+                </TabsList>
+                <TabsContent value="categories" className="grid gap-4 md:grid-cols-2">
+                  <ChartCard title="지출 카테고리 (상위 5개)">
+                    <CategoryPieChart data={categoryData.expense.slice(0, 5)} />
+                  </ChartCard>
+                  <ChartCard title="수입 카테고리 (상위 5개)">
+                    <CategoryPieChart data={categoryData.income.slice(0, 5)} />
+                  </ChartCard>
+                </TabsContent>
+                <TabsContent value="monthly">
+                  <ChartCard title="월별 수입 및 지출">
+                    <MonthlyLineChart data={monthlyData} />
+                  </ChartCard>
+                </TabsContent>
+              </Tabs>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <TransactionTable title="지출 내역" data={expenseTransactions} showType={false} />
+                <TransactionTable title="수입 내역" data={incomeTransactions} showType={false} />
+              </div>
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="management" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>데이터 관리</CardTitle>
+              <CardDescription>엑셀 파일을 업로드하거나 모든 데이터를 초기화할 수 있습니다.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center space-x-4">
+              <Input id="excel-upload" type="file" accept=".xlsx, .xls" onChange={handleFileChange} ref={fileInputRef} className="max-w-sm" disabled={loading} />
+              <Button onClick={handleClearAllData} variant="destructive" disabled={loading}>모든 데이터 삭제</Button>
             </CardContent>
-        </Card>
-      )}
+            {error && <CardFooter><p className="text-red-500 mt-2">오류: {error}</p></CardFooter>}
+          </Card>
 
-      {filteredTransactions.length > 0 && (
-        <>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <SummaryCard title="총 수입" value={summary.totalIncome} />
-            <SummaryCard title="총 지출" value={summary.totalExpense} />
-            <SummaryCard title="순이익" value={netProfit} />
-            <SummaryCard title="총 거래 건수" value={filteredTransactions.length} isCurrency={false} />
-          </div>
-
-          <Tabs defaultValue="categories">
-            <TabsList>
-              <TabsTrigger value="categories">카테고리별 분석</TabsTrigger>
-              <TabsTrigger value="monthly">월별 추이</TabsTrigger>
-            </TabsList>
-            <TabsContent value="categories" className="grid gap-4 md:grid-cols-2">
-              <ChartCard title="지출 카테고리 (상위 5개)">
-                <CategoryPieChart data={categoryData.expense.slice(0, 5)} />
-              </ChartCard>
-              <ChartCard title="수입 카테고리 (상위 5개)">
-                <CategoryPieChart data={categoryData.income.slice(0, 5)} />
-              </ChartCard>
-            </TabsContent>
-            <TabsContent value="monthly">
-              <ChartCard title="월별 수입 및 지출">
-                <MonthlyLineChart data={monthlyData} />
-              </ChartCard>
-            </TabsContent>
-          </Tabs>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <TransactionTable title="지출 내역" data={expenseTransactions} showType={false} />
-            <TransactionTable title="수입 내역" data={incomeTransactions} showType={false} />
-          </div>
-        </>
-      )}
+          {stagedTransactions.length > 0 && (
+            <Card className="border-blue-500 border-2">
+              <CardHeader>
+                <CardTitle>미리보기 및 저장</CardTitle>
+                <CardDescription>{stagedTransactions.length}개의 새로운 거래 내역을 저장할 준비가 되었습니다. 아래에서 내용을 확인하세요.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TransactionTable title="저장 대기중인 데이터" data={stagedTransactions} />
+              </CardContent>
+              <CardFooter className="flex justify-end space-x-2">
+                <Button onClick={handleSaveStagedTransactions} variant="default" disabled={loading}>저장</Button>
+                <Button onClick={handleClearStaged} variant="outline" disabled={loading}>취소</Button>
+              </CardFooter>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
