@@ -8,7 +8,7 @@ import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 
 export interface ProfitAnalysisData {
@@ -21,7 +21,7 @@ export interface ProfitAnalysisData {
   type: 'income' | 'expense';
 }
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 const TRANSACTIONS_COLLECTION = 'transactions';
 
 const ProfitAnalysis: React.FC = () => {
@@ -420,8 +420,6 @@ const ProfitAnalysis: React.FC = () => {
   );
 };
 
-// --- Helper Components ---
-
 const SummaryCard: React.FC<{ title: string; value: number; isCurrency?: boolean }> = ({ title, value, isCurrency = true }) => (
   <Card>
     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -438,32 +436,79 @@ const SummaryCard: React.FC<{ title: string; value: number; isCurrency?: boolean
 const ChartCard: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
   <Card>
     <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
-    <CardContent>
-      <ResponsiveContainer width="100%" height={300}>{children}</ResponsiveContainer>
+    <CardContent className="h-[300px]">
+      {children}
     </CardContent>
   </Card>
 );
 
-const CategoryPieChart: React.FC<{ data: { name: string; value: number }[] }> = ({ data }) => (
-  <PieChart>
-    <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} fill="#8884d8" label>
-      {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-    </Pie>
-    <Tooltip formatter={(value) => `${new Intl.NumberFormat('ko-KR').format(value as number)} 원`} />
-    <Legend />
-  </PieChart>
-);
+const CategoryPieChart: React.FC<{ data: { name: string; value: number }[] }> = ({ data }) => {
+  const total = useMemo(() => data.reduce((sum, entry) => sum + entry.value, 0), [data]);
+
+  return (
+    <div className="w-full h-full flex items-center justify-between">
+      <div className="w-1/2 h-full relative">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius="60%"
+              outerRadius="80%"
+              fill="#8884d8"
+              paddingAngle={5}
+              dataKey="value"
+              labelLine={false}
+            >
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              ))}
+            </Pie>
+            <Tooltip formatter={(value) => `${new Intl.NumberFormat('ko-KR').format(value as number)} 원`} />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+          <p className="text-sm text-muted-foreground">총계</p>
+          <p className="text-xl font-bold">
+            {new Intl.NumberFormat('ko-KR', {
+              style: 'currency',
+              currency: 'KRW',
+              maximumFractionDigits: 0,
+            }).format(total)}
+          </p>
+        </div>
+      </div>
+      <div className="w-1/2 pr-4 flex flex-col justify-center space-y-2">
+        {data.map((entry, index) => (
+          <div key={`legend-${index}`} className="flex items-center text-sm">
+            <span
+              className="w-3 h-3 rounded-full mr-2"
+              style={{ backgroundColor: COLORS[index % COLORS.length] }}
+            />
+            <span className="flex-1 truncate" title={entry.name}>{entry.name}</span>
+            <span className="font-semibold ml-2">
+              {`${((entry.value / total) * 100).toFixed(1)}%`}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 
 const MonthlyLineChart: React.FC<{ data: { month: string; income: number; expense: number }[] }> = ({ data }) => (
-  <LineChart data={data}>
-    <CartesianGrid strokeDasharray="3 3" />
-    <XAxis dataKey="month" />
-    <YAxis tickFormatter={(value) => new Intl.NumberFormat('ko-KR').format(value as number)} />
-    <Tooltip formatter={(value) => new Intl.NumberFormat('ko-KR').format(value as number)} />
-    <Legend />
-    <Line type="monotone" dataKey="income" stroke="#82ca9d" name="수입" strokeWidth={2} />
-    <Line type="monotone" dataKey="expense" stroke="#ff8042" name="지출" strokeWidth={2} />
-  </LineChart>
+  <ResponsiveContainer width="100%" height={300}>
+    <LineChart data={data}>
+      <CartesianGrid strokeDasharray="3 3" />
+      <XAxis dataKey="month" />
+      <YAxis tickFormatter={(value) => new Intl.NumberFormat('ko-KR').format(value as number)} />
+      <Tooltip formatter={(value) => new Intl.NumberFormat('ko-KR').format(value as number)} />
+      <Line type="monotone" dataKey="income" stroke="#82ca9d" name="수입" strokeWidth={2} />
+      <Line type="monotone" dataKey="expense" stroke="#ff8042" name="지출" strokeWidth={2} />
+    </LineChart>
+  </ResponsiveContainer>
 );
 
 const TransactionTable: React.FC<{ title: string, data: ProfitAnalysisData[], showType?: boolean }> = ({ title, data, showType = true }) => (
