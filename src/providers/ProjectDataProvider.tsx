@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
 import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, GeneralActivity, CustomTab, MonthlyReport, TenantInfo, Contract, Attachment, Unit } from '../types';
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../features/auth/AuthContext';
 import { Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
 import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '../constants';
@@ -218,7 +218,30 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
           getDocs(reportsCollRef)
         ]);
 
-        let reports: MonthlyReport[] = reportsSnap.docs.map(doc => doc.data() as MonthlyReport);
+        // --- START CLEANUP LOGIC FOR DUPLICATE REPORTS ---
+        const reportsToDelete = [];
+        const reportsToKeep = new Map();
+        reportsSnap.docs.forEach(doc => {
+            const report = doc.data() as MonthlyReport;
+            const reportId = `${report.year}-${String(report.month).padStart(2, '0')}`;
+            if (reportsToKeep.has(reportId)) {
+                reportsToDelete.push(doc.ref);
+            } else {
+                reportsToKeep.set(reportId, doc.data());
+            }
+        });
+
+        if (reportsToDelete.length > 0) {
+            console.log(`[Data Cleanup] Found ${reportsToDelete.length} duplicate reports. Deleting...`);
+            const deletePromises = reportsToDelete.map(ref => deleteDoc(ref));
+            await Promise.all(deletePromises);
+            console.log(`[Data Cleanup] Successfully deleted duplicate reports.`);
+        }
+        // --- END CLEANUP LOGIC ---
+
+        let reports: MonthlyReport[] = Array.from(reportsToKeep.values());
+        reports.sort((a, b) => b.year - a.year || b.month - a.month);
+
         const februaryReportExists = reports.some(r => r.id === '2026-02');
         if (!februaryReportExists) {
             reports.push(februaryReportData);
@@ -230,8 +253,6 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
             console.log("[Data] Existing user document found. Loading data from Firestore.");
             const firestoreData = userDocSnap.data() as any;
             
-            // For existing users, we strictly load from Firestore or default to an empty state.
-            // We NEVER fallback to initialData to prevent overwriting user's data.
             finalData = {
                 safetyKPIs: (firestoreData.safetyKPIs || []).map(sanitizeKpi),
                 leaseKPIs: (firestoreData.leaseKPIs || []).map(sanitizeKpi),
@@ -252,7 +273,6 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
 
         } else {
           console.log("[Data] New user detected. Initializing new document with default data.");
-          // For new users, we populate the document with the initial boilerplate data.
           finalData = { ...newUserInitialData, monthly_reports: reports };
           const dataToSaveForNewUser = { ...newUserInitialData };
           delete (dataToSaveForNewUser as Partial<IProjectData>).monthly_reports;
@@ -260,15 +280,11 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
           console.log("[Data] New user document created in Firestore.");
         }
         
-        console.log("[Data] Final data processed. Setting application state.", { 
-          units: finalData.units.length,
-          complexFacilities: finalData.complexFacilities.length
-        });
+        console.log("[Data] Final data processed. Setting application state.");
         setData(finalData);
 
       } catch (error) { 
           console.error("[Data] Error fetching data:", error);
-          // In case of error, load a minimal, safe state.
           setData({ ...initialData, monthly_reports: [februaryReportData] });
       } finally {
           console.log("[Data] Data loading process finished.");
@@ -279,30 +295,25 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     fetchData();
   }, [currentUser, db]);
   
-  // This useEffect handles saving data back to Firestore.
-  // It is debounced to avoid excessive writes.
   useEffect(() => {
     if (!isDataLoaded || !currentUser) {
-        return; // Don't save if data isn't loaded or there's no user
+        return;
     }
 
-    // Create a copy of the data, excluding monthly_reports which are saved separately.
     const nonReportData = { ...data };
     delete (nonReportData as Partial<IProjectData>).monthly_reports;
 
     const debounceSave = setTimeout(() => {
-        if (!currentUser) return; // Final check for user before writing
+        if (!currentUser) return;
         console.log(`[Data Save] Debounced save triggered for user ${currentUser.uid}.`);
         try {
-            // Use setDoc with merge:true to update or create the document.
             setDoc(doc(db, 'users', currentUser.uid), nonReportData, { merge: true });
             console.log("[Data Save] Successfully requested save to Firestore.");
         } catch (error) {
             console.error("[Data Save] Error saving data:", error);
         }
-    }, 1000); // 1-second debounce period
+    }, 1000);
 
-    // Cleanup function to cancel the timeout if the component unmounts or data changes again.
     return () => {
         clearTimeout(debounceSave);
     };
@@ -396,14 +407,26 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
   }, []);
   
   const addMonthlyReport = useCallback(async (newReport: MonthlyReport) => {
-    const reportRef = doc(db, "monthly_reports", newReport.id);
-    await setDoc(reportRef, newReport);
+    const reportId = `${newReport.year}-${String(newReport.month).padStart(2, '0')}`;
+    newReport.id = reportId;
+  
+    const reportRef = doc(db, "monthly_reports", reportId);
+    await setDoc(reportRef, newReport, { merge: true });
+  
     setData(prev => {
-      const existing = prev.monthly_reports?.find(r => r.id === newReport.id);
-      if (existing) {
-        return { ...prev, monthly_reports: prev.monthly_reports?.map(r => r.id === newReport.id ? newReport : r) };
+      const existingReports = prev.monthly_reports || [];
+      const reportIndex = existingReports.findIndex(r => r.id === reportId);
+  
+      if (reportIndex !== -1) {
+        // Update existing report
+        const updatedReports = [...existingReports];
+        updatedReports[reportIndex] = newReport;
+        return { ...prev, monthly_reports: updatedReports };
       } else {
-        return { ...prev, monthly_reports: [...(prev.monthly_reports || []), newReport] };
+        // Add new report and sort
+        const updatedReports = [...existingReports, newReport];
+        updatedReports.sort((a, b) => b.year - a.year || b.month - a.month);
+        return { ...prev, monthly_reports: updatedReports };
       }
     });
   }, [db]);

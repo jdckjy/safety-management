@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 
 export interface ProfitAnalysisData {
   id?: string;
@@ -29,10 +30,30 @@ const ProfitAnalysis: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedYear, setSelectedYear] = useState<string>('all');
 
   const combinedTransactions = useMemo(() => {
     return [...transactions, ...stagedTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [transactions, stagedTransactions]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set(combinedTransactions.map(t => new Date(t.date).getFullYear()));
+    return ['all', ...Array.from(years).sort((a, b) => b - a)];
+  }, [combinedTransactions]);
+
+  const filteredTransactions = useMemo(() => {
+    if (selectedYear === 'all') {
+      return combinedTransactions;
+    }
+    const year = parseInt(selectedYear, 10);
+    return combinedTransactions.filter(t => !isNaN(year) && new Date(t.date).getFullYear() === year);
+  }, [combinedTransactions, selectedYear]);
+
+  const { incomeTransactions, expenseTransactions } = useMemo(() => {
+    const income = filteredTransactions.filter(t => t.type === 'income');
+    const expense = filteredTransactions.filter(t => t.type === 'expense');
+    return { incomeTransactions: income, expenseTransactions: expense };
+  }, [filteredTransactions]);
 
   const fetchTransactions = async () => {
     setLoading(true);
@@ -101,7 +122,7 @@ const ProfitAnalysis: React.FC = () => {
               amount: isNaN(amount) ? 0 : amount,
               type: type,
             };
-          }).filter(item => item.amount !== 0);
+          }).filter(item => item.amount !== 0 && item.category && item.category.trim() !== '');
 
           const newItems = processedData.filter(newItem =>
             !transactions.some(existingItem =>
@@ -189,17 +210,17 @@ const ProfitAnalysis: React.FC = () => {
   };
 
   const summary = useMemo(() => {
-    return combinedTransactions.reduce((acc, curr) => {
+    return filteredTransactions.reduce((acc, curr) => {
       if (curr.type === 'income') acc.totalIncome += curr.amount;
       else acc.totalExpense += curr.amount;
       return acc;
     }, { totalIncome: 0, totalExpense: 0 });
-  }, [combinedTransactions]);
+  }, [filteredTransactions]);
 
   const netProfit = summary.totalIncome - summary.totalExpense;
 
   const categoryData = useMemo(() => {
-     const data = combinedTransactions.reduce((acc, curr) => {
+     const data = filteredTransactions.reduce((acc, curr) => {
       const { category, amount, type } = curr;
       if (!acc[type][category]) {
         acc[type][category] = 0;
@@ -212,10 +233,10 @@ const ProfitAnalysis: React.FC = () => {
       income: Object.entries(data.income).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value),
       expense: Object.entries(data.expense).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value),
     };
-  }, [combinedTransactions]);
+  }, [filteredTransactions]);
 
   const monthlyData = useMemo(() => {
-    const data = combinedTransactions.reduce((acc, curr) => {
+    const data = filteredTransactions.reduce((acc, curr) => {
       const month = new Date(curr.date).toISOString().slice(0, 7);
       if (!acc[month]) {
         acc[month] = { month, income: 0, expense: 0 };
@@ -225,13 +246,29 @@ const ProfitAnalysis: React.FC = () => {
       return acc;
     }, {} as Record<string, { month: string; income: number; expense: number }>);
     return Object.values(data).sort((a, b) => a.month.localeCompare(b.month));
-  }, [combinedTransactions]);
+  }, [filteredTransactions]);
 
   return (
     <div className="container mx-auto p-4 space-y-8">
-      <header>
-        <h1 className="text-3xl font-bold mb-2">수익 분석 대시보드</h1>
-        <p className="text-muted-foreground">엑셀 파일을 업로드하여 수입/지출 내역을 분석하고 관리하세요.</p>
+      <header className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">수익 분석 대시보드</h1>
+          <p className="text-muted-foreground">엑셀 파일을 업로드하여 수입/지출 내역을 분석하고 관리하세요.</p>
+        </div>
+        <div className="w-[180px]">
+          <Select value={selectedYear} onValueChange={setSelectedYear}>
+            <SelectTrigger>
+              <SelectValue placeholder="연도 선택" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableYears.map(year => (
+                <SelectItem key={year} value={String(year)}>
+                  {year === 'all' ? '전체 연도' : `${year}년`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </header>
       
       <Card>
@@ -272,13 +309,21 @@ const ProfitAnalysis: React.FC = () => {
         </Card>
       )}
 
-      {combinedTransactions.length > 0 && (
+      {!loading && combinedTransactions.length > 0 && filteredTransactions.length === 0 && (
+        <Card>
+            <CardContent className="p-6 text-center">
+              <p className="text-muted-foreground">{selectedYear}년에는 데이터가 없습니다.</p>
+            </CardContent>
+        </Card>
+      )}
+
+      {filteredTransactions.length > 0 && (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <SummaryCard title="총 수입" value={summary.totalIncome} />
             <SummaryCard title="총 지출" value={summary.totalExpense} />
             <SummaryCard title="순이익" value={netProfit} />
-            <SummaryCard title="총 거래 건수" value={combinedTransactions.length} isCurrency={false} />
+            <SummaryCard title="총 거래 건수" value={filteredTransactions.length} isCurrency={false} />
           </div>
 
           <Tabs defaultValue="categories">
@@ -301,7 +346,10 @@ const ProfitAnalysis: React.FC = () => {
             </TabsContent>
           </Tabs>
 
-          <TransactionTable title="전체 거래 내역" data={combinedTransactions} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <TransactionTable title="지출 내역" data={expenseTransactions} showType={false} />
+            <TransactionTable title="수입 내역" data={incomeTransactions} showType={false} />
+          </div>
         </>
       )}
     </div>
@@ -354,7 +402,7 @@ const MonthlyLineChart: React.FC<{ data: { month: string; income: number; expens
   </LineChart>
 );
 
-const TransactionTable: React.FC<{ title: string, data: ProfitAnalysisData[] }> = ({ title, data }) => (
+const TransactionTable: React.FC<{ title: string, data: ProfitAnalysisData[], showType?: boolean }> = ({ title, data, showType = true }) => (
     <Card>
         <CardHeader>
             <CardTitle>{title}</CardTitle>
@@ -365,7 +413,7 @@ const TransactionTable: React.FC<{ title: string, data: ProfitAnalysisData[] }> 
                     <TableHeader>
                         <TableRow>
                             <TableHead>일자</TableHead>
-                            <TableHead>유형</TableHead>
+                            {showType && <TableHead>유형</TableHead>}
                             <TableHead>카테고리</TableHead>
                             <TableHead>거래처</TableHead>
                             <TableHead>내용</TableHead>
@@ -376,11 +424,13 @@ const TransactionTable: React.FC<{ title: string, data: ProfitAnalysisData[] }> 
                         {data.length > 0 ? data.map((t, index) => (
                             <TableRow key={t.id || `staged-${index}`}>
                                 <TableCell>{new Date(t.date).toLocaleDateString()}</TableCell>
-                                <TableCell>
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${t.type === 'income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                        {t.type === 'income' ? '수입' : '지출'}
-                                    </span>
-                                </TableCell>
+                                {showType && 
+                                    <TableCell>
+                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${t.type === 'income' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                            {t.type === 'income' ? '수입' : '지출'}
+                                        </span>
+                                    </TableCell>
+                                }
                                 <TableCell>{t.category}</TableCell>
                                 <TableCell>{t.client}</TableCell>
                                 <TableCell>{t.description}</TableCell>
@@ -388,7 +438,7 @@ const TransactionTable: React.FC<{ title: string, data: ProfitAnalysisData[] }> 
                             </TableRow>
                         )) : (
                             <TableRow>
-                                <TableCell colSpan={6} className="text-center">표시할 데이터가 없습니다.</TableCell>
+                                <TableCell colSpan={showType ? 6 : 5} className="text-center">표시할 데이터가 없습니다.</TableCell>
                             </TableRow>
                         )}
                     </TableBody>
