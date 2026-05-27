@@ -1,13 +1,16 @@
 
 import React, { useState, useCallback } from 'react';
-import { useProjectData } from '@/providers/ProjectDataProvider';
+import { db } from '../../firebase'; // Firebase 'db' 인스턴스 가져오기
+import { collection, query, where, getDocs, addDoc, updateDoc, serverTimestamp } from 'firebase/firestore'; // Firestore 함수 가져오기
 import { UploadCloud, FileCheck2, AlertTriangle, Loader2, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import * as pdfjsLib from 'pdfjs-dist';
-import type { RenderParameters } from 'pdfjs-dist/types/src/display/api';
+import type { PDFDocumentProxy, RenderParameters, TextItem } from 'pdfjs-dist/types/src/display/api';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+
+// ... (ExtractedData, PdfItem 인터페이스는 이전과 동일) ...
 
 interface ExtractedData {
   electricity: {
@@ -56,26 +59,76 @@ interface ExtractedData {
   grand_total: number | null;
 }
 
+interface PdfItem extends TextItem {
+  str: string;
+  transform: number[];
+  text: string;
+  x: number;
+  y: number;
+  textUnspaced: string;
+}
+
+const findBillingMonth = async (pdf: PDFDocumentProxy): Promise<string> => {
+  const page = await pdf.getPage(1);
+  const textContent = await page.getTextContent();
+  const pageText = textContent.items.map((item: any) => item.str).join(' ');
+  const regex = /과업수행\s*보고서.*\[\s*(\d{4})\s*년\s*(\d{1,2})\s*월\s*\]/;
+  const match = pageText.match(regex);
+
+  if (match && match[1] && match[2]) {
+    const year = match[1];
+    const month = match[2];
+    return `${year}-${month.padStart(2, '0')}`;
+  }
+
+  const pageTextUnspaced = textContent.items.map((item: any) => item.str.replace(/\s/g, '')).join('');
+  const regexUnspaced = /과업수행보고서.*\[(\d{4})년(\d{1,2})월\]/;
+  const matchUnspaced = pageTextUnspaced.match(regexUnspaced);
+
+  if (matchUnspaced && matchUnspaced[1] && matchUnspaced[2]) {
+    const year = matchUnspaced[1];
+    const month = matchUnspaced[2];
+    return `${year}-${month.padStart(2, '0')}`;
+  }
+
+  throw new Error("1페이지의 '과업수행 보고서 [...] '에서 'YYYY년 MM월' 형식의 날짜를 찾을 수 없습니다.");
+};
+
+
 const OmsUploader: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
+  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
 
-  const renderPdfPages = useCallback(async (selectedFile: File) => {
-    setIsProcessing(true);
+
+  const resetState = useCallback(() => {
+    setFile(null);
     setError(null);
     setExtractedData(null);
     setImageUrls([]);
+    setPdfDoc(null);
+    setIsProcessing(false);
+    setIsSaving(false);
+  }, []);
+
+  const renderPdfPages = useCallback(async (selectedFile: File) => {
+    resetState();
+    setIsProcessing(true);
 
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
       const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+      setPdfDoc(pdf);
+
       const dataPage = await pdf.getPage(6);
       const textContent = await dataPage.getTextContent();
       
-      const items = textContent.items.map((item: any) => ({
+      const items: PdfItem[] = textContent.items.map((item: any) => ({
+        ...item,
         text: item.str.replace(/\s+/g, ' ').trim(),
         x: item.transform[4],
         y: item.transform[5],
@@ -92,7 +145,7 @@ const OmsUploader: React.FC = () => {
       };
       
       const findValue = (
-        block: any[],
+        block: PdfItem[],
         labelKeyword: RegExp,
         options: { yTolerance?: number, xConstraint?: boolean, closestToLabel?: boolean, useUnspaced?: boolean } = {}
       ) => {
@@ -214,7 +267,7 @@ const OmsUploader: React.FC = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, []);
+  }, [resetState]);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -224,12 +277,49 @@ const OmsUploader: React.FC = () => {
     }
   }, [renderPdfPages]);
   
-  const handleSaveData = () => {
-    if (extractedData) {
-      console.log("Saving data:", extractedData);
-      alert("데이터 저장 로직은 새로운 구조에 맞게 별도 수정이 필요합니다. 현재 데이터는 콘솔에만 출력됩니다.");
+  const handleSaveData = useCallback(async () => {
+    if (!extractedData || !pdfDoc) return;
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      const billingMonth = await findBillingMonth(pdfDoc);
+      
+      const utilityBillsRef = collection(db, "utility-bills");
+      const q = query(utilityBillsRef, where("billingMonth", "==", billingMonth));
+      
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        // Add new document
+        const payload = {
+          billingMonth,
+          ...extractedData,
+          createdAt: serverTimestamp(),
+        };
+        await addDoc(utilityBillsRef, payload);
+        alert('데이터가 성공적으로 저장되었습니다.');
+      } else {
+        // Update existing document
+        const docToUpdate = querySnapshot.docs[0];
+        const payload = {
+          billingMonth,
+          ...extractedData,
+          updatedAt: serverTimestamp(),
+        };
+        await updateDoc(docToUpdate.ref, payload);
+        alert(`기존 ${billingMonth}월의 데이터를 성공적으로 업데이트했습니다.`);
+      }
+
+      resetState();
+
+    } catch (e: any) {
+      console.error(e);
+      setError(e.message || '데이터 저장/업데이트 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
     }
-  };
+  }, [extractedData, pdfDoc, resetState]);
 
   return (
     <div className="p-4 bg-white rounded-lg shadow-md space-y-6">
@@ -249,9 +339,18 @@ const OmsUploader: React.FC = () => {
             </div>
 
             <div className="mt-8">
-              <Button onClick={handleSaveData} size="lg">
-                <Save className="mr-2 h-5 w-5" />
-                데이터 저장하기
+              <Button onClick={handleSaveData} size="lg" disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    저장 중...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-5 w-5" />
+                    데이터 저장하기
+                  </>
+                )}
               </Button>
             </div>
              <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 border p-4 rounded-lg bg-gray-50">
@@ -265,30 +364,39 @@ const OmsUploader: React.FC = () => {
           </>
         ) : (
           <>
-            <UploadCloud className="mx-auto h-16 w-16 text-gray-300" />
-            <h2 className="mt-4 text-2xl font-bold text-gray-800">월간 보고서 자동화</h2>
-            <p className="mt-2 text-sm text-gray-500">PDF 파일을 선택하여 데이터를 자동으로 추출하세요.</p>
-            <div className="mt-8">
-              <label htmlFor="file-upload" className="cursor-pointer inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-full shadow-sm bg-white text-gray-700 hover:bg-gray-50 transition-colors">
-                <FileCheck2 className="-ml-1 mr-2 h-5 w-5" />
-                보고서 PDF 파일 선택
-              </label>
-              <input
-                id="file-upload"
-                type="file"
-                className="sr-only"
-                accept=".pdf"
-                onChange={handleFileChange}
-              />
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <UploadCloud className="mx-auto h-16 w-16 text-gray-300" />
+                <h2 className="mt-4 text-2xl font-bold text-gray-800">월간 보고서 자동화</h2>
+                <p className="mt-2 text-sm text-gray-500">PDF 파일을 선택하여 데이터를 자동으로 추출하세요.</p>
+                <div className="mt-8">
+                  <label htmlFor="file-upload" className="cursor-pointer inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-full shadow-sm bg-white text-gray-700 hover:bg-gray-50 transition-colors">
+                    <FileCheck2 className="-ml-1 mr-2 h-5 w-5" />
+                    보고서 PDF 파일 선택
+                  </label>
+                  <input
+                    id="file-upload"
+                    type="file"
+                    className="sr-only"
+                    accept=".pdf"
+                    onChange={handleFileChange}
+                  />
+                </div>
+              </div>
             </div>
           </>
         )}
 
         {error && (
-          <p className="mt-4 text-sm font-semibold text-red-600 flex items-center justify-center">
-            <AlertTriangle className="h-5 w-5 mr-2" />
-            {error}
-          </p>
+          <div className="mt-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            <div className="flex">
+              <div className="py-1"><AlertTriangle className="h-5 w-5 mr-3" /></div>
+              <div>
+                <p className="font-bold">오류 발생</p>
+                <p className="text-sm">{error}</p>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
