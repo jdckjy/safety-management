@@ -1,51 +1,62 @@
 
 import React, { useState, useCallback } from 'react';
 import { useProjectData } from '@/providers/ProjectDataProvider';
-import { MonthlyReport } from '@/types';
 import { UploadCloud, FileCheck2, AlertTriangle, Loader2, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import * as pdfjsLib from 'pdfjs-dist';
+import type { RenderParameters } from 'pdfjs-dist/types/src/display/api';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
-// Final data structure matching the user's exact request
 interface ExtractedData {
-  electricityUsage: {
-    lowPeakKwh: number;
-    midPeakKwh: number;
-    onPeakKwh: number; // Corresponds to user's "peakDemandKw", which is a usage value
-    totalKwh: number;
+  electricity: {
+    usage: {
+      light_load: number | null;
+      medium_load: number | null;
+      max_load: number | null;
+      total_usage: number | null;
+    };
+    charges: {
+      base_charge: number | null;
+      usage_charge: number | null;
+      climate_environment_charge: number | null;
+      fuel_cost_adjustment: number | null;
+      power_factor_charge: number | null;
+      subtotal: number | null;
+      vat: number | null;
+      power_industry_fund: number | null;
+      round_off: number | null;
+    };
+    total_billed_amount: number | null;
   };
-  electricityCharges: {
-    basicCharge: number;
-    energyCharge: number;
-    climateCharge: number;
-    fuelCostAdjustment: number;
-    powerfactorCharge: number;
-    subtotal: number;
-    vat: number;
-    fund: number;
-    truncatedWon: number;
-    totalCharge: number;
+  water: {
+    general: {
+      usage_m3: number | null;
+      base_charge: number | null;
+      water_supply_charge: number | null;
+      sewerage_charge: number | null;
+      sewage_reduction: number | null;
+      total_charge: number | null;
+    };
+    fire_hydrant: {
+      usage_m3: number | null;
+      base_charge: number | null;
+      water_supply_charge: number | null;
+      sewerage_charge: number | null;
+      total_charge: number | null;
+    };
   };
-  waterCharge: {
-    generalUsage: number;
-    generalbasicCharge: number;
-    watersupplyCharge: number;
-    sewerageCharge: number;
-    reclaimedwaterDiscount: number;
-    generalSubtotal: number;
+  gas: {
+    meter_reading_m3: number | null;
+    usage_m3: number | null;
+    unit_price: number | null;
+    usage_charge: number | null;
   };
-  gasCharge: {
-    gasUsage: number;
-    gastotalCharge: number;
-  };
-  grandTotal: number;
+  grand_total: number | null;
 }
 
 const OmsUploader: React.FC = () => {
-  const { addMonthlyReport } = useProjectData();
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -56,6 +67,7 @@ const OmsUploader: React.FC = () => {
     setIsProcessing(true);
     setError(null);
     setExtractedData(null);
+    setImageUrls([]);
 
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
@@ -64,98 +76,112 @@ const OmsUploader: React.FC = () => {
       const textContent = await dataPage.getTextContent();
       
       const items = textContent.items.map((item: any) => ({
-        str: item.str.trim(),
-        y: item.transform[5],
+        text: item.str.replace(/\s+/g, ' ').trim(),
         x: item.transform[4],
-      })).sort((a, b) => {
-        if (Math.abs(a.y - b.y) > 2) return b.y - a.y;
-        return a.x - b.x;
-      });
+        y: item.transform[5],
+        textUnspaced: item.str.replace(/\s/g, ''),
+      }));
 
-      const parseNumericValue = (text: string | undefined) => {
-        if (!text) return 0;
-        return parseInt(text.replace(/[,원]/g, ''), 10) || 0;
+      const CURRENT_MONTH_X_START = 340;
+      const CURRENT_MONTH_X_END = 450;
+
+      const parseNumericValue = (text: string | null | undefined): number | null => {
+        if (!text || text.trim() === '-' || text.trim() === '') return null;
+        const num = parseFloat(text.replace(/,/g, ''));
+        return isNaN(num) ? null : num;
       };
-
+      
       const findValue = (
-        items: any[],
-        options: {
-          keyword: string;
-          order?: number;
-          yTolerance?: number;
-          section?: { start: string; end: string };
-          reference?: string;
-        }
+        block: any[],
+        labelKeyword: RegExp,
+        options: { yTolerance?: number, xConstraint?: boolean, closestToLabel?: boolean, useUnspaced?: boolean } = {}
       ) => {
-        const { keyword, order = 1, yTolerance = 5, section, reference } = options;
+        const { yTolerance = 5, xConstraint = true, closestToLabel = false, useUnspaced = false } = options;
 
-        let searchItems = items;
+        const labelItem = block.find(item => labelKeyword.test(useUnspaced ? item.textUnspaced : item.text));
+        if (!labelItem) return null;
 
-        if (section) {
-          const startItem = items.find(it => it.str.includes(section.start));
-          const endItem = items.find(it => it.str.includes(section.end));
-          if (startItem && endItem) {
-            searchItems = items.filter(it => it.y <= startItem.y && it.y >= endItem.y);
-          } else {
-            searchItems = []; 
-          }
-        }
+        let potentialValues = block.filter(it => 
+            Math.abs(it.y - labelItem.y) < yTolerance &&
+            /^[\d,.-]+$/.test(it.text) &&
+            it.text !== labelItem.text
+        );
         
-        let keywordItems = searchItems.filter(it => it.str.includes(keyword));
-
-        if (reference && keywordItems.length > 1) {
-            const refItem = searchItems.find(it => it.str.includes(reference));
-            if (refItem) {
-                keywordItems.sort((a,b) => Math.abs(a.y - refItem.y) - Math.abs(b.y - refItem.y));
-            }
+        if (xConstraint) {
+            potentialValues = potentialValues.filter(it => it.x >= CURRENT_MONTH_X_START && it.x < CURRENT_MONTH_X_END);
         }
 
-        const keywordItem = keywordItems[0];
-        if (!keywordItem) return undefined;
+        if (closestToLabel) {
+            potentialValues = potentialValues.filter(it => it.x > labelItem.x);
+        }
 
-        const numericItemsOnRow = items
-          .filter(it => 
-            Math.abs(it.y - keywordItem.y) < yTolerance &&
-            it.x > keywordItem.x &&
-            /^[\d,.-]+$/.test(it.str)
-          )
-          .sort((a, b) => a.x - b.x);
-          
-        return numericItemsOnRow[order - 1]?.str;
+        if (potentialValues.length === 0) return null;
+
+        potentialValues.sort((a,b) => a.x - b.x);
+        
+        return potentialValues[0]?.text || null;
       };
+
+      const elecTotalRow = items.find(it => /^청구금액$/.test(it.textUnspaced));
+      const waterGeneralTotalRow = items.find(it => /일반용.*합계/.test(it.textUnspaced));
+      const waterHydrantTotalRow = items.find(it => /소화전.*합계/.test(it.textUnspaced));
+      const grandTotalRow = items.find(it => /^총합계$/.test(it.textUnspaced));
+
+      const y1 = elecTotalRow?.y ?? 0;
+      const y2 = waterGeneralTotalRow?.y ?? 0;
+      const y3 = waterHydrantTotalRow?.y ?? 0;
+      const y4 = grandTotalRow?.y ?? 0;
+
+      const electricityBlock = items.filter(it => it.y > y1);
+      const waterGeneralBlock = items.filter(it => it.y < y1 && it.y > y2);
+      const waterFireHydrantBlock = items.filter(it => it.y < y2 && it.y > y3);
+      const gasBlock = items.filter(it => it.y < y3 && it.y > y4);
 
       const data: ExtractedData = {
-        electricityUsage: {
-          lowPeakKwh: parseNumericValue(findValue(items, { keyword: '경부하' })),
-          midPeakKwh: parseNumericValue(findValue(items, { keyword: '중간부하' })),
-          onPeakKwh: parseNumericValue(findValue(items, { keyword: '최대부하' })),
-          totalKwh: parseNumericValue(findValue(items, { keyword: '총사용량', section: {start: '전기', end: '전기요금계'} })),
+        electricity: {
+          usage: {
+            light_load: parseNumericValue(findValue(electricityBlock, /^경부하$/)),
+            medium_load: parseNumericValue(findValue(electricityBlock, /^중간부하$/)),
+            max_load: parseNumericValue(findValue(electricityBlock, /^최대부하$/)),
+            total_usage: parseNumericValue(findValue(electricityBlock, /^총사용량$/)),
+          },
+          charges: {
+            base_charge: parseNumericValue(findValue(electricityBlock, /^기본요금$/)),
+            usage_charge: parseNumericValue(findValue(electricityBlock, /^전력량요금$/)),
+            climate_environment_charge: parseNumericValue(findValue(electricityBlock, /^기후환경요금$/)),
+            fuel_cost_adjustment: parseNumericValue(findValue(electricityBlock, /^연료비조정액$/)),
+            power_factor_charge: parseNumericValue(findValue(electricityBlock, /^역률요금$/)),
+            subtotal: parseNumericValue(findValue(items, /^전기요금계$/, { xConstraint: false, closestToLabel: true, yTolerance: 10, useUnspaced: true })),
+            vat: parseNumericValue(findValue(electricityBlock, /^부가가치세$/)),
+            power_industry_fund: parseNumericValue(findValue(electricityBlock, /^전력기금$/)),
+            round_off: parseNumericValue(findValue(electricityBlock, /^원단위절사$/)),
+          },
+          total_billed_amount: parseNumericValue(findValue(items, /^청구금액$/, { xConstraint: false, closestToLabel: true, yTolerance: 5, useUnspaced: true })),
         },
-        electricityCharges: {
-          basicCharge: parseNumericValue(findValue(items, { keyword: '기본요금', section: {start: '전기요금계', end: '청구금액'} })),
-          energyCharge: parseNumericValue(findValue(items, { keyword: '전력량요금' })),
-          climateCharge: parseNumericValue(findValue(items, { keyword: '기후환경요금' })),
-          fuelCostAdjustment: parseNumericValue(findValue(items, { keyword: '연료비조정액' })),
-          powerfactorCharge: parseNumericValue(findValue(items, { keyword: '역률요금' })),
-          subtotal: parseNumericValue(findValue(items, { keyword: '전기요금계' })),
-          vat: parseNumericValue(findValue(items, { keyword: '부가가치세' })),
-          fund: parseNumericValue(findValue(items, { keyword: '전력기금' })),
-          truncatedWon: parseNumericValue(findValue(items, { keyword: '원단위절사' })),
-          totalCharge: parseNumericValue(findValue(items, { keyword: '청구금액', section: {start: '전기', end: '수도'} })),
+        water: {
+          general: {
+            usage_m3: parseNumericValue(findValue(waterGeneralBlock, /^사용량\(m/, { useUnspaced: true })),
+            base_charge: parseNumericValue(findValue(waterGeneralBlock, /^기본요금$/)),
+            water_supply_charge: parseNumericValue(findValue(waterGeneralBlock, /^상수도요금$/)),
+            sewerage_charge: parseNumericValue(findValue(waterGeneralBlock, /^하수도요금$/)),
+            sewage_reduction: parseNumericValue(findValue(waterGeneralBlock, /^중수도감면$/)),
+            total_charge: parseNumericValue(findValue(items, /일반용.*합계/, { xConstraint: false, closestToLabel: true, yTolerance: 10, useUnspaced: true })),
+          },
+          fire_hydrant: {
+            usage_m3: parseNumericValue(findValue(waterFireHydrantBlock, /^사용량\(m/, { useUnspaced: true })),
+            base_charge: parseNumericValue(findValue(waterFireHydrantBlock, /^기본요금$/, { useUnspaced: true })),
+            water_supply_charge: parseNumericValue(findValue(waterFireHydrantBlock, /^상수도요금$/, { useUnspaced: true })),
+            sewerage_charge: parseNumericValue(findValue(waterFireHydrantBlock, /^하수도요금$/, { useUnspaced: true })),
+            total_charge: parseNumericValue(findValue(items, /소화전.*합계/, { xConstraint: false, closestToLabel: true, yTolerance: 10, useUnspaced: true })),
+          }
         },
-        waterCharge: {
-            generalUsage: parseNumericValue(findValue(items, { keyword: '사용량', section: {start: '수도', end: '가스'}, reference: '일반용'})),
-            generalbasicCharge: parseNumericValue(findValue(items, { keyword: '기본요금', section: {start: '수도', end: '가스'}, reference: '일반용'})),
-            watersupplyCharge: parseNumericValue(findValue(items, { keyword: '상수도요금' })),
-            sewerageCharge: parseNumericValue(findValue(items, { keyword: '하수도요금' })),
-            reclaimedwaterDiscount: parseNumericValue(findValue(items, { keyword: '물이용부담금' })),
-            generalSubtotal: parseNumericValue(findValue(items, { keyword: '합계', section: {start: '수도', end: '소화전'}, reference: '일반용'})),
+        gas: {
+          meter_reading_m3: parseNumericValue(findValue(gasBlock, /^검침\(m/, { useUnspaced: true })),
+          usage_m3: parseNumericValue(findValue(gasBlock, /^사용량\(m/, { useUnspaced: true })),
+          unit_price: parseNumericValue(findValue(gasBlock, /당단가/, { useUnspaced: true })),
+          usage_charge: parseNumericValue(findValue(gasBlock, /^사용량요금$/, { useUnspaced: true })),
         },
-        gasCharge: {
-            gasUsage: parseNumericValue(findValue(items, { keyword: '사용량', section: {start: '가스', end: '총합계'} })),
-            gastotalCharge: parseNumericValue(findValue(items, { keyword: '사용요금', section: {start: '가스', end: '총합계'} })),
-        },
-        grandTotal: parseNumericValue(findValue(items, { keyword: '총합계' })),
+        grand_total: parseNumericValue(findValue(items, /^총합계$/, { xConstraint: false, closestToLabel: true, yTolerance: 15, useUnspaced: true })),
       };
 
       setExtractedData(data);
@@ -163,15 +189,20 @@ const OmsUploader: React.FC = () => {
       const urls: string[] = [];
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
-      
       if (context) {
-        for (let i = 5; i <= Math.min(10, pdf.numPages); i++) {
+        for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
           const page = await pdf.getPage(i);
           const viewport = page.getViewport({ scale: 1.5 });
           canvas.height = viewport.height;
           canvas.width = viewport.width;
-          // @ts-ignore
-          await page.render({ canvasContext: context, viewport: viewport }).promise;
+          
+          const renderContext: RenderParameters = {
+            canvasContext: context,
+            viewport: viewport,
+            canvas: canvas,
+          };
+
+          await page.render(renderContext).promise;
           urls.push(canvas.toDataURL('image/png'));
         }
       }
@@ -183,7 +214,7 @@ const OmsUploader: React.FC = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [addMonthlyReport]);
+  }, []);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -193,7 +224,12 @@ const OmsUploader: React.FC = () => {
     }
   }, [renderPdfPages]);
   
-  const handleSaveData = () => { /* ... */ };
+  const handleSaveData = () => {
+    if (extractedData) {
+      console.log("Saving data:", extractedData);
+      alert("데이터 저장 로직은 새로운 구조에 맞게 별도 수정이 필요합니다. 현재 데이터는 콘솔에만 출력됩니다.");
+    }
+  };
 
   return (
     <div className="p-4 bg-white rounded-lg shadow-md space-y-6">
@@ -201,30 +237,28 @@ const OmsUploader: React.FC = () => {
         {isProcessing ? (
           <div className="flex flex-col items-center justify-center">
             <Loader2 className="h-16 w-16 text-indigo-600 animate-spin" />
-            <h2 className="mt-4 text-2xl font-bold text-gray-800">최종 데이터를 추출 중입니다...</h2>
-            <p className="mt-2 text-md text-gray-600">물리 좌표 기반으로 섹션을 분석하고 있습니다.</p>
+            <h2 className="mt-4 text-2xl font-bold text-gray-800">데이터를 추출하고 있습니다...</h2>
+            <p className="mt-2 text-md text-gray-600">블록 단위로 PDF 구조를 분석하고 있습니다.</p>
           </div>
-        ) : imageUrls.length > 0 ? (
+        ) : extractedData ? (
           <>
             <h2 className="text-2xl font-bold text-gray-800">최종 추출 결과</h2>
-            <p className="mt-2 text-sm text-gray-500">모든 값이 완벽하게 추출되었습니다. 최종 확인 후 저장하세요.</p>
-            {extractedData && (
-                <div className="my-4 p-4 bg-gray-100 rounded-lg text-left">
-                    <h3 className="font-bold text-lg mb-2">추출된 비용 데이터 (Page 6)</h3>
-                    <pre className="text-sm whitespace-pre-wrap">{JSON.stringify(extractedData, null, 2)}</pre>
-                </div>
-            )}
+            <p className="mt-2 text-sm text-gray-500">추출된 데이터를 확인 후 저장하세요.</p>
+            <div className="my-4 p-4 bg-gray-800 text-white rounded-lg text-left font-mono text-sm">
+              <pre className="whitespace-pre-wrap">{JSON.stringify(extractedData, null, 2)}</pre>
+            </div>
+
             <div className="mt-8">
-              <Button onClick={handleSaveData} size="lg" disabled={!extractedData || extractedData.grandTotal === 0}>
+              <Button onClick={handleSaveData} size="lg">
                 <Save className="mr-2 h-5 w-5" />
                 데이터 저장하기
               </Button>
             </div>
-             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 border p-4 rounded-lg bg-gray-50">
+             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 border p-4 rounded-lg bg-gray-50">
               {imageUrls.map((url, index) => (
                 <div key={index} className="border rounded-lg overflow-hidden shadow-sm">
-                   <p className="text-sm font-semibold p-2 bg-gray-100">Page {5 + index}</p>
-                   <img src={url} alt={`Page ${5 + index}`} className="w-full" />
+                   <p className="text-sm font-semibold p-2 bg-gray-100">Page {index + 1}</p>
+                   <img src={url} alt={`Page ${index + 1}`} className="w-full" />
                 </div>
               ))}
             </div>
@@ -233,7 +267,7 @@ const OmsUploader: React.FC = () => {
           <>
             <UploadCloud className="mx-auto h-16 w-16 text-gray-300" />
             <h2 className="mt-4 text-2xl font-bold text-gray-800">월간 보고서 자동화</h2>
-            <p className="mt-2 text-sm text-gray-500">PDF 파일을 선택하여 텍스트를 추출하고 데이터를 저장하세요.</p>
+            <p className="mt-2 text-sm text-gray-500">PDF 파일을 선택하여 데이터를 자동으로 추출하세요.</p>
             <div className="mt-8">
               <label htmlFor="file-upload" className="cursor-pointer inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-full shadow-sm bg-white text-gray-700 hover:bg-gray-50 transition-colors">
                 <FileCheck2 className="-ml-1 mr-2 h-5 w-5" />

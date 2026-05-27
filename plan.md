@@ -1,40 +1,42 @@
-### 수익 분석 대시보드 구현 계획
+# `OmsUploader.tsx` 데이터 추출 로직 개선 계획
 
-**목표:** 사용자가 Excel 파일을 업로드하여 수익 및 지출 내역을 분석하고, 시각적인 대시보드를 통해 재무 상태를 직관적으로 파악할 수 있는 기능을 구현합니다.
+## 1. 최종 목표
 
-**핵심 전략:** `xlsx` 라이브러리를 사용해 Excel 데이터를 JSON으로 파싱하고, `recharts`를 활용하여 다양한 분석 차트를 제공합니다.
+`OmsUploader.tsx` 컴포넌트가 월간 공과금 PDF 파일을 파싱할 때, `research.md`에 명시된 **정확한 JSON 구조**와 일치하는 데이터를 추출하도록 로직을 개선합니다. 이 과정에서 다른 모든 기능은 완벽하게 보존합니다.
 
----
+## 2. 수정 대상 파일
 
-#### 1단계: Excel 파싱 유틸리티 고도화 (Excel Parsing Utility Enhancement)
+- `src/components/oms/OmsUploader.tsx`
 
-- **작업:** `src/utils/ExcelParser.ts`의 `parseExcelFile` 함수를 수정하여 날짜 파싱 로직을 개선하고, `ProfitAnalysisData` 인터페이스를 `export`하여 다른 컴포넌트에서 재사용할 수 있도록 합니다.
-- **이유:** 안정적인 데이터 처리를 위해 다양한 형식의 날짜를 올바르게 ISO String으로 변환하고, 타입 정의를 공유하여 코드의 일관성과 유지보수성을 높입니다.
-- **파일:**
-  - `src/utils/ExcelParser.ts`
+## 3. 핵심 구현 계획
 
----
+### 1단계: 데이터 인터페이스 교체
 
-#### 2단계: 수익 분석 컴포넌트 재설계 (Profit Analysis Component Redesign)
+- 현재 `OmsUploader.tsx`에 정의된 `ExtractedData` 타입스크립트 인터페이스를 삭제합니다.
+- `research.md`에 명시된 최종 JSON 구조와 100% 일치하는 새로운 `ExtractedData` 인터페이스를 정의하여 삽입합니다.
 
-- **작업:** `src/features/tenant-info/ProfitAnalysis.tsx` 컴포넌트를 `Research.md`에 정의된 UI/UX 계획에 따라 재설계합니다.
-- **이유:** 단순한 JSON 표시 기능을 넘어, 사용자에게 실질적인 재무 인사이트를 제공하는 동적인 대시보드를 구현합니다. 이를 위해 데이터 요약, 차트, 상세 거래 내역 테이블을 포함하는 종합적인 UI를 구성합니다.
-- **파일:** `src/features/tenant-info/ProfitAnalysis.tsx`
+### 2단계: 좌표 기반의 새로운 값 추출 함수 구현
 
----
+- 기존의 부정확한 `findValue` 함수를 완전히 새로운 함수로 교체합니다.
+- 새로 만들 `findValueInCurrentMonthColumn` 함수의 로직은 다음과 같습니다.
+    1.  PDF 텍스트의 **x축 좌표**를 기반으로 '금월 사용량' 컬럼의 시작(약 `340px`)과 끝(약 `450px`) 범위를 상수로 정의합니다. 이를 통해 '전월 사용량' 컬럼의 값은 원천적으로 무시합니다.
+    2.  찾으려는 항목의 레이블 텍스트(예: `기본요금`)를 정규식으로 찾습니다.
+    3.  찾아낸 레이블과 거의 동일한 **y축 좌표** 상에 위치하면서, 위에서 정의한 '금월 사용량' x축 범위 안에 있는 숫자 형식의 텍스트를 찾아 반환합니다.
 
-#### 3단계: 데이터 시각화 구현 (Data Visualization Implementation)
+### 3단계: 새로운 데이터 객체 생성 및 값 채우기
 
-- **작업:** `recharts` 라이브러리를 사용하여 `ProfitAnalysis.tsx` 내에 다음 차트들을 구현합니다:
-  - **요약 카드 (Summary Cards):** 총 수입, 총 지출, 순수익, 총 거래 건수
-  - **카테고리별 분석:** 지출 및 수입 상위 5개 항목을 보여주는 원형 차트 (Pie Chart)
-  - **월별 추이 분석:** 월별 수입과 지출의 변화를 보여주는 꺾은선 그래프 (Line Chart)
-- **이유:** 복잡한 재무 데이터를 시각적으로 표현하여 사용자가 재무 상태의 트렌드와 주요 항목을 쉽게 파악할 수 있도록 돕습니다.
-- **파일:** `src/features/tenant-info/ProfitAnalysis.tsx`
+- `renderPdfPages` 함수 내에서, 1단계에서 정의한 새 인터페이스를 타입으로 하는 `data` 객체를 초기화합니다.
+- `electricity_current_month` 객체 내의 모든 필드(`light_load_kw`, `base` 등)를, 2단계에서 만든 `findValueInCurrentMonthColumn` 함수를 호출하여 순서대로 채워 넣습니다.
+- **예외 처리:** `water_current_month`와 `gas_current_month`같이 구조가 더 복잡한 부분은, 이번 단계에서는 일단 `0`과 같은 플레이스홀더 값으로 채워 넣어 전기 요금 추출 안정화에 집중합니다. `grand_total_current_month`는 정확히 추출하여 새 로직의 가능성을 검증합니다.
 
----
+### 4단계: UI 업데이트 및 저장 로직 임시 처리
 
-#### 4단계: 전체 기능 테스트 및 검증 (End-to-End Testing and Validation)
+- 추출이 완료된 새로운 `data` 객체를 컴포넌트의 `extractedData` 상태에 저장합니다.
+- UI에 있는 `<pre>` 태그는 자동으로 이 상태를 참조하므로, 수정된 JSON 결과가 화면에 올바르게 표시될 것입니다.
+- `handleSaveData` 함수는 새로운 데이터 구조를 처리하도록 수정이 필요하지만, 이번 작업 범위에서는 `console.log`로 추출된 데이터를 출력하고 알림창을 띄우는 정도로만 임시 처리하여, 데이터 추출과 저장 로직을 분리합니다.
 
-- **작업:** Excel 파일 업로드부터 데이터 파싱, 차트 렌더링, 테이블 표시까지 전체 기능이 올바르게 작동하는지 테스트합니다.
-- **이유:** 다양한 형식의 Excel 파일과 데이터를 사용하여 예외 상황을 처리하고, 모든 기능이 기획된 대로 정확하게 동작하는지 최종 검증합니다. 특히, 데이터 계산의 정확성과 차트의 상호작용성을 중점적으로 확인합니다.
+## 4. 영향 없음 보장
+
+- 모든 코드 수정은 `OmsUploader.tsx` 파일 **내부에서만** 이루어집니다.
+- `OmsSystem.tsx`, `useProjectData` 컨텍스트, 라우팅 등 다른 파일이나 기능에는 어떠한 변경도 가하지 않습니다.
+- 이를 통해 **기존 기능 유실이나 사이드 이펙트 발생 가능성을 원천적으로 차단**합니다.
