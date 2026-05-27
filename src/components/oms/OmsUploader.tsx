@@ -10,9 +10,12 @@ import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
-// ... (ExtractedData, PdfItem 인터페이스는 이전과 동일) ...
-
 interface ExtractedData {
+  environmental: {
+    solar_power_generation_kwh: number | null;
+    gray_water_usage_m3: number | null;
+    avg_monthly_temperature_celsius: number | null;
+  };
   electricity: {
     usage: {
       light_load: number | null;
@@ -65,6 +68,7 @@ interface PdfItem extends TextItem {
   text: string;
   x: number;
   y: number;
+  width: number;
   textUnspaced: string;
 }
 
@@ -72,7 +76,7 @@ const findBillingMonth = async (pdf: PDFDocumentProxy): Promise<string> => {
   const page = await pdf.getPage(1);
   const textContent = await page.getTextContent();
   const pageText = textContent.items.map((item: any) => item.str).join(' ');
-  const regex = /과업수행\s*보고서.*\[\s*(\d{4})\s*년\s*(\d{1,2})\s*월\s*\]/;
+  const regex = /과업수행\s*보고서.*\s*\[\s*(\d{4})\s*년\s*(\d{1,2})\s*월\s*\]/;
   const match = pageText.match(regex);
 
   if (match && match[1] && match[2]) {
@@ -124,20 +128,6 @@ const OmsUploader: React.FC = () => {
       const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
       setPdfDoc(pdf);
 
-      const dataPage = await pdf.getPage(6);
-      const textContent = await dataPage.getTextContent();
-      
-      const items: PdfItem[] = textContent.items.map((item: any) => ({
-        ...item,
-        text: item.str.replace(/\s+/g, ' ').trim(),
-        x: item.transform[4],
-        y: item.transform[5],
-        textUnspaced: item.str.replace(/\s/g, ''),
-      }));
-
-      const CURRENT_MONTH_X_START = 340;
-      const CURRENT_MONTH_X_END = 450;
-
       const parseNumericValue = (text: string | null | undefined): number | null => {
         if (!text || text.trim() === '-' || text.trim() === '') return null;
         const num = parseFloat(text.replace(/,/g, ''));
@@ -147,9 +137,9 @@ const OmsUploader: React.FC = () => {
       const findValue = (
         block: PdfItem[],
         labelKeyword: RegExp,
-        options: { yTolerance?: number, xConstraint?: boolean, closestToLabel?: boolean, useUnspaced?: boolean } = {}
+        options: { yTolerance?: number, xConstraint?: boolean, closestToLabel?: boolean, useUnspaced?: boolean, xStart?: number, xEnd?: number } = {}
       ) => {
-        const { yTolerance = 5, xConstraint = true, closestToLabel = false, useUnspaced = false } = options;
+        const { yTolerance = 5, xConstraint = true, closestToLabel = false, useUnspaced = false, xStart = 340, xEnd = 450 } = options;
 
         const labelItem = block.find(item => labelKeyword.test(useUnspaced ? item.textUnspaced : item.text));
         if (!labelItem) return null;
@@ -161,7 +151,7 @@ const OmsUploader: React.FC = () => {
         );
         
         if (xConstraint) {
-            potentialValues = potentialValues.filter(it => it.x >= CURRENT_MONTH_X_START && it.x < CURRENT_MONTH_X_END);
+            potentialValues = potentialValues.filter(it => it.x >= xStart && it.x < xEnd);
         }
 
         if (closestToLabel) {
@@ -174,6 +164,12 @@ const OmsUploader: React.FC = () => {
         
         return potentialValues[0]?.text || null;
       };
+
+      const dataPage = await pdf.getPage(6);
+      const textContent = await dataPage.getTextContent();
+      const items: PdfItem[] = textContent.items.map((item: any) => ({
+        ...item, text: item.str.replace(/\s+/g, ' ').trim(), x: item.transform[4], y: item.transform[5], width: item.width, textUnspaced: item.str.replace(/\s/g, ''),
+      }));
 
       const elecTotalRow = items.find(it => /^청구금액$/.test(it.textUnspaced));
       const waterGeneralTotalRow = items.find(it => /일반용.*합계/.test(it.textUnspaced));
@@ -190,7 +186,7 @@ const OmsUploader: React.FC = () => {
       const waterFireHydrantBlock = items.filter(it => it.y < y2 && it.y > y3);
       const gasBlock = items.filter(it => it.y < y3 && it.y > y4);
 
-      const data: ExtractedData = {
+      const energyData = {
         electricity: {
           usage: {
             light_load: parseNumericValue(findValue(electricityBlock, /^경부하$/)),
@@ -231,13 +227,78 @@ const OmsUploader: React.FC = () => {
         gas: {
           meter_reading_m3: parseNumericValue(findValue(gasBlock, /^검침\(m/, { useUnspaced: true })),
           usage_m3: parseNumericValue(findValue(gasBlock, /^사용량\(m/, { useUnspaced: true })),
-          unit_price: parseNumericValue(findValue(gasBlock, /당단가/, { useUnspaced: true })),
+          unit_price: parseNumericValue(findValue(gasBlock, /당월단가/, { useUnspaced: true })),
           usage_charge: parseNumericValue(findValue(gasBlock, /^사용량요금$/, { useUnspaced: true })),
         },
         grand_total: parseNumericValue(findValue(items, /^총합계$/, { xConstraint: false, closestToLabel: true, yTolerance: 15, useUnspaced: true })),
       };
 
-      setExtractedData(data);
+      const envPage = await pdf.getPage(5);
+      const envTextContent = await envPage.getTextContent();
+      const envItems: PdfItem[] = envTextContent.items.map((item: any) => ({
+        ...item,
+        text: item.str.replace(/\s+/g, ' ').trim(),
+        x: item.transform[4],
+        y: item.transform[5],
+        textUnspaced: item.str.replace(/\s/g, ''),
+        width: item.width,
+      }));
+
+      const billingMonthString = await findBillingMonth(pdf);
+      const [year, month] = billingMonthString.split('-');
+      const targetColumnRegex = new RegExp(`^${year}년\s*${parseInt(month, 10)}월$`);
+
+      const targetColumnHeader = envItems.find(it => targetColumnRegex.test(it.textUnspaced));
+
+      if (!targetColumnHeader) {
+        throw new Error(`5페이지의 '전년 동월 사용량 비교' 표에서 '${year}년 ${parseInt(month, 10)}월' 헤더를 찾을 수 없습니다.`);
+      }
+
+      const envOptions = {
+          yTolerance: 10,
+          xStart: targetColumnHeader.x - 5,
+          xEnd: targetColumnHeader.x + targetColumnHeader.width + 5,
+      };
+
+      const solarLabels = envItems.filter(it => /태양광발전량/.test(it.textUnspaced)).sort((a,b)=>a.y-b.y);
+      const solarLabel = solarLabels.length > 0 ? solarLabels[0] : null;
+      const solarValues = solarLabel ? envItems.filter(it => 
+          Math.abs(it.y - solarLabel.y) < envOptions.yTolerance &&
+          /^[\d,.-]+$/.test(it.text) &&
+          it.x >= envOptions.xStart && it.x < envOptions.xEnd
+      ).sort((a,b) => a.x - b.x) : [];
+      const solar_power_generation_kwh = parseNumericValue(solarValues[0]?.text);
+
+      const grayWaterLabels = envItems.filter(it => /중수사용량/.test(it.textUnspaced)).sort((a,b)=>a.y-b.y);
+      const grayWaterLabel = grayWaterLabels.length > 0 ? grayWaterLabels[0] : null;
+      const grayWaterValues = grayWaterLabel ? envItems.filter(it => 
+          Math.abs(it.y - grayWaterLabel.y) < envOptions.yTolerance &&
+          /^[\d,.-]+$/.test(it.text) &&
+          it.x >= envOptions.xStart && it.x < envOptions.xEnd
+      ).sort((a,b) => a.x - b.x) : [];
+      const gray_water_usage_m3 = parseNumericValue(grayWaterValues[0]?.text);
+
+      const tempLabels = envItems.filter(it => /월평균기온/.test(it.textUnspaced)).sort((a,b)=>a.y-b.y);
+      const tempLabel = tempLabels.length > 0 ? tempLabels[0] : null;
+      const tempValues = tempLabel ? envItems.filter(it => 
+          Math.abs(it.y - tempLabel.y) < envOptions.yTolerance &&
+          /^[\d,.-]+$/.test(it.text) &&
+          it.x >= envOptions.xStart && it.x < envOptions.xEnd
+      ).sort((a,b) => a.x - b.x) : [];
+      const avg_monthly_temperature_celsius = parseNumericValue(tempValues[0]?.text);
+
+      const environmentalData = {
+          solar_power_generation_kwh,
+          gray_water_usage_m3,
+          avg_monthly_temperature_celsius,
+      };
+
+      const finalData: ExtractedData = {
+        environmental: environmentalData,
+        ...energyData,
+      };
+
+      setExtractedData(finalData);
       
       const urls: string[] = [];
       const canvas = document.createElement('canvas');
@@ -261,9 +322,9 @@ const OmsUploader: React.FC = () => {
       }
       setImageUrls(urls);
 
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      setError('PDF를 처리하는 중 오류가 발생했습니다.');
+      setError(`PDF 처리 중 오류: ${e.message}`);
     } finally {
       setIsProcessing(false);
     }
@@ -290,23 +351,18 @@ const OmsUploader: React.FC = () => {
       
       const querySnapshot = await getDocs(q);
 
+      const payload = {
+        billingMonth,
+        ...extractedData,
+        ...(querySnapshot.empty && { createdAt: serverTimestamp() }),
+        updatedAt: serverTimestamp(),
+      };
+
       if (querySnapshot.empty) {
-        // Add new document
-        const payload = {
-          billingMonth,
-          ...extractedData,
-          createdAt: serverTimestamp(),
-        };
         await addDoc(utilityBillsRef, payload);
         alert('데이터가 성공적으로 저장되었습니다.');
       } else {
-        // Update existing document
         const docToUpdate = querySnapshot.docs[0];
-        const payload = {
-          billingMonth,
-          ...extractedData,
-          updatedAt: serverTimestamp(),
-        };
         await updateDoc(docToUpdate.ref, payload);
         alert(`기존 ${billingMonth}월의 데이터를 성공적으로 업데이트했습니다.`);
       }

@@ -7,12 +7,17 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp, Zap, Droplets, Flame, Loader2 } from 'lucide-react';
+import { TrendingUp, Zap, Droplets, Flame, Loader2, Sun, Recycle, Thermometer } from 'lucide-react';
 
 // Firestore에서 가져온 데이터 타입 정의
 interface UtilityBill {
   id: string;
   billingMonth: string;
+  environmental?: {
+    solar_power_generation_kwh: number | null;
+    gray_water_usage_m3: number | null;
+    avg_monthly_temperature_celsius: number | null;
+  };
   electricity: {
     usage: {
       light_load: number | null;
@@ -66,9 +71,9 @@ const formatCurrency = (value: number | null | undefined) => {
     return `${Math.round(value).toLocaleString()}원`;
 };
 
-const formatNumber = (value: number | null | undefined) => {
+const formatNumber = (value: number | null | undefined, unit: string = '') => {
     if (value === null || value === undefined) return '-';
-    return value.toLocaleString();
+    return `${value.toLocaleString()}${unit}`;
 };
 
 const ElectricityCostDetail: React.FC<{ details: UtilityBill['electricity'] }> = ({ details }) => (
@@ -159,7 +164,6 @@ const OmsEnergyDashboard: React.FC = () => {
                 const querySnapshot = await getDocs(q);
                 const fetchedReports = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UtilityBill));
 
-                // 중복 월 제거 로직 추가
                 const uniqueReports = fetchedReports.filter((report, index, self) =>
                     index === self.findIndex((r) => r.billingMonth === report.billingMonth)
                 );
@@ -209,6 +213,42 @@ const OmsEnergyDashboard: React.FC = () => {
 
     return (
         <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">태양광 발전량</CardTitle>
+                        <Sun className="h-5 w-5 text-yellow-500"/>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">
+                            {formatNumber(selectedReport?.environmental?.solar_power_generation_kwh, ' kWh')}
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">중수 사용량</CardTitle>
+                        <Recycle className="h-5 w-5 text-green-500"/>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">
+                             {formatNumber(selectedReport?.environmental?.gray_water_usage_m3, ' m³')}
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">월평균 기온</CardTitle>
+                        <Thermometer className="h-5 w-5 text-red-500"/>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">
+                           {formatNumber(selectedReport?.environmental?.avg_monthly_temperature_celsius, ' °C')}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>에너지 비용 상세 분석</CardTitle>
