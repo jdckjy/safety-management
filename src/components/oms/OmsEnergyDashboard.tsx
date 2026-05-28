@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '@/firebase'; // Firestore 인스턴스 가져오기
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -158,31 +158,31 @@ const OmsEnergyDashboard: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        const fetchReports = async () => {
-            try {
-                const q = query(collection(db, "utility-bills"), orderBy("billingMonth", "desc"));
-                const querySnapshot = await getDocs(q);
-                const fetchedReports = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UtilityBill));
+        setLoading(true);
+        const q = query(collection(db, "utility-bills"), orderBy("billingMonth", "desc"));
 
-                const uniqueReports = fetchedReports.filter((report, index, self) =>
-                    index === self.findIndex((r) => r.billingMonth === report.billingMonth)
-                );
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const fetchedReports = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as UtilityBill));
+            
+            const uniqueReports = fetchedReports.filter((report, index, self) =>
+                index === self.findIndex((r) => r.billingMonth === report.billingMonth)
+            );
 
-                setReports(uniqueReports);
+            setReports(uniqueReports);
 
-                if (uniqueReports.length > 0 && !selectedMonth) {
-                    setSelectedMonth(uniqueReports[0].billingMonth);
-                }
-            } catch (err) {
-                console.error("Error fetching utility bills: ", err);
-                setError("데이터를 불러오는 중 오류가 발생했습니다.");
-            } finally {
-                setLoading(false);
+            if (uniqueReports.length > 0 && !selectedMonth) {
+                setSelectedMonth(uniqueReports[0].billingMonth);
             }
-        };
+            setLoading(false);
+        }, (err) => {
+            console.error("Error fetching utility bills: ", err);
+            setError("데이터를 불러오는 중 오류가 발생했습니다.");
+            setLoading(false);
+        });
 
-        fetchReports();
-    }, []);
+        // Cleanup subscription on unmount
+        return () => unsubscribe();
+    }, [selectedMonth]);
 
     const selectedReport = reports.find(r => r.billingMonth === selectedMonth);
 
