@@ -8,14 +8,15 @@ import {
   HardHat,
   ChevronDown,
   FolderOpen,
-  Calendar // 1. Calendar 아이콘을 임포트합니다.
+  Calendar, // 1. Calendar 아이콘을 임포트합니다.
+  BarChart
 } from 'lucide-react';
 import { MenuKey } from '../types';
 
-// 2. activeMenu와 onMenuChange의 타입에 'calendar'를 추가합니다.
+// 2. activeMenu와 onMenuChange의 타입에 'calendar' | 'statistics'를 추가합니다.
 interface SidebarProps {
-  activeMenu: MenuKey | 'base-info' | 'calendar';
-  onMenuChange: (menu: MenuKey | 'base-info' | 'calendar') => void;
+  activeMenu: MenuKey | 'base-info' | 'calendar' | 'statistics';
+  onMenuChange: (menu: MenuKey | 'base-info' | 'calendar' | 'statistics') => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange }) => {
@@ -40,7 +41,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange }) => {
       <button
         key={key}
         // 4. onMenuChange 핸들러의 타입 캐스팅을 업데이트합니다.
-        onClick={() => onMenuChange(key as MenuKey | 'base-info' | 'calendar')}
+        onClick={() => onMenuChange(key as MenuKey | 'base-info' | 'calendar' | 'statistics')}
         className={`w-full flex items-center p-3 rounded-lg transition-all group ${
           isActive
             ? 'bg-white text-black font-bold shadow-sm ring-1 ring-gray-100'
@@ -83,6 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange }) => {
           </div>
           <div className="space-y-1">
             {renderMenuItem('base-info', '기본정보', <FolderOpen size={18} />)}
+            {renderMenuItem('statistics', '통계정보', <BarChart size={18} />)}
           </div>
         </div>
       </div>

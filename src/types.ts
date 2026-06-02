@@ -1,13 +1,15 @@
 
 import { LucideIcon } from "lucide-react";
 
+export type MenuKey = 'dashboard' | 'calendar' | 'safety' | 'lease' | 'asset' | 'infra';
+
 export interface KPI {
     id: string;
     title: string;
     description?: string;
     current: number;
     target: number;
-    unit: string; 
+    unit: string;
     activities?: Activity[];
     previous?: number;
 }
@@ -79,7 +81,7 @@ export interface ComplexFacility {
     name: string;
     category: string;
     location: string;
-    area_sqm: number; 
+    area_sqm: number;
     status: string;
 }
 
@@ -126,7 +128,7 @@ export interface Contract {
     id: string;
     tenantId: string;
     unitId?: string;
-    facilityId?: string; 
+    facilityId?: string;
     startDate: string;
     endDate: string;
     deposit: number;
