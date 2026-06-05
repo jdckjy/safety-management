@@ -67,7 +67,19 @@ export const jejuPopulationActualData = [
   { PRD_DE: '202406', DT: '15040', C1_NM: '성산읍' },
   { PRD_DE: '202406', DT: '15290', C1_NM: '구좌읍' },
   { PRD_DE: '202406', DT: '26280', C1_NM: '조천읍' },
-  { PRD_DE: '202406', DT: '18450', C1_NM: '남원읍' }
+  { PRD_DE: '202406', DT: '18450', C1_NM: '남원읍' },
+
+  // Seogwipo Administrative Dongs (202406)
+  { PRD_DE: '202406', DT: '23500', C1_NM: '동홍동' },
+  { PRD_DE: '202406', DT: '11200', C1_NM: '서홍동' },
+  { PRD_DE: '202406', DT: '15400', C1_NM: '대륜동' },
+  { PRD_DE: '202406', DT: '14800', C1_NM: '대천동' },
+  { PRD_DE: '202406', DT: '9200', C1_NM: '영천동' },
+  { PRD_DE: '202406', DT: '4200', C1_NM: '송산동' },
+  { PRD_DE: '202406', DT: '2100', C1_NM: '정방동' },
+  { PRD_DE: '202406', DT: '3200', C1_NM: '중앙동' },
+  { PRD_DE: '202406', DT: '3400', C1_NM: '천지동' },
+  { PRD_DE: '202406', DT: '5100', C1_NM: '효돈동' }
 ];
 
 export interface RawKosisData {
