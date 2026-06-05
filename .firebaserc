@@ -1,8 +1,14 @@
 {
   "projects": {
-    "default": "safety-management-233137-77a49",
-    "s.m. 233137": "safety-management-233137-77a49"
+    "default": "safety-management-233137-77a49"
   },
-  "targets": {},
-  "etags": {}
+  "targets": {
+    "safety-management-233137-77a49": {
+      "hosting": {
+        "htown-mgmt": [
+          "htown-mgmt"
+        ]
+      }
+    }
+  }
 }

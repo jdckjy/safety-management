@@ -1,4 +1,4 @@
-# 단지조성팀 업무관리 시스템
+# H-Town Management System (htown-mgmt)
 
 ## 프로젝트 개요
 

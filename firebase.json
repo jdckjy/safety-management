@@ -1,5 +1,9 @@
 {
+  "functions": {
+    "source": "functions"
+  },
   "hosting": {
+    "site": "htown-mgmt",
     "public": "dist",
     "ignore": [
       "firebase.json",
@@ -7,6 +11,10 @@
       "**/node_modules/**"
     ],
     "rewrites": [
+      {
+        "source": "/api/kosisProxy",
+        "function": "kosisProxy"
+      },
       {
         "source": "**",
         "destination": "/index.html"

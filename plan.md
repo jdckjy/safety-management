@@ -1,42 +1,59 @@
-# `OmsUploader.tsx` 데이터 추출 로직 개선 계획
+# KOSIS 연동 인구 통계 대시보드 구현 계획
 
 ## 1. 최종 목표
 
-`OmsUploader.tsx` 컴포넌트가 월간 공과금 PDF 파일을 파싱할 때, `research.md`에 명시된 **정확한 JSON 구조**와 일치하는 데이터를 추출하도록 로직을 개선합니다. 이 과정에서 다른 모든 기능은 완벽하게 보존합니다.
+현재 정적 콘텐츠만 표시하는 `StatisticsPage.tsx`를 **동적 데이터 기반의 인터랙티브 대시보드**로 전환합니다. `research.md`의 분석에 따라, 백엔드 프록시를 통해 KOSIS의 인구 통계 데이터를 실시간으로 가져와 시계열 차트와 GIS 지도로 시각화하는 것을 목표로 합니다. 이 과정에서 현재 시스템 아키텍처의 한계(백엔드 및 동적 데이터 처리 로직 부재)를 해결합니다.
 
-## 2. 수정 대상 파일
+## 2. 수정 및 신규 생성 파일
 
-- `src/components/oms/OmsUploader.tsx`
+### 가. 수정 대상
 
-## 3. 핵심 구현 계획
+*   `src/pages/PopulationInfoTab.tsx`: 동적 데이터 패칭, 상태 관리 및 시각화 컴포넌트 렌더링 로직 추가
 
-### 1단계: 데이터 인터페이스 교체
+### 나. 신규 생성
 
-- 현재 `OmsUploader.tsx`에 정의된 `ExtractedData` 타입스크립트 인터페이스를 삭제합니다.
-- `research.md`에 명시된 최종 JSON 구조와 100% 일치하는 새로운 `ExtractedData` 인터페이스를 정의하여 삽입합니다.
+*   `api/kosisProxy.ts`: KOSIS API 호출을 중계하고 CORS 문제를 해결할 백엔드 프록시 (서버리스 함수)
+*   `src/components/charts/PopulationChart.tsx`: 시계열 인구 데이터를 라인/바 차트로 시각화할 컴포넌트
+*   `src/components/maps/JejuMap.tsx`: 제주 읍면동별 인구 데이터를 단계 구분도로 시각화할 컴포넌트
+*   `src/types/population.ts`: KOSIS API 응답 및 시각화에 사용될 데이터 관련 TypeScript 인터페이스
+*   `.env.local`: KOSIS API 키를 저장할 환경 변수 파일
 
-### 2단계: 좌표 기반의 새로운 값 추출 함수 구현
+## 3. 핵심 구현 계획 (P0 우선순위 중심)
 
-- 기존의 부정확한 `findValue` 함수를 완전히 새로운 함수로 교체합니다.
-- 새로 만들 `findValueInCurrentMonthColumn` 함수의 로직은 다음과 같습니다.
-    1.  PDF 텍스트의 **x축 좌표**를 기반으로 '금월 사용량' 컬럼의 시작(약 `340px`)과 끝(약 `450px`) 범위를 상수로 정의합니다. 이를 통해 '전월 사용량' 컬럼의 값은 원천적으로 무시합니다.
-    2.  찾으려는 항목의 레이블 텍스트(예: `기본요금`)를 정규식으로 찾습니다.
-    3.  찾아낸 레이블과 거의 동일한 **y축 좌표** 상에 위치하면서, 위에서 정의한 '금월 사용량' x축 범위 안에 있는 숫자 형식의 텍스트를 찾아 반환합니다.
+### 1단계: 백엔드 프록시 구축 및 API 연동 준비
 
-### 3단계: 새로운 데이터 객체 생성 및 값 채우기
+- **목표:** 클라이언트에서 KOSIS API를 직접 호출할 때 발생하는 CORS 오류를 우회하기 위한 서버리스 함수 기반의 프록시를 구축합니다.
+- **실행 방안:**
+    1.  프로젝트 루트에 `.env.local` 파일을 생성하고, 발급받은 KOSIS API 키를 `VITE_KOSIS_API_KEY="{발급받은 키}"` 형식으로 저장합니다. (`.gitignore`에 `.env.local` 추가 확인)
+    2.  프로젝트 루트에 `api` 디렉터리를 생성하고, 그 안에 `kosisProxy.ts` 파일을 만듭니다.
+    3.  `kosisProxy.ts` 내부에 KOSIS API (`statisticsData.do`) 호출을 중계하는 서버리스 함수를 작성합니다. 이 함수는 프론트엔드의 요청을 받아 환경 변수에 저장된 API 키를 포함하여 KOSIS 서버로 전달하고, 그 결과를 다시 프론트엔드에 반환하는 역할을 합니다.
 
-- `renderPdfPages` 함수 내에서, 1단계에서 정의한 새 인터페이스를 타입으로 하는 `data` 객체를 초기화합니다.
-- `electricity_current_month` 객체 내의 모든 필드(`light_load_kw`, `base` 등)를, 2단계에서 만든 `findValueInCurrentMonthColumn` 함수를 호출하여 순서대로 채워 넣습니다.
-- **예외 처리:** `water_current_month`와 `gas_current_month`같이 구조가 더 복잡한 부분은, 이번 단계에서는 일단 `0`과 같은 플레이스홀더 값으로 채워 넣어 전기 요금 추출 안정화에 집중합니다. `grand_total_current_month`는 정확히 추출하여 새 로직의 가능성을 검증합니다.
+### 2단계: 데이터 패칭 로직 및 상태 관리 구현
 
-### 4단계: UI 업데이트 및 저장 로직 임시 처리
+- **목표:** `PopulationInfoTab.tsx` 컴포넌트가 1단계에서 만든 백엔드 프록시를 통해 실제 인구 데이터를 비동기적으로 가져오도록 구현합니다.
+- **실행 방안:**
+    1.  데이터 통신을 위해 `axios` 라이브러리를 설치합니다. (`npm install axios`)
+    2.  `PopulationInfoTab.tsx`에 `useState`를 사용하여 `data`, `loading`, `error` 상태를 관리합니다.
+    3.  `useEffect` 훅을 사용하여 컴포넌트가 마운트될 때 백엔드 프록시 API (`/api/kosisProxy`)를 호출하는 함수를 실행합니다.
+    4.  API 호출 시작 시 `loading` 상태를 `true`로, 호출 완료 시 `false`로 변경합니다. 데이터 수신 성공 시 `data` 상태에 저장하고, 실패 시 `error` 상태에 에러 정보를 저장합니다.
+    5.  `loading` 및 `error` 상태에 따라 적절한 UI(로딩 스피너, 에러 메시지)가 표시되도록 조건부 렌더링을 구현합니다.
 
-- 추출이 완료된 새로운 `data` 객체를 컴포넌트의 `extractedData` 상태에 저장합니다.
-- UI에 있는 `<pre>` 태그는 자동으로 이 상태를 참조하므로, 수정된 JSON 결과가 화면에 올바르게 표시될 것입니다.
-- `handleSaveData` 함수는 새로운 데이터 구조를 처리하도록 수정이 필요하지만, 이번 작업 범위에서는 `console.log`로 추출된 데이터를 출력하고 알림창을 띄우는 정도로만 임시 처리하여, 데이터 추출과 저장 로직을 분리합니다.
+### 3단계: 차트 라이브러리 연동 및 시각화
 
-## 4. 영향 없음 보장
+- **목표:** KOSIS에서 가져온 시계열 데이터를 사용자가 직관적으로 이해할 수 있는 라인 차트로 시각화합니다.
+- **실행 방안:**
+    1.  React 차트 라이브러리인 `recharts`를 설치합니다. (`npm install recharts`)
+    2.  `src/components/charts/PopulationChart.tsx` 파일을 생성합니다.
+    3.  KOSIS API로부터 받은 원본 JSON 데이터를 `recharts`가 요구하는 데이터 형식(예: `[{ name: '2023년 01월', value: 12345 }]`)으로 변환하는 유틸리티 함수를 작성합니다.
+    4.  `PopulationChart.tsx`는 변환된 데이터를 props로 받아, `LineChart`, `XAxis`, `YAxis`, `Tooltip` 등의 컴포넌트를 사용하여 차트를 렌더링합니다.
+    5.  `PopulationInfoTab.tsx`에서 데이터 로딩이 완료되면 `PopulationChart.tsx` 컴포넌트를 렌더링하여 차트를 화면에 표시합니다.
 
-- 모든 코드 수정은 `OmsUploader.tsx` 파일 **내부에서만** 이루어집니다.
-- `OmsSystem.tsx`, `useProjectData` 컨텍스트, 라우팅 등 다른 파일이나 기능에는 어떠한 변경도 가하지 않습니다.
-- 이를 통해 **기존 기능 유실이나 사이드 이펙트 발생 가능성을 원천적으로 차단**합니다.
+### 4단계 (P1): GIS 지도 연동 및 단계 구분도 구현
+
+- **목표:** 읍면동별 인구 데이터를 지도 위에 색상으로 표현하여 지역별 인구 분포를 한눈에 파악할 수 있도록 합니다.
+- **실행 방안:**
+    1.  지도 라이브러리인 `react-leaflet`과 `leaflet`을 설치합니다. (`npm install react-leaflet leaflet`, `npm install -D @types/leaflet`)
+    2.  제주특별자치도 읍면동 단위의 `GeoJSON` 데이터를 확보하여 `src/data` 폴더에 저장합니다.
+    3.  `src/components/maps/JejuMap.tsx` 파일을 생성합니다.
+    4.  `JejuMap.tsx`에서 `MapContainer`, `TileLayer`, `GeoJSON` 컴포넌트를 사용하여 기본 지도를 렌더링하고, 확보한 GeoJSON 데이터를 지도 위에 표시합니다.
+    5.  인구 데이터와 GeoJSON의 지역 코드를 기준으로 데이터를 조인하고, 인구 수에 따라 각 폴리곤의 채우기 색상을 다르게 설정하는 로직을 구현하여 단계 구분도를 완성합니다.

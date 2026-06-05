@@ -36,3 +36,7 @@
 
 - **경로 별칭 (`@/`):**
     - 컴포넌트나 페이지를 가져올 때, 상대 경로 (`../`) 대신 `@/` 별칭을 사용하여 `src` 디렉토리로부터의 절대 경로를 참조해야 합니다. (예: `import TenantInfoPage from '@/pages/TenantInfoPage';`)
+
+## Deployment
+
+이 프로젝트의 배포 사이트는 `htown-mgmt`입니다.
