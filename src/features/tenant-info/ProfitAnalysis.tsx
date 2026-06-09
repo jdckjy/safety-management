@@ -105,16 +105,9 @@ const ProfitAnalysis: React.FC = () => {
             const category = row['계정과목명'] || '';
             const amountStr = String(row['당기실적'] || '0');
             let amount = parseFloat(amountStr.replace(/,/g, ''));
-            let type: 'income' | 'expense';
-
-            if (category === '잡이익') {
-              type = 'income';
-              amount = Math.abs(amount);
-            } else {
-              const budgetBalanceStr = String(row['운영예산잔액'] || '0');
-              const budgetBalance = parseFloat(budgetBalanceStr.replace(/,/g, ''));
-              type = budgetBalance > 0 ? 'expense' : 'income';
-            }
+            
+            const detailedProjectCode = String(row['세부사업'] || '');
+            const type: 'income' | 'expense' = detailedProjectCode.startsWith('9') ? 'income' : 'expense';
 
             const dateValue = row['일자'];
             let isoDate = '';

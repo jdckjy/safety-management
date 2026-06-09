@@ -115,14 +115,14 @@ const Header: React.FC<HeaderProps> = ({ activeMenu }) => {
         {currentUser ? (
             <>
                 <img 
-                  src={currentUserMemberInfo?.photo || currentUser.photoURL || `https://i.pravatar.cc/40?u=${currentUser.uid}`}
+                  src={currentUserMemberInfo?.avatar || currentUser.photoURL || `https://i.pravatar.cc/40?u=${currentUser.uid}`}
                   alt="user" 
                   className="w-10 h-10 rounded-full border-2 border-white shadow-md" 
                 />
                 <div>
                     {/* [수정] 사용자를 찾으면 전체 이름을, 아니면 기존 displayName을 표시합니다. */}
                     <p className="text-sm font-bold">{currentUserMemberInfo?.name || currentUser.displayName || '사용자'}</p>
-                    <p className="text-xs text-gray-400 font-bold">{currentUserMemberInfo?.position || 'Project Manager'}</p>
+                    <p className="text-xs text-gray-400 font-bold">{currentUserMemberInfo?.role || 'Project Manager'}</p>
                 </div>
             </>
         ) : (
