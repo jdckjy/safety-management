@@ -32,10 +32,17 @@ const ProfitAnalysis: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
 
   useEffect(() => {
     setSelectedMonth('all');
+    setSelectedCategory(null); 
   }, [selectedYear]);
+
+  useEffect(() => {
+    setSelectedCategory(null);
+  }, [selectedMonth]);
 
   const availableYears = useMemo(() => {
     const years = new Set(transactions.map(t => new Date(t.date).getFullYear()));
@@ -68,6 +75,17 @@ const ProfitAnalysis: React.FC = () => {
     const expense = filteredTransactions.filter(t => t.type === 'expense');
     return { incomeTransactions: income, expenseTransactions: expense };
   }, [filteredTransactions]);
+  
+  const { filteredIncomeForTable, filteredExpenseForTable } = useMemo(() => {
+    if (!selectedCategory) {
+      return { filteredIncomeForTable: incomeTransactions, filteredExpenseForTable: expenseTransactions };
+    }
+    return {
+      filteredIncomeForTable: incomeTransactions.filter(t => t.category === selectedCategory),
+      filteredExpenseForTable: expenseTransactions.filter(t => t.category === selectedCategory),
+    };
+  }, [selectedCategory, incomeTransactions, expenseTransactions]);
+
 
   const fetchTransactions = async () => {
     setLoading(true);
@@ -216,6 +234,10 @@ const ProfitAnalysis: React.FC = () => {
     }
   };
 
+  const handleCategoryClick = (category: string) => {
+    setSelectedCategory(prev => (prev === category ? null : category));
+  };
+
   const summary = useMemo(() => {
     return filteredTransactions.reduce((acc, curr) => {
       if (curr.type === 'income') acc.totalIncome += curr.amount;
@@ -339,17 +361,17 @@ const ProfitAnalysis: React.FC = () => {
 
               <Tabs defaultValue="categories">
                 <TabsList>
-                  <TabsTrigger value="categories">카테고리별 분석</TabsTrigger>
+                  <TabsTrigger value="categories" onClick={() => setSelectedCategory(null)}>카테고리별 분석</TabsTrigger>
                   <TabsTrigger value="monthly">월별 추이</TabsTrigger>
                 </TabsList>
                 <TabsContent value="categories" className="grid gap-4 md:grid-cols-2">
                   {filteredTransactions.length > 0 ? (
                     <>
                       <ChartCard title="지출 카테고리 (상위 5개)">
-                        <CategoryPieChart data={categoryData.expense.slice(0, 5)} />
+                        <CategoryPieChart data={categoryData.expense.slice(0, 5)} onSliceClick={handleCategoryClick} />
                       </ChartCard>
                       <ChartCard title="수입 카테고리 (상위 5개)">
-                        <CategoryPieChart data={categoryData.income.slice(0, 5)} />
+                        <CategoryPieChart data={categoryData.income.slice(0, 5)} onSliceClick={handleCategoryClick} />
                       </ChartCard>
                     </>
                   ) : (
@@ -368,11 +390,19 @@ const ProfitAnalysis: React.FC = () => {
                   </ChartCard>
                 </TabsContent>
               </Tabs>
+
+              {selectedCategory && (
+                <div className="text-center my-4">
+                    <Button variant="outline" onClick={() => setSelectedCategory(null)}>
+                      '{selectedCategory}' 필터 해제
+                    </Button>
+                </div>
+              )}
               
               {filteredTransactions.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <TransactionTable title="지출 내역" data={expenseTransactions} showType={false} />
-                  <TransactionTable title="수입 내역" data={incomeTransactions} showType={false} />
+                    <TransactionTable title={selectedCategory ? `지출: ${selectedCategory}` : "지출 내역"} data={filteredExpenseForTable} showType={false} />
+                    <TransactionTable title={selectedCategory ? `수입: ${selectedCategory}` : "수입 내역"} data={filteredIncomeForTable} showType={false} />
                 </div>
               )}
             </>
@@ -435,12 +465,12 @@ const ChartCard: React.FC<{ title: string; children: React.ReactNode }> = ({ tit
   </Card>
 );
 
-const CategoryPieChart: React.FC<{ data: { name: string; value: number }[] }> = ({ data }) => {
+const CategoryPieChart: React.FC<{ data: { name: string; value: number }[], onSliceClick: (name: string) => void }> = ({ data, onSliceClick }) => {
   const total = useMemo(() => data.reduce((sum, entry) => sum + entry.value, 0), [data]);
 
   return (
     <div className="w-full h-full flex items-center justify-between">
-      <div className="w-1/2 h-full relative">
+      <div className="w-1/2 h-full relative cursor-pointer">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -453,6 +483,7 @@ const CategoryPieChart: React.FC<{ data: { name: string; value: number }[] }> = 
               paddingAngle={5}
               dataKey="value"
               labelLine={false}
+              onClick={(e) => onSliceClick(e.name)}
             >
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -461,7 +492,7 @@ const CategoryPieChart: React.FC<{ data: { name: string; value: number }[] }> = 
             <Tooltip formatter={(value) => `${new Intl.NumberFormat('ko-KR').format(value as number)} 원`} />
           </PieChart>
         </ResponsiveContainer>
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
           <p className="text-sm text-muted-foreground">총계</p>
           <p className="text-xl font-bold">
             {new Intl.NumberFormat('ko-KR', {
@@ -474,7 +505,7 @@ const CategoryPieChart: React.FC<{ data: { name: string; value: number }[] }> = 
       </div>
       <div className="w-1/2 pr-4 flex flex-col justify-center space-y-2">
         {data.map((entry, index) => (
-          <div key={`legend-${index}`} className="flex items-center text-sm">
+          <div key={`legend-${index}`} className="flex items-center text-sm cursor-pointer" onClick={() => onSliceClick(entry.name)}>
             <span
               className="w-3 h-3 rounded-full mr-2"
               style={{ backgroundColor: COLORS[index % COLORS.length] }}
@@ -489,7 +520,6 @@ const CategoryPieChart: React.FC<{ data: { name: string; value: number }[] }> = 
     </div>
   );
 };
-
 
 const MonthlyLineChart: React.FC<{ data: { month: string; income: number; expense: number }[] }> = ({ data }) => (
   <ResponsiveContainer width="100%" height={300}>
