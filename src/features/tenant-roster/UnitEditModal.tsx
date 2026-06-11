@@ -7,13 +7,12 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Textarea } from '../../components/ui/textarea';
 import { X } from 'lucide-react';
 
 interface UnitEditModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (unit: Partial<Unit>, contract?: Partial<Contract>) => void;
+  onSave: (unit: Partial<Unit>, contract?: Partial<Contract> & { tenantId: string }) => void;
   unit: Partial<Unit> | null;
   floor: string;
   tenantInfo: TenantInfo[];
@@ -22,6 +21,7 @@ interface UnitEditModalProps {
 const NO_TENANT_VALUE = '__NONE__';
 
 const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, onSave, unit, floor, tenantInfo }) => {
+  const { contracts } = useProjectData();
   const [unitData, setUnitData] = useState<Partial<Unit>>({});
   const [contractData, setContractData] = useState<Partial<Contract>>({});
   const [selectedTenantId, setSelectedTenantId] = useState<string>(NO_TENANT_VALUE);
@@ -30,19 +30,26 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, onSave, 
     if (isOpen) {
       if (unit) {
         setUnitData(unit);
-        setContractData({ unitId: unit.id }); 
-        setSelectedTenantId(NO_TENANT_VALUE);
+        const currentContract = contracts.find(c => c.unitId === unit.id);
+        if (currentContract) {
+          setContractData(currentContract);
+          setSelectedTenantId(currentContract.tenantId);
+        } else {
+          setContractData({});
+          setSelectedTenantId(NO_TENANT_VALUE);
+        }
       } else {
-        setUnitData({ floor: floor, name: '', area_sqm: 0 });
+        setUnitData({ floor, name: '', area_sqm: 0, status: 'vacant' });
         setContractData({});
         setSelectedTenantId(NO_TENANT_VALUE);
       }
     } else {
+      // Reset state when modal is closed
       setUnitData({});
       setContractData({});
       setSelectedTenantId(NO_TENANT_VALUE);
     }
-  }, [isOpen, unit, floor]);
+  }, [isOpen, unit, floor, contracts]);
 
   const handleUnitChange = (field: keyof Unit, value: any) => {
     setUnitData(prev => ({ ...prev, [field]: value }));
@@ -55,7 +62,9 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, onSave, 
   const handleTenantChange = (tenantId: string) => {
     setSelectedTenantId(tenantId);
     if (tenantId === NO_TENANT_VALUE) {
-      setContractData(prev => ({ ...prev, tenantId: undefined }));
+      // Clear contract details but keep unitId
+      const { unitId } = contractData;
+      setContractData({ unitId });
     } else {
       setContractData(prev => ({ ...prev, tenantId }));
     }
@@ -66,7 +75,9 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, onSave, 
   }, [unitData.name]);
 
   const handleSave = () => {
-    const contractToSave = selectedTenantId !== NO_TENANT_VALUE ? contractData : undefined;
+    const contractToSave = selectedTenantId !== NO_TENANT_VALUE 
+      ? { ...contractData, tenantId: selectedTenantId }
+      : undefined;
     onSave(unitData, contractToSave);
     onClose();
   };
@@ -102,7 +113,7 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, onSave, 
               <SelectItem value={NO_TENANT_VALUE}>없음 (공실)</SelectItem>
               {tenantInfo.map((info) => (
                 <SelectItem key={info.id} value={info.id}>
-                  {info.businessName}
+                  {info.companyName || info.businessName}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -114,11 +125,11 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, onSave, 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="rent">월임대료</Label>
-                <Input id="rent" type="number" value={contractData.rent || 0} onChange={(e) => handleContractChange('rent', parseInt(e.target.value, 10) || 0)} />
+                <Input id="rent" type="number" value={contractData.rent || ''} onChange={(e) => handleContractChange('rent', parseInt(e.target.value, 10) || 0)} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="deposit">보증금</Label>
-                <Input id="deposit" type="number" value={contractData.deposit || 0} onChange={(e) => handleContractChange('deposit', parseInt(e.target.value, 10) || 0)} />
+                <Input id="deposit" type="number" value={contractData.deposit || ''} onChange={(e) => handleContractChange('deposit', parseInt(e.target.value, 10) || 0)} />
               </div>
             </div>
 
