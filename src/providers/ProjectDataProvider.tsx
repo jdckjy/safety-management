@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
 import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, GeneralActivity, CustomTab, MonthlyReport, TenantInfo, Contract, Attachment, Unit } from '../types';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
@@ -76,7 +75,7 @@ interface IProjectDataContext extends IProjectData {
   units: Unit[];
   customTabs: CustomTab[];
   tenantInfo: TenantInfo[];
-  contracts: Contract[];
+  contracts: (Contract & { status?: 'active' | 'expired' | 'pending' | 'unknown' })[];
   attachments: Attachment[];
   setData: React.Dispatch<React.SetStateAction<IProjectData>>;
   addActivityToKpi: (kpiId: string, newActivity: Omit<Activity, 'id' | 'status' | 'tasks'>) => Promise<Activity>;
@@ -321,6 +320,52 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     };
   }, [data, currentUser, db, isDataLoaded]);
 
+
+  const processedData = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const updatedContracts = (data.contracts || []).map(contract => {
+      if (!contract.startDate || !contract.endDate) {
+        return { ...contract, status: 'unknown' as const };
+      }
+      const startDate = new Date(contract.startDate);
+      const endDate = new Date(contract.endDate);
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(0, 0, 0, 0);
+
+      let status: 'active' | 'pending' | 'expired';
+      if (today >= startDate && today <= endDate) {
+        status = 'active';
+      } else if (today < startDate) {
+        status = 'pending';
+      } else { // today > endDate
+        status = 'expired';
+      }
+      return { ...contract, status };
+    });
+
+    const updatedUnits = (data.units || []).map(unit => {
+      const activeOrPendingContracts = updatedContracts.filter(c => c.unitId === unit.id && c.status !== 'expired');
+      
+      let newStatus: 'occupied' | 'vacant' | 'notice' = 'vacant';
+
+      if (activeOrPendingContracts.length > 0) {
+        // Check for active contract first
+        if (activeOrPendingContracts.some(c => c.status === 'active')) {
+          newStatus = 'occupied';
+        } else { // All are pending
+          newStatus = 'notice';
+        }
+      } 
+
+      return { ...unit, status: newStatus };
+    });
+
+    return { units: updatedUnits, contracts: updatedContracts };
+  }, [data.units, data.contracts]);
+
+
   const updateKpiArray = useCallback((updateFn: (data: IProjectData) => IProjectData) => {
     setData(prevData => updateFn(prevData));
   }, []);
@@ -523,10 +568,10 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     kpiData, 
     navigationState, 
     isDataLoaded, 
-    units: data.units || [],
+    units: processedData.units,
     customTabs: data.customTabs || [], 
     tenantInfo: data.tenantInfo || [], 
-    contracts: data.contracts || [],
+    contracts: processedData.contracts,
     attachments: data.attachments || [],
     setData, 
     addActivityToKpi, 

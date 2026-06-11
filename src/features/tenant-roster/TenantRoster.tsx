@@ -41,20 +41,10 @@ const TenantRoster: React.FC = () => {
       const latestContract = unitContracts.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())[0];
       const tenant = latestContract ? (tenantInfo || []).find(t => t.id === latestContract.tenantId) : undefined;
       
-      let status: Unit['status'];
-      if (unit.status === 'under-renovation') {
-        status = 'under-renovation';
-      } else if (tenant && latestContract) {
-        status = 'occupied';
-      } else {
-        status = 'vacant';
-      }
-
       return {
-        ...unit,
+        ...unit, // unit.status is already calculated in ProjectDataProvider
         contract: latestContract,
         tenant,
-        status,
       };
     });
   }, [units, contracts, tenantInfo]);

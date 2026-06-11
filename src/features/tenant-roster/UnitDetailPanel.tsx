@@ -14,6 +14,7 @@ interface UnitDetailPanelProps {
 const statusMap: { [key in EnrichedUnit['status']]: { text: string; className: string } } = {
   occupied: { text: '계약', className: 'text-green-600' },
   vacant: { text: '공실', className: 'text-red-600' },
+  notice: { text: '계약 예정', className: 'text-blue-600' },
   'under-renovation': { text: '리모델링 중', className: 'text-yellow-600' },
 };
 

@@ -100,7 +100,7 @@ export interface Unit {
     name: string;
     floor: string;
     area_sqm: number;
-    status: 'occupied' | 'vacant' | 'under-renovation';
+    status: 'occupied' | 'vacant' | 'under-renovation' | 'notice';
     pathData: string;
     position_x?: number;
     position_y?: number;

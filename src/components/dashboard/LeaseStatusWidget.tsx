@@ -4,20 +4,18 @@ import { useProjectData } from '@/providers/ProjectDataProvider';
 import { ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const LeaseStatusWidget: React.FC = () => {
-  const { units, contracts } = useProjectData();
+  const { units } = useProjectData(); // contracts는 더 이상 직접 필요하지 않습니다.
 
   const leaseRateStats = useMemo(() => {
     const allUnits = units || [];
-    const allContracts = contracts || [];
 
     if (allUnits.length === 0) {
       return { rate: 0, occupied: 0, vacant: 0, totalRentable: 0 };
     }
 
-    const contractedUnitIds = new Set(allContracts.map(c => c.unitId));
-
+    // ProjectDataProvider에서 이미 계산된 unit.status를 사용합니다.
     const occupiedArea = allUnits
-      .filter(u => contractedUnitIds.has(u.id))
+      .filter(u => u.status === 'occupied') // 'occupied' 상태인 유닛만 필터링
       .reduce((sum, u) => sum + (u.area_sqm || 0), 0);
 
     const totalRentableArea = allUnits.reduce((sum, u) => sum + (u.area_sqm || 0), 0);
@@ -30,18 +28,16 @@ const LeaseStatusWidget: React.FC = () => {
       vacant: parseFloat(vacantArea.toFixed(2)),
       totalRentable: parseFloat(totalRentableArea.toFixed(2)),
     };
-  }, [units, contracts]);
+  }, [units]); // 종속성 배열에서 contracts 제거
 
   const data = [
     { name: '임대 면적', value: leaseRateStats.occupied },
     { name: '공실/리모델링', value: leaseRateStats.vacant },
   ];
 
-  // 업무진척도와 동일한 색상 팔레트 적용 (파란색 계열)
-  const OCCUPIED_COLOR = '#3B82F6'; // 진한 파랑
-  const VACANT_COLOR = '#DBEAFE';   // 연한 파랑 (배경색)
+  const OCCUPIED_COLOR = '#3B82F6';
+  const VACANT_COLOR = '#DBEAFE';
 
-  // 데이터가 없을 경우 배경만 표시
   if (leaseRateStats.totalRentable === 0) {
     data[0].value = 0;
     data[1].value = 1;
