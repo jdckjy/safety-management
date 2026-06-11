@@ -74,7 +74,7 @@ const AITenantRecommender: React.FC = () => {
     if (!contracts || !tenantInfo) return map;
     contracts.forEach(contract => {
       const tenant = tenantInfo.find((t: TenantInfo) => t.id === contract.tenantId);
-      if (tenant) {
+      if (tenant && contract.status === 'active') { // 활성 계약만 매핑
         map.set(contract.unitId, tenant.businessName);
       }
     });
@@ -89,7 +89,7 @@ const AITenantRecommender: React.FC = () => {
   const floorUnits = useMemo(() => {
     return units
       .filter(u => u.floor === selectedFloor)
-      .sort((a, b) => (a.unitNumber || '').localeCompare(b.unitNumber || ''));
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [units, selectedFloor]);
 
   const selectedUnit = useMemo(() => {
@@ -220,9 +220,24 @@ const AITenantRecommender: React.FC = () => {
                   <button
                     key={unit.id}
                     onClick={() => setSelectedUnitId(unit.id)}
-                    className={`aspect-[4/3] rounded-lg border-2 flex flex-col items-center justify-center transition-all duration-300 p-2 text-center ${selectedUnitId === unit.id ? 'bg-indigo-600 border-indigo-700 text-white shadow-xl scale-110 -translate-y-1 z-20' : isOccupied ? 'bg-slate-200 border-slate-300 text-slate-600' : 'bg-white border-slate-200 text-slate-400 hover:border-indigo-400 hover:text-indigo-600'}`}>
-                    <span className="text-[9px] font-black uppercase opacity-60 tracking-tighter">Unit {unit.unitNumber}</span>
-                    <span className="text-xs font-bold leading-tight mt-1">{isOccupied ? (tenantName || '정보 없음') : '-'}</span>
+                    className={`aspect-[4/3] rounded-lg border-2 flex flex-col items-center justify-center transition-all duration-300 p-2 text-center ${
+                      selectedUnitId === unit.id 
+                        ? 'bg-indigo-600 border-indigo-700 text-white shadow-xl scale-110 -translate-y-1 z-20' 
+                        : isOccupied 
+                        ? 'bg-slate-200 border-slate-300 text-slate-700' 
+                        : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-400 hover:text-indigo-600'
+                    }`}>
+                    {isOccupied ? (
+                      <>
+                        <span className="block text-xs font-bold leading-tight truncate px-1">{tenantName || '정보 없음'}</span>
+                        <span className="block text-[10px] opacity-80 mt-1">{unit.name} | {unit.area_sqm?.toFixed(1)}m²</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="block text-sm font-bold leading-tight">{unit.name}</span>
+                        <span className="block text-[11px] opacity-80 mt-1">{unit.area_sqm?.toFixed(1)}m²</span>
+                      </>
+                    )}
                   </button>
                 );
               })}
@@ -234,7 +249,7 @@ const AITenantRecommender: React.FC = () => {
               <div className="p-2 bg-white rounded-lg border border-slate-200 text-indigo-600"><Maximize size={18} /></div>
               <div>
                 <p className="text-[10px] text-slate-400 font-bold uppercase">Selected Unit</p>
-                <p className="text-sm font-black text-slate-800">{selectedUnit ? selectedUnit.unitNumber : 'None Selected'}</p>
+                <p className="text-sm font-black text-slate-800">{selectedUnit ? selectedUnit.name : 'None Selected'}</p>
               </div>
             </div>
             <div className="text-right">
@@ -287,7 +302,7 @@ const AITenantRecommender: React.FC = () => {
                     </div>
                   ))}
                 </div>
-              </div>
+``              </div>
               <div className="pt-6 space-y-3">
                 <button className="w-full py-4 bg-white text-slate-950 rounded-xl text-sm font-black hover:bg-blue-50 transition-all flex items-center justify-center gap-3 shadow-xl"><Download size={18} />IR용 데이터 리포트 추출</button>
                 <button className="w-full py-3 bg-slate-900 text-slate-400 rounded-xl text-xs font-bold hover:text-white transition-all flex items-center justify-center gap-2 border border-slate-800"><FileText size={16} />메디컬 MD 제안서 자동 생성 (AI)</button>
