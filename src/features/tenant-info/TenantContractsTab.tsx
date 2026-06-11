@@ -1,12 +1,12 @@
 
 import React, { useMemo } from 'react';
+import { useProjectData } from '../../providers/ProjectDataProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Contract, Unit } from '../../types';
 
 interface TenantContractsTabProps {
-  contracts: Contract[];
-  units: Unit[];
+  tenantId: string;
 }
 
 // 숫자를 안전하게 파싱하고, 실패 시 0을 반환하는 헬퍼 함수
@@ -18,7 +18,6 @@ const parseSafeNumber = (value: any): number => {
 // 숫자를 통화 형식으로 안전하게 포맷하는 헬퍼 함수
 const formatCurrencySafe = (amount: any) => {
   const num = parseSafeNumber(amount);
-  // ₩0과 NaN/Invalid 값을 구분하기 위해, 원래 값이 0이 아닐 때만 N/A 처리
   if (num === 0 && amount !== 0 && amount !== '0') {
       return 'N/A';
   }
@@ -57,14 +56,21 @@ const ContractCard: React.FC<{ contract: Contract, unit?: Unit }> = ({ contract,
           <p className="font-mono text-right">{formatCurrencySafe(contract.deposit)}</p>
 
           <p className="text-gray-500">월 임대료</p>
-          <p className="font-mono text-right">{formatCurrencySafe(contract.monthlyRent)}</p>
+          <p className="font-mono text-right">{formatCurrencySafe(contract.rent)}</p>
         </div>
       </CardContent>
     </Card>
   );
 };
 
-const TenantContractsTab: React.FC<TenantContractsTabProps> = ({ contracts, units }) => {
+const TenantContractsTab: React.FC<TenantContractsTabProps> = ({ tenantId }) => {
+  const { contracts, units } = useProjectData();
+
+  const tenantContracts = useMemo(
+    () => (contracts || []).filter(c => c.tenantId === tenantId),
+    [contracts, tenantId]
+  );
+
   const unitsMap = useMemo(() => 
     (units || []).reduce((map, unit) => {
       map[unit.id] = unit;
@@ -72,12 +78,7 @@ const TenantContractsTab: React.FC<TenantContractsTabProps> = ({ contracts, unit
     }, {} as { [key: string]: Unit })
   , [units]);
 
-  const validContracts = useMemo(
-    () => (contracts || []).filter(contract => unitsMap[contract.unitId]),
-    [contracts, unitsMap]
-  );
-
-  if (validContracts.length === 0) {
+  if (tenantContracts.length === 0) {
     return (
       <div className="text-center py-12 text-gray-500">
         <p>해당 임차인의 계약 정보가 없습니다.</p>
@@ -87,7 +88,7 @@ const TenantContractsTab: React.FC<TenantContractsTabProps> = ({ contracts, unit
 
   return (
     <div className="space-y-4">
-      {validContracts.map(contract => (
+      {tenantContracts.map(contract => (
         <ContractCard 
           key={contract.id} 
           contract={contract} 

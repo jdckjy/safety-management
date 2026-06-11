@@ -97,31 +97,40 @@ export interface TeamMember {
 
 export interface Unit {
     id: string;
-    unitNumber: string;
+    name: string;
     floor: string;
     area_sqm: number;
     status: 'occupied' | 'vacant' | 'under-renovation';
-    svgPath: string;
+    pathData: string;
+    position_x?: number;
+    position_y?: number;
 }
 
 export interface TenantUnit {
-  id: string;
-  floor: string;
-  name: string;
-  tenant: string;
-  area_sqm: number;
-  status: 'OCCUPIED' | 'VACANT';
-  pathData: string;
+    id: string;
+    floor: string;
+    name: string;
+    tenant: string;
+    area_sqm: number;
+    status: string;
+    pathData: string;
 }
-
 
 export interface TenantInfo {
     id: string;
-    businessName: string;
-    ownerName: string;
+    businessName?: string; 
+    companyName?: string; 
+    ownerName?: string;
+    representativeName?: string;
     contact: string;
-    businessType: string;
-    unitId: string;
+    businessType?: string; 
+    businessCategory?: string;
+    unitId?: string;
+    residentEmployees?: { male: number; female: number };
+    companySize?: string;
+    businessDescription?: string;
+    acquisitionChannel?: string;
+    businessRegistrationNumber?: string;
 }
 
 export interface Contract {
@@ -133,7 +142,13 @@ export interface Contract {
     endDate: string;
     deposit: number;
     rent: number;
+    moveInDate?: string;
 }
+
+export type EnrichedUnit = Unit & {
+    tenant?: TenantInfo;
+    contract?: Contract;
+};
 
 export interface Attachment {
     id: string;
@@ -159,7 +174,20 @@ export interface CustomTab {
     content?: string;
 }
 
+export interface Floor {
+  level: number;
+  floor_plan_url: string;
+}
+
+export interface Building {
+  id: string;
+  name: string;
+  floors: Floor[];
+  units: Unit[];
+}
+
 export interface IProjectData {
+    buildings?: Building[];
     safetyKPIs: KPI[];
     leaseKPIs: KPI[];
     assetKPIs: KPI[];

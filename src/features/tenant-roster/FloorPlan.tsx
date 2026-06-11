@@ -1,18 +1,20 @@
+
 import React, { useState, useRef } from 'react';
-import { EnrichedUnit } from './TenantRoster'; // EnrichedUnit 타입을 import 합니다.
+import { EnrichedUnit } from '../../types'; // EnrichedUnit 타입을 수정된 경로에서 가져옵니다.
 
 interface FloorPlanProps {
-  units: EnrichedUnit[]; // props 타입을 EnrichedUnit으로 변경합니다.
+  units: EnrichedUnit[];
   onUnitSelect: (unitId: string) => void;
   selectedUnitId: string | null;
   floorPlanImage: string;
 }
 
-// 새로운 status ('OCCUPIED', 'VACANT')에 맞게 함수를 단순화합니다.
+// 'occupied', 'vacant', 'under-renovation' 상태에 맞게 색상을 반환합니다.
 const getStatusColor = (status: EnrichedUnit['status']) => {
     switch (status) {
-        case 'OCCUPIED': return 'rgba(74, 222, 128, 0.6)';   // Green-400 (계약)
-        case 'VACANT': return 'rgba(248, 113, 113, 0.6)';   // Red-400 (공실)
+        case 'occupied': return 'rgba(74, 222, 128, 0.6)';   // Green-400 (계약)
+        case 'vacant': return 'rgba(248, 113, 113, 0.6)';   // Red-400 (공실)
+        case 'under-renovation': return 'rgba(251, 191, 36, 0.6)'; // Amber-400 (리모델링)
         default: return 'rgba(156, 163, 175, 0.5)'; // 기본 회색
     }
 };

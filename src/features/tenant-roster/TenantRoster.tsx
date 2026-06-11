@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useProjectData } from '../../providers/ProjectDataProvider';
-import { Unit, TenantInfo, Contract } from '../../types';
+import { Unit, TenantInfo, Contract, EnrichedUnit } from '../../types';
 import UnitEditModal from './UnitEditModal';
 import TenantInfoEditModal from './TenantInfoEditModal';
 import FloorPlan from './FloorPlan';
@@ -13,13 +13,6 @@ import { Card, CardContent } from "../../components/ui/card";
 import floor1F from '../../assets/1F.png';
 import floor2F from '../../assets/2F.png';
 import floor3F from '../../assets/3F.png';
-
-// 컴포넌트 내부에서 사용할 확장된 유닛 데이터 타입
-export interface EnrichedUnit extends Unit {
-  tenant?: TenantInfo;
-  contract?: Contract;
-  status: 'OCCUPIED' | 'VACANT';
-}
 
 const TenantRoster: React.FC = () => {
   const { units, contracts, tenantInfo, deleteUnit, addUnit, updateUnit, addContract, updateContract, deleteContract } = useProjectData();
@@ -41,19 +34,27 @@ const TenantRoster: React.FC = () => {
   };
 
   const enrichedUnits: EnrichedUnit[] = useMemo(() => {
-    if (!units || !contracts || !tenantInfo) return [];
-
-    const contractMap = new Map(contracts.map(c => [c.unitId, c]));
-    const tenantMap = new Map(tenantInfo.map(t => [t.id, t]));
+    if (!units || !tenantInfo || !contracts) return [];
 
     return units.map(unit => {
-      const contract = contractMap.get(unit.id);
-      const tenant = contract ? tenantMap.get(contract.tenantId) : undefined;
+      const unitContracts = (contracts || []).filter(c => c.unitId === unit.id);
+      const latestContract = unitContracts.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())[0];
+      const tenant = latestContract ? (tenantInfo || []).find(t => t.id === latestContract.tenantId) : undefined;
+      
+      let status: Unit['status'];
+      if (unit.status === 'under-renovation') {
+        status = 'under-renovation';
+      } else if (tenant && latestContract) {
+        status = 'occupied';
+      } else {
+        status = 'vacant';
+      }
+
       return {
         ...unit,
-        contract,
+        contract: latestContract,
         tenant,
-        status: contract ? 'OCCUPIED' : 'VACANT',
+        status,
       };
     });
   }, [units, contracts, tenantInfo]);
@@ -63,7 +64,7 @@ const TenantRoster: React.FC = () => {
       if (unitList.length === 0) return { rate: 0, occupied: 0, totalRentable: 0 };
       
       const occupiedArea = unitList
-        .filter(u => u.status === 'OCCUPIED')
+        .filter(u => u.status === 'occupied')
         .reduce((sum, u) => sum + u.area_sqm, 0);
       
       const totalRentableArea = unitList.reduce((sum, u) => sum + u.area_sqm, 0);
@@ -105,8 +106,8 @@ const TenantRoster: React.FC = () => {
   };
 
   const handleEditUnit = (unit: Unit) => {
-    const { id, floor, name, area_sqm, pathData } = unit;
-    setEditingUnit({ id, floor, name, area_sqm, pathData });
+    const { id, floor, name, area_sqm, pathData, status } = unit;
+    setEditingUnit({ id, floor, name, area_sqm, pathData, status });
     setUnitModalOpen(true);
   };
 
@@ -143,6 +144,7 @@ const TenantRoster: React.FC = () => {
         name: unitData.name || '새 유닛',
         area_sqm: unitData.area_sqm || 0,
         pathData: unitData.pathData || '',
+        status: 'vacant',
       } as Omit<Unit, 'id'>);
 
       if (contractData && contractData.tenantId) {
@@ -177,7 +179,7 @@ const TenantRoster: React.FC = () => {
         onSave={handleSaveUnit}
         unit={editingUnit}
         floor={selectedFloor}
-        tenantInfo={tenantInfo} // Pass tenantInfo here
+        tenantInfo={tenantInfo}
       />}
       {isTenantModalOpen && <TenantInfoEditModal
         isOpen={isTenantModalOpen}

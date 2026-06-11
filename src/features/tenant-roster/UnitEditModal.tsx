@@ -30,19 +30,14 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, onSave, 
     if (isOpen) {
       if (unit) {
         setUnitData(unit);
-        // Note: This modal doesn't directly edit contracts, but prepares data.
-        // We could fetch the existing contract if needed, but for now, we'll start fresh
-        // or assume the parent component handles merging.
         setContractData({ unitId: unit.id }); 
         setSelectedTenantId(NO_TENANT_VALUE);
       } else {
-        // For new units
         setUnitData({ floor: floor, name: '', area_sqm: 0 });
         setContractData({});
         setSelectedTenantId(NO_TENANT_VALUE);
       }
     } else {
-      // Reset on close
       setUnitData({});
       setContractData({});
       setSelectedTenantId(NO_TENANT_VALUE);
@@ -71,7 +66,6 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, onSave, 
   }, [unitData.name]);
 
   const handleSave = () => {
-    // Only include contract data if a tenant is selected
     const contractToSave = selectedTenantId !== NO_TENANT_VALUE ? contractData : undefined;
     onSave(unitData, contractToSave);
     onClose();
@@ -108,7 +102,7 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, onSave, 
               <SelectItem value={NO_TENANT_VALUE}>없음 (공실)</SelectItem>
               {tenantInfo.map((info) => (
                 <SelectItem key={info.id} value={info.id}>
-                  {info.companyName}
+                  {info.businessName}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -120,7 +114,7 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, onSave, 
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="rent">월임대료</Label>
-                <Input id="rent" type="number" value={contractData.monthlyRent || 0} onChange={(e) => handleContractChange('monthlyRent', parseInt(e.target.value, 10) || 0)} />
+                <Input id="rent" type="number" value={contractData.rent || 0} onChange={(e) => handleContractChange('rent', parseInt(e.target.value, 10) || 0)} />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="deposit">보증금</Label>
@@ -128,29 +122,15 @@ const UnitEditModal: React.FC<UnitEditModalProps> = ({ isOpen, onClose, onSave, 
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="contractDate">계약일</Label>
-                <Input id="contractDate" type="date" value={contractData.startDate || ''} onChange={(e) => handleContractChange('startDate', e.target.value)} />
+                <Label htmlFor="startDate">계약 시작일</Label>
+                <Input id="startDate" type="date" value={contractData.startDate || ''} onChange={(e) => handleContractChange('startDate', e.target.value)} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="moveInDate">입주일</Label>
-                <Input id="moveInDate" type="date" value={contractData.moveInDate || ''} onChange={(e) => handleContractChange('moveInDate', e.target.value)} />
+                <Label htmlFor="endDate">계약 만기일</Label>
+                <Input id="endDate" type="date" value={contractData.endDate || ''} onChange={(e) => handleContractChange('endDate', e.target.value)} />
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="moveOutDate">만기일</Label>
-                <Input id="moveOutDate" type="date" value={contractData.endDate || ''} onChange={(e) => handleContractChange('endDate', e.target.value)} />
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="remarks">비고</Label>
-              <Textarea 
-                  id="remarks"
-                  value={contractData.remarks || ''}
-                  onChange={(e) => handleContractChange('remarks', e.target.value)}
-                  placeholder="특약 사항이나 민원 이력 등 정형화하기 어려운 내용을 입력하세요."
-              />
             </div>
           </>
         )}

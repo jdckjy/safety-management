@@ -1,33 +1,34 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
-import { Building } from '@/types';
+import { Building, EnrichedUnit } from '@/types';
+import { useProjectData } from '../../providers/ProjectDataProvider';
 import FloorPlanControls from './FloorPlanControls';
 import FloorPlan from './FloorPlan';
+import UnitDetailPanel from '../tenant-roster/UnitDetailPanel';
 
 interface FloorPlanBrowserProps {
   buildings: Building[];
 }
 
 const FloorPlanBrowser: React.FC<FloorPlanBrowserProps> = ({ buildings }) => {
+  const { tenantInfo, contracts } = useProjectData();
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [selectedFloor, setSelectedFloor] = useState<number>(1);
+  const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
 
-  // 무한 루프 수정: useEffect의 의존성 배열에서 selectedBuildingId를 제거합니다.
-  // 이 로직은 이제 buildings 배열 자체가 변경될 때만 실행됩니다.
   useEffect(() => {
     if (buildings && buildings.length > 0) {
-      // 현재 선택된 건물이 전체 목록에 여전히 존재하는지 확인합니다.
       const currentBuildingExists = buildings.some(b => b.id === selectedBuildingId);
-      // 만약 선택된 건물이 없거나, 더 이상 목록에 존재하지 않는다면 첫 번째 건물로 리셋합니다.
       if (!selectedBuildingId || !currentBuildingExists) {
         setSelectedBuildingId(buildings[0].id);
-        setSelectedFloor(1); // 건물이 바뀌면 1층으로 리셋
+        setSelectedFloor(1);
+        setSelectedUnitId(null);
       }
     } else {
-        // 건물이 없으면 선택도 초기화합니다.
-        setSelectedBuildingId(null);
+      setSelectedBuildingId(null);
+      setSelectedUnitId(null);
     }
-    // 의존성 배열에서 selectedBuildingId 제거
-  }, [buildings]);
+  }, [buildings, selectedBuildingId]);
 
   const selectedBuilding = useMemo(() => 
     buildings.find(b => b.id === selectedBuildingId), 
@@ -36,58 +37,94 @@ const FloorPlanBrowser: React.FC<FloorPlanBrowserProps> = ({ buildings }) => {
 
   const handleFloorChange = (floor: number) => {
     setSelectedFloor(floor);
+    setSelectedUnitId(null);
   };
   
-  // (나머지 코드는 이전과 동일)
+  const handleUnitSelect = (unitId: string) => {
+    setSelectedUnitId(prevId => prevId === unitId ? null : unitId);
+  };
+
   const currentFloorInfo = useMemo(() => 
     selectedBuilding?.floors.find(f => f.level === selectedFloor), 
     [selectedBuilding, selectedFloor]
   );
 
   const unitsOnCurrentFloor = useMemo(() => 
-    selectedBuilding?.units.filter(unit => unit.floor === selectedFloor) || [], 
+    selectedBuilding?.units.filter(unit => String(unit.floor) === String(selectedFloor)) || [], 
     [selectedBuilding, selectedFloor]
   );
 
+  const enrichedUnits = useMemo<EnrichedUnit[]>(() => {
+    if (!unitsOnCurrentFloor) return [];
+    return unitsOnCurrentFloor.map(unit => {
+      const unitContracts = (contracts || []).filter(c => c.unitId === unit.id);
+      const latestContract = unitContracts.sort((a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime())[0];
+      const tenant = latestContract ? (tenantInfo || []).find(t => t.id === latestContract.tenantId) : undefined;
+      return { ...unit, tenant, contract: latestContract };
+    });
+  }, [unitsOnCurrentFloor, tenantInfo, contracts]);
+
+  const selectedUnit = useMemo<EnrichedUnit | undefined>(() =>
+    enrichedUnits.find(unit => unit.id === selectedUnitId),
+    [enrichedUnits, selectedUnitId]
+  );
+
   if (!buildings || buildings.length === 0) {
-    return (
-      <div className="bg-white rounded-5xl p-6 md:p-10 shadow-sm border border-gray-50">
-        <h3 className="text-2xl font-bold mb-6">층별 평면도</h3>
-        <div className="text-center py-10 text-gray-500">
-          <p>등록된 건물 정보가 없습니다.</p>
-          <p className="text-sm text-gray-400 mt-2">데이터베이스 시딩 스크립트를 실행해주세요.</p>
-        </div>
-      </div>
-    );
+    return <div className="bg-white rounded-lg shadow-md p-6"><h3 className="text-xl font-bold mb-4">층별 평면도</h3><div className="text-center py-10 text-gray-500">등록된 건물 정보가 없습니다.</div></div>;
   }
   
   if (!selectedBuilding) {
-    return (
-        <div className="bg-white rounded-5xl p-6 md:p-10 shadow-sm border border-gray-50">
-            <h3 className="text-2xl font-bold mb-6">층별 평면도</h3>
-            <div className="text-center py-10 text-gray-500">건물 정보를 불러오는 중입니다...</div>
-        </div>
-    );
+    return <div className="bg-white rounded-lg shadow-md p-6"><h3 className="text-xl font-bold mb-4">층별 평면도</h3><div className="text-center py-10 text-gray-500">건물 정보를 불러오는 중입니다...</div></div>;
   }
 
   return (
-    <div className="bg-white rounded-5xl p-6 md:p-10 shadow-sm border border-gray-50">
-      <h3 className="text-2xl font-bold mb-6">층별 평면도</h3>
-      <FloorPlanControls
-        floors={selectedBuilding.floors.map(f => f.level)}
-        selectedFloor={selectedFloor}
-        onFloorChange={handleFloorChange}
-      />
-      {
-        currentFloorInfo ? (
+    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="xl:col-span-2 bg-white rounded-lg shadow-md p-6">
+        <h3 className="text-xl font-bold mb-4">{selectedBuilding.name}</h3>
+        
+        {/* ===== DEBUG OUTPUT START ===== */}
+        <div className="bg-gray-100 p-2 rounded-md my-4">
+          <h4 className="font-bold text-sm mb-1">[DEBUG] Enriched Units Data:</h4>
+          <pre className="text-xs overflow-auto max-h-48 bg-white p-2 border">{
+            JSON.stringify(enrichedUnits, null, 2)
+          }</pre>
+        </div>
+        {/* ===== DEBUG OUTPUT END ===== */}
+
+        <FloorPlanControls
+          floors={selectedBuilding.floors.map(f => f.level)}
+          selectedFloor={selectedFloor}
+          onFloorChange={handleFloorChange}
+        />
+        {currentFloorInfo ? (
           <FloorPlan 
             imageUrl={currentFloorInfo.floor_plan_url}
-            units={unitsOnCurrentFloor}
+            units={enrichedUnits}
+            selectedUnitId={selectedUnitId}
+            onUnitSelect={handleUnitSelect}
+            currentFloor={selectedFloor}
           />
         ) : (
           <div className="text-center py-10">선택된 층의 평면도 정보가 없습니다.</div>
-        )
-      }
+        )}
+      </div>
+      
+      <div className="xl:col-span-1">
+        {selectedUnit ? (
+          <UnitDetailPanel
+            unit={selectedUnit}
+            onEdit={() => alert(`Edit: ${selectedUnit.name}`)}
+            onDelete={() => alert(`Delete: ${selectedUnit.name}`)}
+          />
+        ) : (
+          <div className="bg-white rounded-lg shadow-lg h-full flex items-center justify-center p-6">
+            <div className="text-center">
+              <p className="text-lg font-semibold text-gray-700">호실을 선택해주세요</p>
+              <p className="text-sm text-gray-500 mt-1">평면도에서 호실을 클릭하면 상세 정보가 표시됩니다.</p>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

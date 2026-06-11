@@ -8,7 +8,6 @@ import TenantBasicInfoTab from './TenantBasicInfoTab';
 import TenantContractsTab from './TenantContractsTab';
 import TenantDocumentsTab from './TenantDocumentsTab';
 import TenantInsightPanel from './TenantInsightPanel';
-import { Unit } from '../../types';
 import { ArrowLeft, Edit } from 'lucide-react';
 
 interface TenantDetailProps {
@@ -17,28 +16,13 @@ interface TenantDetailProps {
 }
 
 const TenantDetail: React.FC<TenantDetailProps> = ({ tenantId, onBackToList }) => {
-  const { tenantInfo, contracts, units, isDataLoaded } = useProjectData();
+  const { tenantInfo, isDataLoaded } = useProjectData();
 
   if (!isDataLoaded) {
     return <div className="flex items-center justify-center h-full">데이터 로딩 중...</div>;
   }
 
   const tenant = (tenantInfo || []).find(t => t.id === tenantId);
-  const allTenantContracts = (contracts || []).filter(c => c.tenantId === tenantId);
-  
-  const activeContracts = allTenantContracts.filter(c => {
-    try {
-      return new Date(c.endDate) >= new Date();
-    } catch (e) {
-        console.error(`[Data Error] 계약 ID ${c.id}의 endDate 형식이 잘못되었습니다:`, c.endDate, e);
-        return false;
-    }
-  });
-
-  const totalRentableArea = (units || []).reduce((acc, unit) => {
-    const area = parseFloat(String(unit.area_sqm || '0'));
-    return acc + (isNaN(area) ? 0 : area);
-  }, 0);
 
   if (!tenant) {
     return (
@@ -59,9 +43,9 @@ const TenantDetail: React.FC<TenantDetailProps> = ({ tenantId, onBackToList }) =
                 <Button variant="outline" size="icon" onClick={onBackToList}>
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
-                <CardTitle className="text-xl">{tenant.companyName}</CardTitle>
+                <CardTitle className="text-xl">{tenant.businessName}</CardTitle>
             </div>
-            <Button variant="outline">
+            <Button variant="outline" disabled>
                 <Edit className="mr-2 h-4 w-4" />
                 수정
             </Button>
@@ -78,10 +62,10 @@ const TenantDetail: React.FC<TenantDetailProps> = ({ tenantId, onBackToList }) =
                             <TabsTrigger value="documents">서류관리</TabsTrigger>
                         </TabsList>
                         <TabsContent value="basic-info" className="mt-4">
-                            <TenantBasicInfoTab tenant={tenant} />
+                            <TenantBasicInfoTab tenantId={tenantId} />
                         </TabsContent>
                         <TabsContent value="contracts" className="mt-4">
-                            <TenantContractsTab contracts={allTenantContracts} units={units} />
+                            <TenantContractsTab tenantId={tenantId} />
                         </TabsContent>
                         <TabsContent value="documents" className="mt-4">
                             <TenantDocumentsTab tenantId={tenantId} />
@@ -91,12 +75,7 @@ const TenantDetail: React.FC<TenantDetailProps> = ({ tenantId, onBackToList }) =
 
                 {/* Right Sidebar (Insight) */}
                 <div className="lg:col-span-1">
-                    <TenantInsightPanel 
-                        tenant={tenant}
-                        activeContracts={activeContracts} 
-                        totalRentableArea={totalRentableArea} 
-                        units={units}
-                    />
+                    <TenantInsightPanel tenantId={tenantId} />
                 </div>
             </div>
         </CardContent>

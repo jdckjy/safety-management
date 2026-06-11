@@ -8,6 +8,8 @@ import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '../constants';
 import { initialComplexFacilities } from '../data/initial-complex-facilities';
 import { initialTeamMembers } from '../data/initial-team-members';
 import { initialUnits } from '../data/initial-units';
+import { initialTenantInfo } from '../data/initial-tenant-info';
+import { initialContracts } from '../data/initial-contracts';
 import rawFebruaryReportData from '../data/2026-02-report.json';
 
 
@@ -135,8 +137,8 @@ const initialData: IProjectData = {
   complexFacilities: initialComplexFacilities || [],
   teamMembers: initialTeamMembers || [],
   units: initialUnits || [],
-  tenantInfo: [],
-  contracts: [],
+  tenantInfo: initialTenantInfo || [],
+  contracts: initialContracts || [],
   attachments: [],
   generalActivities: [],
   customTabs: [], 
@@ -154,8 +156,8 @@ const newUserInitialData: IProjectData = {
   complexFacilities: initialComplexFacilities || [],
   teamMembers: initialTeamMembers || [],
   units: initialUnits || [],
-  tenantInfo: [],
-  contracts: [],
+  tenantInfo: initialTenantInfo || [],
+  contracts: initialContracts || [],
   attachments: [],
   generalActivities: [],
   customTabs: [],

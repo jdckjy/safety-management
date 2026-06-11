@@ -1,14 +1,13 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { TenantInfo } from '../../types';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Pencil } from 'lucide-react';
-import EditTenantDialog from './EditTenantDialog'; // 수정 다이얼로그 임포트
-import { useProjectData } from '../../providers/ProjectDataProvider'; // 데이터 프로바이더 임포트
+import { useProjectData } from '../../providers/ProjectDataProvider';
 
 interface TenantBasicInfoTabProps {
-  tenant: TenantInfo;
+  tenantId: string;
 }
 
 const InfoRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
@@ -18,45 +17,33 @@ const InfoRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, v
   </div>
 );
 
-const TenantBasicInfoTab: React.FC<TenantBasicInfoTabProps> = ({ tenant }) => {
+const TenantBasicInfoTab: React.FC<TenantBasicInfoTabProps> = ({ tenantId }) => {
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
-  const { updateTenant } = useProjectData(); // updateTenant 함수 가져오기
+  const { tenantInfo } = useProjectData(); 
+  const tenant = useMemo(() => tenantInfo.find(t => t.id === tenantId), [tenantInfo, tenantId]);
 
-  const handleUpdateTenant = (updatedTenant: TenantInfo) => {
-    updateTenant(updatedTenant);
-    setEditDialogOpen(false); // 다이얼로그 닫기
-  };
+  if (!tenant) {
+    return <div>기본 정보를 찾을 수 없습니다.</div>;
+  }
 
   return (
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
           <CardTitle className="text-lg font-bold">기본 정보</CardTitle>
-          <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => setEditDialogOpen(true)} disabled>
             <Pencil className="w-4 h-4 mr-2" />
             수정
           </Button>
         </CardHeader>
         <CardContent>
-          <InfoRow label="업체(기관)명" value={tenant.companyName} />
-          <InfoRow label="사업자등록번호" value={tenant.businessRegistrationNumber} />
-          <InfoRow label="대표자명" value={tenant.representativeName} />
+          <InfoRow label="업체(기관)명" value={tenant.businessName} />
+          <InfoRow label="대표자명" value={tenant.ownerName} />
           <InfoRow label="담당자 연락처" value={tenant.contact} />
-          <InfoRow label="기업 규모" value={tenant.companySize} />
-          <InfoRow label="업종 카테고리" value={tenant.businessCategory} />
-          <InfoRow label="주요 사업 내용" value={tenant.businessDescription || '-'} />
-          <InfoRow label="유치 경로" value={tenant.acquisitionChannel || '-'} />
+          <InfoRow label="업종 카테고리" value={tenant.businessType} />
         </CardContent>
       </Card>
-
-      {isEditDialogOpen && (
-        <EditTenantDialog 
-          isOpen={isEditDialogOpen}
-          onClose={() => setEditDialogOpen(false)}
-          tenant={tenant}
-          onUpdateTenant={handleUpdateTenant}
-        />
-      )}
+      {/* 수정 다이얼로그 기능은 현재 비활성화되어 있습니다. */}
     </>
   );
 };

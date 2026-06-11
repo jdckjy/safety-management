@@ -5,11 +5,10 @@ import { TenantInfo } from '../types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-// ❗️ FIX: Correct the import to use a default import for the modal component.
 import TenantInfoModal from '@/components/TenantInfoModal';
 
 const TenantManagementPage: React.FC = () => {
-  const { tenantInfo, addTenant, updateTenant } = useProjectData();
+  const { tenantInfo, contracts, addTenant } = useProjectData(); // updateTenant 제거, contracts 추가
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTenant, setSelectedTenant] = useState<TenantInfo | null>(null);
@@ -20,24 +19,24 @@ const TenantManagementPage: React.FC = () => {
     return searchTerm
       ? tenantInfo.filter(tenant =>
           tenant && (
-            (tenant.companyName || '').toLowerCase().includes(lowercasedSearchTerm) ||
-            (tenant.representativeName || '').toLowerCase().includes(lowercasedSearchTerm)
+            (tenant.businessName || '').toLowerCase().includes(lowercasedSearchTerm) ||
+            (tenant.ownerName || '').toLowerCase().includes(lowercasedSearchTerm) // representativeName -> ownerName
           )
         )
       : tenantInfo;
   }, [tenantInfo, searchTerm]);
 
   const tenantsWithContracts = useMemo(() => {
-    const tenantIdSet = new Set<string>();
-    if (Array.isArray(tenantInfo)) {
-      tenantInfo.forEach(tenant => {
-        if (tenant && Array.isArray(tenant.contracts) && tenant.contracts.length > 0) {
-          tenantIdSet.add(tenant.id);
+    const contractTenantIds = new Set<string>();
+    if (Array.isArray(contracts)) {
+      contracts.forEach(contract => {
+        if (contract && contract.tenantId) {
+            contractTenantIds.add(contract.tenantId);
         }
       });
     }
-    return tenantIdSet;
-  }, [tenantInfo]);
+    return contractTenantIds;
+  }, [contracts]);
 
   const handleOpenModalForEdit = (tenant: TenantInfo) => {
     setSelectedTenant(tenant);
@@ -55,11 +54,11 @@ const TenantManagementPage: React.FC = () => {
   };
 
   const handleSubmit = (submittedTenant: TenantInfo) => {
-    if (submittedTenant.id && selectedTenant) {
-      updateTenant(submittedTenant);
-    } else {
+    // if (submittedTenant.id && selectedTenant) {
+    //   updateTenant(submittedTenant);
+    // } else {
       addTenant(submittedTenant);
-    }
+    // }
     handleCloseModal();
   };
 
@@ -86,7 +85,7 @@ const TenantManagementPage: React.FC = () => {
                     onClick={() => handleOpenModalForEdit(tenant)}
                   >
                     <div>
-                      <p>{tenant.companyName}</p>
+                      <p>{tenant.businessName}</p>
                       <p className={`text-xs ${tenantsWithContracts.has(tenant.id) ? "text-green-500" : "text-gray-400"}`}>
                         {tenantsWithContracts.has(tenant.id) ? "계약 있음" : "계약 없음"}
                       </p>
