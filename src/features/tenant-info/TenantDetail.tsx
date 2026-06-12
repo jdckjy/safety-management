@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useProjectData } from '../../providers/ProjectDataProvider';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
@@ -8,7 +8,9 @@ import TenantBasicInfoTab from './TenantBasicInfoTab';
 import TenantContractsTab from './TenantContractsTab';
 import TenantDocumentsTab from './TenantDocumentsTab';
 import TenantInsightPanel from './TenantInsightPanel';
+import EditTenantDialog from './EditTenantDialog';
 import { ArrowLeft, Edit } from 'lucide-react';
+import { TenantInfo } from '../../types';
 
 interface TenantDetailProps {
   tenantId: string;
@@ -16,13 +18,22 @@ interface TenantDetailProps {
 }
 
 const TenantDetail: React.FC<TenantDetailProps> = ({ tenantId, onBackToList }) => {
-  const { tenantInfo, isDataLoaded } = useProjectData();
+  const { tenantInfo, setTenantInfo, isDataLoaded } = useProjectData();
+  const [isEditDialogOpen, setEditDialogOpen] = useState(false);
 
   if (!isDataLoaded) {
     return <div className="flex items-center justify-center h-full">데이터 로딩 중...</div>;
   }
 
   const tenant = (tenantInfo || []).find(t => t.id === tenantId);
+
+  const handleSave = (updatedTenant: TenantInfo) => {
+    const updatedTenantInfo = tenantInfo.map(t => 
+      t.id === updatedTenant.id ? updatedTenant : t
+    );
+    setTenantInfo(updatedTenantInfo);
+    setEditDialogOpen(false); 
+  };
 
   if (!tenant) {
     return (
@@ -45,7 +56,7 @@ const TenantDetail: React.FC<TenantDetailProps> = ({ tenantId, onBackToList }) =
                 </Button>
                 <CardTitle className="text-xl">{tenant.businessName}</CardTitle>
             </div>
-            <Button variant="outline" disabled>
+            <Button variant="outline" onClick={() => setEditDialogOpen(true)}>
                 <Edit className="mr-2 h-4 w-4" />
                 수정
             </Button>
@@ -79,6 +90,12 @@ const TenantDetail: React.FC<TenantDetailProps> = ({ tenantId, onBackToList }) =
                 </div>
             </div>
         </CardContent>
+        <EditTenantDialog
+          tenant={tenant}
+          isOpen={isEditDialogOpen}
+          onClose={() => setEditDialogOpen(false)}
+          onSave={handleSave}
+        />
     </Card>
   );
 };

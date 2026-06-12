@@ -106,16 +106,6 @@ export interface Unit {
     position_y?: number;
 }
 
-export interface TenantUnit {
-    id: string;
-    floor: string;
-    name: string;
-    tenant: string;
-    area_sqm: number;
-    status: string;
-    pathData: string;
-}
-
 export interface TenantInfo {
     id: string;
     businessName?: string; 
