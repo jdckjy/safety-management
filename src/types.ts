@@ -106,6 +106,10 @@ export interface Unit {
     position_y?: number;
 }
 
+export type CompanySize = '대기업' | '중견' | '중소' | '스타트업';
+export type BusinessCategory = '의료' | '교육' | '연구' | '근생' | '기타';
+export type AcquisitionChannel = '직접 유치' | '유관기관 소개' | '온라인' | '기타';
+
 export interface TenantInfo {
     id: string;
     businessName?: string; 
@@ -114,13 +118,14 @@ export interface TenantInfo {
     representativeName?: string;
     contact: string;
     businessType?: string; 
-    businessCategory?: string;
+    businessCategory?: BusinessCategory;
     unitId?: string;
     residentEmployees?: { male: number; female: number };
-    companySize?: string;
+    companySize?: CompanySize;
     businessDescription?: string;
-    acquisitionChannel?: string;
+    acquisitionChannel?: AcquisitionChannel;
     businessRegistrationNumber?: string;
+    address?: string;
 }
 
 export interface Contract {

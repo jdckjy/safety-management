@@ -46,9 +46,14 @@ const TenantBasicInfoTab: React.FC<TenantBasicInfoTabProps> = ({ tenantId }) => 
         </CardHeader>
         <CardContent>
           <InfoRow label="업체(기관)명" value={tenant.companyName || tenant.businessName} />
+          <InfoRow label="사업자등록번호" value={tenant.businessRegistrationNumber} />
           <InfoRow label="대표자명" value={tenant.representativeName || tenant.ownerName} />
           <InfoRow label="담당자 연락처" value={tenant.contact} />
+          <InfoRow label="기업 규모" value={tenant.companySize} />
           <InfoRow label="업종 카테고리" value={tenant.businessCategory || tenant.businessType} />
+          <InfoRow label="주소" value={tenant.address} />
+          <InfoRow label="주요 사업 내용" value={tenant.businessDescription} />
+          <InfoRow label="유치 경로" value={tenant.acquisitionChannel} />
         </CardContent>
       </Card>
       <EditTenantDialog
