@@ -13,7 +13,7 @@ interface TenantBasicInfoTabProps {
 const InfoRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
   <div className="grid grid-cols-3 gap-4 py-3 border-b border-gray-100">
     <p className="text-sm text-gray-600">{label}</p>
-    <div className="col-span-2 text-sm font-medium">{value}</div>
+    <div className="col-span-2 text-sm font-medium">{value || '-'}</div>
   </div>
 );
 
@@ -37,10 +37,10 @@ const TenantBasicInfoTab: React.FC<TenantBasicInfoTabProps> = ({ tenantId }) => 
           </Button>
         </CardHeader>
         <CardContent>
-          <InfoRow label="업체(기관)명" value={tenant.businessName} />
-          <InfoRow label="대표자명" value={tenant.ownerName} />
+          <InfoRow label="업체(기관)명" value={tenant.companyName || tenant.businessName} />
+          <InfoRow label="대표자명" value={tenant.representativeName || tenant.ownerName} />
           <InfoRow label="담당자 연락처" value={tenant.contact} />
-          <InfoRow label="업종 카테고리" value={tenant.businessType} />
+          <InfoRow label="업종 카테고리" value={tenant.businessCategory || tenant.businessType} />
         </CardContent>
       </Card>
       {/* 수정 다이얼로그 기능은 현재 비활성화되어 있습니다. */}
