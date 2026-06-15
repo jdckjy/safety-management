@@ -16,7 +16,6 @@ import {
   Download
 } from 'lucide-react';
 import { useProjectData } from '@/providers/ProjectDataProvider';
-import { TenantInfo } from '@/types';
 
 // Fix for default marker icon issues in React-Leaflet
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -67,35 +66,31 @@ const AITenantRecommender: React.FC = () => {
   const { units, contracts, tenantInfo } = useProjectData();
   const [radius, setRadius] = useState<number>(5);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
-  const [selectedFloor, setSelectedFloor] = useState<string>('2F');
+  const [selectedFloor, setSelectedFloor] = useState<string>('1F');
 
   const processedFloorUnits = useMemo(() => {
     const tenantMap = new Map(tenantInfo.map(t => [t.id, t]));
-    const activeContractByUnitId = new Map<string, any>();
-
-    for (const contract of contracts) {
-      if (contract.status === 'active' && contract.unitId) {
-        activeContractByUnitId.set(contract.unitId, contract);
-      }
-    }
 
     return units
       .filter(u => u.floor === selectedFloor)
       .map(unit => {
-        const isOccupied = unit.status === 'occupied';
-        let tenantName: string | undefined = undefined;
-        if (isOccupied) {
-          const contract = activeContractByUnitId.get(unit.id);
-          if (contract) {
-            const tenant = tenantMap.get(contract.tenantId);
-            tenantName = tenant?.businessName;
+        const activeContract = contracts.find(
+          c => c.unitId === unit.id && c.status === 'active'
+        );
+
+        const isOccupied = !!activeContract;
+        let tenantName = undefined;
+        if (activeContract && activeContract.tenantId) {
+          const tenant = tenantMap.get(activeContract.tenantId);
+          if (tenant) {
+            tenantName = tenant.businessName || tenant.companyName || tenant.ownerName || tenant.representativeName;
           }
         }
+
         return { ...unit, isOccupied, tenantName };
       })
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [units, contracts, tenantInfo, selectedFloor]);
-
 
   const handleFloorChange = (floor: string) => {
     setSelectedFloor(floor);
