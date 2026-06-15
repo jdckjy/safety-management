@@ -16,6 +16,7 @@ import {
   Download
 } from 'lucide-react';
 import { useProjectData } from '@/providers/ProjectDataProvider';
+import { shortenName } from '@/lib/utils';
 
 // Fix for default marker icon issues in React-Leaflet
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -79,11 +80,12 @@ const AITenantRecommender: React.FC = () => {
         );
 
         const isOccupied = !!activeContract;
-        let tenantName = undefined;
+        let tenantName: string | undefined = undefined;
         if (activeContract && activeContract.tenantId) {
           const tenant = tenantMap.get(activeContract.tenantId);
           if (tenant) {
-            tenantName = tenant.businessName || tenant.companyName || tenant.ownerName || tenant.representativeName;
+            const fullName = tenant.businessName || tenant.companyName || tenant.ownerName || tenant.representativeName;
+            tenantName = shortenName(fullName || '');
           }
         }
 
