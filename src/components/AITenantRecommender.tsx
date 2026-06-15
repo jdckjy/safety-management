@@ -69,41 +69,43 @@ const AITenantRecommender: React.FC = () => {
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [selectedFloor, setSelectedFloor] = useState<string>('2F');
 
-  const tenantNameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    if (!contracts || !tenantInfo) return map;
+  const processedFloorUnits = useMemo(() => {
+    const tenantMap = new Map(tenantInfo.map(t => [t.id, t]));
+    const activeContractByUnitId = new Map<string, any>();
 
-    const now = new Date();
-
-    contracts.forEach(contract => {
-      const tenant = tenantInfo.find((t: TenantInfo) => t.id === contract.tenantId);
-      
-      const startDate = new Date(contract.startDate);
-      const endDate = new Date(contract.endDate);
-      const isActive = now >= startDate && now <= endDate;
-
-      if (tenant && tenant.businessName && contract.unitId && isActive) {
-        map.set(contract.unitId, tenant.businessName);
+    for (const contract of contracts) {
+      if (contract.status === 'active' && contract.unitId) {
+        activeContractByUnitId.set(contract.unitId, contract);
       }
-    });
-    return map;
-  }, [contracts, tenantInfo]);
+    }
+
+    return units
+      .filter(u => u.floor === selectedFloor)
+      .map(unit => {
+        const isOccupied = unit.status === 'occupied';
+        let tenantName: string | undefined = undefined;
+        if (isOccupied) {
+          const contract = activeContractByUnitId.get(unit.id);
+          if (contract) {
+            const tenant = tenantMap.get(contract.tenantId);
+            tenantName = tenant?.businessName;
+          }
+        }
+        return { ...unit, isOccupied, tenantName };
+      })
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  }, [units, contracts, tenantInfo, selectedFloor]);
+
 
   const handleFloorChange = (floor: string) => {
     setSelectedFloor(floor);
     setSelectedUnitId(null);
   };
 
-  const floorUnits = useMemo(() => {
-    return units
-      .filter(u => u.floor === selectedFloor)
-      .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  }, [units, selectedFloor]);
-
   const selectedUnit = useMemo(() => {
     if (!selectedUnitId) return null;
-    return units.find(u => u.id === selectedUnitId);
-  }, [selectedUnitId, units]);
+    return processedFloorUnits.find(u => u.id === selectedUnitId);
+  }, [selectedUnitId, processedFloorUnits]);
 
   const stats = useMemo((): PopulationStats => {
     const dongs5km = ['동홍동', '서홍동', '송산동', '정방동', '중앙동', '천지동', '효돈동', '영천동'];
@@ -221,23 +223,23 @@ const AITenantRecommender: React.FC = () => {
         <CardContent className="pt-6">
           <div className="bg-slate-50 rounded-2xl p-8 border border-slate-100 relative shadow-inner">
             <div className="grid grid-cols-5 gap-3">
-              {floorUnits.map((unit) => {
-                const isOccupied = unit.status === 'occupied';
-                const tenantName = isOccupied ? tenantNameMap.get(unit.id) : undefined;
+              {processedFloorUnits.map((unit) => {
                 return (
                   <button
                     key={unit.id}
-                    onClick={() => setSelectedUnitId(unit.id)}
+                    disabled={unit.isOccupied}
+                    onClick={() => !unit.isOccupied && setSelectedUnitId(unit.id)}
                     className={`aspect-[4/3] rounded-lg border-2 flex flex-col items-center justify-center transition-all duration-300 p-2 text-center ${
                       selectedUnitId === unit.id 
                         ? 'bg-indigo-600 border-indigo-700 text-white shadow-xl scale-110 -translate-y-1 z-20' 
-                        : isOccupied && tenantName
-                        ? 'bg-slate-200 border-slate-300 text-slate-700' 
+                        : unit.isOccupied
+                        ? 'bg-slate-200 border-slate-300 text-slate-700 cursor-not-allowed' 
                         : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-400 hover:text-indigo-600'
-                    }`}>
-                    {isOccupied && tenantName ? (
+                    }`}
+                  >
+                    {unit.isOccupied && unit.tenantName ? (
                       <>
-                        <span className="block text-xs font-bold leading-tight truncate px-1">{tenantName}</span>
+                        <span className="block text-xs font-bold leading-tight truncate px-1">{unit.tenantName}</span>
                         <span className="block text-[10px] opacity-80 mt-1">{unit.name} | {unit.area_sqm?.toFixed(1)}m²</span>
                       </>
                     ) : (
@@ -263,8 +265,8 @@ const AITenantRecommender: React.FC = () => {
             <div className="text-right">
               <p className="text-[10px] text-slate-400 font-bold uppercase">Status</p>
               {selectedUnit ? (
-                <Badge variant="outline" className={`text-[10px] font-black ${selectedUnit.status === 'occupied' ? 'text-red-600 bg-red-50 border-red-200' : 'text-green-600 bg-green-50 border-green-200'}`}>
-                  {selectedUnit.status === 'occupied' && tenantNameMap.has(selectedUnit.id) ? `입주중 (${tenantNameMap.get(selectedUnit.id)})` : '공실'}
+                <Badge variant="outline" className={`text-[10px] font-black ${selectedUnit.isOccupied ? 'text-red-600 bg-red-50 border-red-200' : 'text-green-600 bg-green-50 border-green-200'}`}>
+                  {selectedUnit.isOccupied ? `입주중 (${selectedUnit.tenantName})` : '공실'}
                 </Badge>
               ) : (
                  <Badge variant="outline" className="text-[10px] font-black text-slate-500 bg-slate-100 border-slate-200">N/A</Badge>
@@ -278,13 +280,13 @@ const AITenantRecommender: React.FC = () => {
       <Card className="lg:col-span-4 border-none shadow-2xl bg-slate-950 text-white overflow-hidden flex flex-col">
         <CardHeader className="pb-4 bg-slate-900 border-b border-slate-800"><CardTitle className="text-lg flex items-center gap-2 font-bold"><Activity size={20} className="text-cyan-400" />AI Medical Shortage Index</CardTitle></CardHeader>
         <CardContent className="pt-6 flex-grow overflow-y-auto custom-scrollbar">
-          {!selectedUnitId || (selectedUnit?.status === 'occupied' && tenantNameMap.has(selectedUnit.id)) ? (
+          {!selectedUnit || selectedUnit.isOccupied ? (
             <div className="h-full flex flex-col items-center justify-center py-20 text-slate-700 space-y-5 text-center px-6">
               <div className="p-8 rounded-full bg-slate-900 border border-slate-800 shadow-2xl"><AlertCircle size={48} strokeWidth={1.5} className="text-slate-800" /></div>
               <div><p className="text-sm font-bold text-slate-500 mb-1">
-                {selectedUnit?.status === 'occupied' ? 'Occupied Unit' : 'Select a Vacant Unit'}
+                {selectedUnit?.isOccupied ? 'Occupied Unit' : 'Select a Vacant Unit'}
               </p><p className="text-xs text-slate-600">
-                {selectedUnit?.status === 'occupied' ? `이 호실은 현재 ${tenantNameMap.get(selectedUnitId!)}이(가) 입주해 있습니다.` : '분석할 공실 유닛을 선택하세요.'}
+                {selectedUnit?.isOccupied ? `이 호실은 현재 ${selectedUnit.tenantName}이(가) 입주해 있습니다.` : '분석할 공실 유닛을 선택하세요.'}
               </p></div>
             </div>
           ) : (
