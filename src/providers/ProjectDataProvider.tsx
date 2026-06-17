@@ -1,5 +1,6 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, GeneralActivity, CustomTab, MonthlyReport, TenantInfo, Contract, Attachment, Unit } from '../types';
+import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, GeneralActivity, CustomTab, MonthlyReport, TenantInfo, Contract, Attachment, Unit, RentalHistory, EvaluationResult } from '../types';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '../features/auth/AuthContext';
 import { Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
@@ -9,6 +10,7 @@ import { initialTeamMembers } from '../data/initial-team-members';
 import { initialUnits } from '../data/initial-units';
 import { initialTenantInfo } from '../data/initial-tenant-info';
 import { initialContracts } from '../data/initial-contracts';
+import { initialRentalHistory } from '../data/initial-rental-history';
 import rawFebruaryReportData from '../data/2026-02-report.json';
 
 
@@ -77,6 +79,8 @@ interface IProjectDataContext extends IProjectData {
   tenantInfo: TenantInfo[];
   contracts: (Contract & { status?: 'active' | 'expired' | 'pending' | 'unknown' })[];
   attachments: Attachment[];
+  rentalHistory: RentalHistory[];
+  evaluationResults: EvaluationResult[];
   setData: React.Dispatch<React.SetStateAction<IProjectData>>;
   addActivityToKpi: (kpiId: string, newActivity: Omit<Activity, 'id' | 'status' | 'tasks'>) => Promise<Activity>;
   updateActivityInKpi: (kpiId: string, updatedActivity: Activity) => void;
@@ -122,6 +126,14 @@ interface IProjectDataContext extends IProjectData {
   addMonthlyReport: (newReport: MonthlyReport) => Promise<void>;
   addAttachment: (tenantId: string, file: File) => void;
   deleteAttachment: (attachmentId: string) => void;
+  setRentalHistory: React.Dispatch<React.SetStateAction<RentalHistory[]>>;
+  addRentalHistory: (newHistory: Omit<RentalHistory, 'id'>) => void;
+  updateRentalHistory: (updatedHistory: RentalHistory) => void;
+  deleteRentalHistory: (historyId: string) => void;
+  setEvaluationResults: React.Dispatch<React.SetStateAction<EvaluationResult[]>>;
+  addEvaluationResult: (newResult: Omit<EvaluationResult, 'id'>) => void;
+  updateEvaluationResult: (updatedResult: EvaluationResult) => void;
+  deleteEvaluationResult: (resultId: string) => void;
 }
 
 const ProjectDataContext = createContext<IProjectDataContext | undefined>(undefined);
@@ -142,6 +154,8 @@ const initialData: IProjectData = {
   generalActivities: [],
   customTabs: [], 
   monthly_reports: [],
+  rentalHistory: initialRentalHistory || [],
+  evaluationResults: [],
 };
 
 // A safe version of initialData that is used ONLY for new user document creation.
@@ -161,6 +175,8 @@ const newUserInitialData: IProjectData = {
   generalActivities: [],
   customTabs: [],
   monthly_reports: [],
+  rentalHistory: initialRentalHistory || [],
+  evaluationResults: [],
 };
 
 
@@ -270,6 +286,8 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
                 generalActivities: firestoreData.generalActivities || [],
                 customTabs: firestoreData.customTabs || [], 
                 monthly_reports: reports,
+                rentalHistory: firestoreData.rentalHistory && firestoreData.rentalHistory.length > 0 ? firestoreData.rentalHistory : initialRentalHistory,
+                evaluationResults: firestoreData.evaluationResults || [],
             };
 
         } else {
@@ -555,6 +573,36 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
       setData(prev => ({ ...prev, attachments: (prev.attachments || []).filter(a => a.id !== attachmentId) }));
   }, []);
   
+  const addRentalHistory = useCallback((newHistoryData: Omit<RentalHistory, 'id' | 'created_at'>) => {
+    const newHistory: RentalHistory = { 
+      ...newHistoryData, 
+      id: `rh-${Date.now()}`,
+      created_at: new Date().toISOString(),
+    };
+    setData(prev => ({ ...prev, rentalHistory: [newHistory, ...(prev.rentalHistory || [])] }));
+  }, []);
+
+  const updateRentalHistory = useCallback((updatedHistory: RentalHistory) => {
+    setData(prev => ({ ...prev, rentalHistory: (prev.rentalHistory || []).map(h => h.id === updatedHistory.id ? updatedHistory : h) }));
+  }, []);
+
+  const deleteRentalHistory = useCallback((historyId: string) => {
+    setData(prev => ({ ...prev, rentalHistory: (prev.rentalHistory || []).filter(h => h.id !== historyId) }));
+  }, []);
+
+  const addEvaluationResult = useCallback((newResultData: Omit<EvaluationResult, 'id'>) => {
+    const newResult: EvaluationResult = { ...newResultData, id: `er-${Date.now()}` };
+    setData(prev => ({ ...prev, evaluationResults: [newResult, ...(prev.evaluationResults || [])] }));
+  }, []);
+
+  const updateEvaluationResult = useCallback((updatedResult: EvaluationResult) => {
+    setData(prev => ({ ...prev, evaluationResults: (prev.evaluationResults || []).map(r => r.id === updatedResult.id ? updatedResult : r) }));
+  }, []);
+
+  const deleteEvaluationResult = useCallback((resultId: string) => {
+    setData(prev => ({ ...prev, evaluationResults: (prev.evaluationResults || []).filter(r => r.id !== resultId) }));
+  }, []);
+
     const kpiData = useMemo(() => [
         ...(data.safetyKPIs || []).map(k => ({ ...k, type: '안전 관리', icon: <Shield size={16}/>, color: 'text-pink-500' })),
         ...(data.leaseKPIs || []).map(k => ({ ...k, type: '임대 및 세대', icon: <Handshake size={16}/>, color: 'text-black' })),
@@ -573,6 +621,8 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     tenantInfo: data.tenantInfo || [], 
     contracts: processedData.contracts,
     attachments: data.attachments || [],
+    rentalHistory: data.rentalHistory || [],
+    evaluationResults: data.evaluationResults || [],
     setData, 
     addActivityToKpi, 
     updateActivityInKpi, 
@@ -617,7 +667,15 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     deleteGeneralActivity,
     addMonthlyReport,
     addAttachment,
-    deleteAttachment
+    deleteAttachment,
+    setRentalHistory: (history) => setData(p => ({...p, rentalHistory: typeof history === 'function' ? history(p.rentalHistory || []) : history})),
+    addRentalHistory,
+    updateRentalHistory,
+    deleteRentalHistory,
+    setEvaluationResults: (results) => setData(p => ({...p, evaluationResults: typeof results === 'function' ? results(p.evaluationResults || []) : results})),
+    addEvaluationResult,
+    updateEvaluationResult,
+    deleteEvaluationResult,
   };
 
   return <ProjectDataContext.Provider value={value}>{children}</ProjectDataContext.Provider>;

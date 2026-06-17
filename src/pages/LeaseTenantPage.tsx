@@ -108,7 +108,7 @@ const LeaseTenantPage: React.FC = () => {
       <h1 className="text-2xl font-bold tracking-tight mb-6">임대 및 세대 관리</h1>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="leaseStatusSummary">주요 임대현황</TabsTrigger>
+          <TabsTrigger value="leaseStatusSummary">임대율 지표</TabsTrigger>
           <TabsTrigger value="tenantInfo">임차인 정보</TabsTrigger>
           <TabsTrigger value="tenantRoster">Tenant Roster</TabsTrigger>
           <TabsTrigger value="profitAnalysis">수익 분석</TabsTrigger>

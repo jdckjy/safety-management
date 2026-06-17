@@ -100,7 +100,7 @@ export interface Unit {
     name: string;
     floor: string;
     area_sqm: number;
-    status: 'occupied' | 'vacant' | 'under-renovation' | 'notice';
+    status: 'occupied' | 'vacant' | 'under-renovation' | 'notice' | '임대중' | '공실';
     pathData: string;
     position_x?: number;
     position_y?: number;
@@ -198,6 +198,8 @@ export interface IProjectData {
     generalActivities: GeneralActivity[];
     customTabs: CustomTab[];
     monthly_reports: MonthlyReport[];
+    rentalHistory: RentalHistory[];
+    evaluationResults: EvaluationResult[];
 }
 
 export interface MonthlyReport {
@@ -233,4 +235,24 @@ export interface MonthlyReport {
     };
     teamActivities: { id: string; teamName: string; tasks: string[]; }[];
   };
+}
+
+export interface RentalHistory {
+  id: string;
+  year: number;
+  rentable_area: number;
+  leased_area: number;
+  occupancy_rate: number;
+  created_at: string;
+}
+
+export interface EvaluationResult {
+  id: string;
+  year: number;
+  baseline: number;
+  std_dev: number;
+  target_high: number;
+  target_low: number;
+  score: number;
+  weighted_score: number;
 }
