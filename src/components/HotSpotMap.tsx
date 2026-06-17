@@ -8,7 +8,10 @@ import L from 'leaflet';
 import NewNodeModal from './NewNodeModal';
 import { Facility, HotSpot } from '../types';
 
-type ModalData = (Omit<HotSpot, 'id' | 'attachments'> | HotSpot) & { attachments?: (File | string)[] };
+// This is the type of data received from the modal now.
+type HotspotSubmitData = Omit<HotSpot, 'id' | 'attachments'> & {
+   attachments?: string[];
+} & { id?: string };
 
 interface HotSpotMapProps {
   facilities: Facility[];
@@ -93,31 +96,17 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ facilities, hotspots, onAddHots
     }
   };
 
-  const handleRegister = (data: ModalData) => {
-    const { attachments, ...restData } = data;
+  const handleRegister = (data: HotspotSubmitData) => {
+    // Data from the modal is already processed (Base64 attachments).
+    // We just need to call the correct provider function.
+    const { id, ...restData } = data;
 
-    let newAttachmentUrls: string[] = [];
-    let existingAttachmentUrls: string[] = [];
-
-    if (attachments && Array.isArray(attachments)) {
-      const filesToUpload = attachments.filter((a): a is File => a instanceof File);
-      existingAttachmentUrls = attachments.filter((a): a is string => typeof a === 'string');
-
-      // Create blob URLs for new files
-      newAttachmentUrls = filesToUpload.map(file => URL.createObjectURL(file));
-    }
-
-    const allAttachmentUrls = [...existingAttachmentUrls, ...newAttachmentUrls];
-
-    const hotspotPayload = { 
-        ...restData,
-        attachments: allAttachmentUrls 
-    };
-
-    if ('id' in hotspotPayload && hotspotPayload.id) {
-        onUpdateHotspot(hotspotPayload as HotSpot);
+    if (id) {
+      // For updates, the full HotSpot object is expected by the provider.
+      onUpdateHotspot({ id, ...restData } as HotSpot);
     } else {
-        onAddHotspot(hotspotPayload as Omit<HotSpot, 'id'>);
+      // For additions, the provider expects the object without the id.
+      onAddHotspot(restData as Omit<HotSpot, 'id'>);
     }
     setIsModalOpen(false);
   };
@@ -154,13 +143,13 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ facilities, hotspots, onAddHots
                           <div className="mt-2 pt-2 border-t border-slate-600">
                             <p className="text-sm font-semibold text-gray-400 mb-2 flex items-center"><Paperclip size={12} className="mr-1" />첨부파일</p>
                             <div className="flex gap-2 flex-wrap">
-                              {spot.attachments?.map((url, index) => (
+                              {spot.attachments?.map((base64Url, index) => (
                                 <button 
                                   key={index} 
-                                  onClick={() => setSelectedImageUrl(url)}
+                                  onClick={() => setSelectedImageUrl(base64Url)}
                                   className="w-12 h-12 rounded bg-slate-700 bg-cover bg-center cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
-                                  title={url.split('/').pop()}
-                                  style={{backgroundImage: `url(${url})`}} />
+                                  title="첨부파일 보기"
+                                  style={{backgroundImage: `url(${base64Url})`}} />
                               ))}
                             </div>
                           </div>
@@ -193,7 +182,7 @@ const HotSpotMap: React.FC<HotSpotMapProps> = ({ facilities, hotspots, onAddHots
               src={selectedImageUrl} 
               alt="Enlarged view" 
               className="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl"
-              onClick={(e) => e.stopPropagation()} // Prevent closing modal when clicking on the image itself
+              onClick={(e) => e.stopPropagation()} 
             />
             <button 
               onClick={() => setSelectedImageUrl(null)} 

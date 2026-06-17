@@ -1,28 +1,65 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { X, Search, UploadCloud, Camera } from 'lucide-react';
+import { X, Search, UploadCloud, Camera, Loader2 } from 'lucide-react';
 import { Facility, HotSpot } from '../types';
 
-// This local type can now handle both newly selected files (File object) and existing URLs (string)
-interface AttachmentSource {
-  file?: File;
-  preview: string; // For both Blob URLs and existing http URLs
-}
-
-// The data passed to the onRegister function
-type HotspotSubmitData = (Omit<HotSpot, 'id' | 'attachments'> | HotSpot) & {
-   attachments?: (File | string)[];
-};
+// The data passed to the onRegister function. Attachments are now always strings.
+type HotspotSubmitData = Omit<HotSpot, 'id' | 'attachments'> & {
+   attachments?: string[];
+} & { id?: string };
 
 
 interface NewNodeModalProps {
   isOpen: boolean;
   onClose: () => void;
+  // This now expects attachments to be an array of strings (Base64)
   onRegister: (data: HotspotSubmitData) => void;
   location: { lat: number; lng: number } | null;
   facilities: Facility[];
   editingHotspot: HotSpot | null;
 }
+
+// Helper function to resize and convert image to Base64 (inspired by MemberActionModal)
+const resizeAndEncodeImage = (file: File): Promise<string> => {
+  const MAX_WIDTH = 800; // A bit larger for hotspot details, but still optimized
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (!event.target?.result) {
+        return reject(new Error("FileReader did not successfully read the file."));
+      }
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > MAX_WIDTH) {
+          height = (MAX_WIDTH / width) * height;
+          width = MAX_WIDTH;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return reject(new Error('Failed to get canvas context'));
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Use JPEG with quality for smaller size, suitable for photos
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        resolve(dataUrl);
+      };
+      img.onerror = (error) => reject(error);
+      img.src = event.target.result as string;
+    };
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(file);
+  });
+};
+
 
 const NewNodeModal: React.FC<NewNodeModalProps> = ({
   isOpen,
@@ -37,7 +74,9 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
   const [responseType, setResponseType] = useState<'정기' | '긴급'>('정기');
   const [riskLevel, setRiskLevel] = useState<HotSpot['riskLevel']>('low');
   const [description, setDescription] = useState('');
-  const [attachments, setAttachments] = useState<AttachmentSource[]>([]);
+  // State now simply holds Base64 strings
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [isProcessingImages, setIsProcessingImages] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isEditing = !!editingHotspot;
@@ -52,11 +91,8 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
       setRiskLevel(editingHotspot.riskLevel || 'low');
       setDescription(editingHotspot.description || '');
       setSearchTerm(facility?.name || '');
-      
-      // If there are existing attachments (URLs), map them to the state
-      const existingAttachments = editingHotspot.attachments?.map(url => ({ preview: url })) || [];
-      setAttachments(existingAttachments);
-
+      // Existing attachments are already strings from the DB
+      setAttachments(editingHotspot.attachments || []);
     } else {
       // Reset all fields for a new node
       setSearchTerm('');
@@ -66,19 +102,8 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
       setDescription('');
       setAttachments([]);
     }
+    setIsProcessingImages(false);
   }, [editingHotspot, facilities, isOpen, isEditing]);
-
-  // Cleanup blob URLs
-  useEffect(() => {
-    return () => {
-      attachments.forEach(attachment => {
-        // Only revoke if it's a blob URL created for a local file preview
-        if (attachment.file) {
-          URL.revokeObjectURL(attachment.preview);
-        }
-      });
-    };
-  }, [attachments]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -89,26 +114,27 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
     return facilities.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()));
   }, [facilities, searchTerm]);
   
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const filesArray = Array.from(e.target.files).filter(file => file.type.startsWith('image/'));
-      const newAttachments = filesArray.map(file => ({
-        file,
-        preview: URL.createObjectURL(file),
-      }));
-      setAttachments(prev => [...prev, ...newAttachments]);
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    
+    const files = Array.from(e.target.files).filter(file => file.type.startsWith('image/'));
+    if (files.length === 0) return;
+
+    setIsProcessingImages(true);
+    try {
+      const base64Promises = files.map(file => resizeAndEncodeImage(file));
+      const newBase64Strings = await Promise.all(base64Promises);
+      setAttachments(prev => [...prev, ...newBase64Strings]);
+    } catch (error) {
+        console.error("Error processing images:", error);
+        alert("이미지 처리 중 오류가 발생했습니다.");
+    } finally {
+        setIsProcessingImages(false);
     }
   };
 
   const handleRemoveImage = (indexToRemove: number) => {
-    setAttachments(prev => {
-      const attachmentToRemove = prev[indexToRemove];
-      // If it was a newly added file, revoke its blob URL
-      if (attachmentToRemove && attachmentToRemove.file) {
-        URL.revokeObjectURL(attachmentToRemove.preview);
-      }
-      return prev.filter((_, index) => index !== indexToRemove);
-    });
+    setAttachments(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
   const handleSubmit = () => {
@@ -118,10 +144,6 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
       return;
     }
 
-    // Separate new files from existing URLs
-    const filesToUpload = attachments.map(a => a.file).filter(f => f instanceof File) as File[];
-    const existingUrls = attachments.filter(a => !a.file).map(a => a.preview);
-
     const hotspotData: HotspotSubmitData = {
       title: selectedFacility.name,
       description: description,
@@ -129,7 +151,7 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
       responseType,
       riskLevel,
       position: finalLocation,
-      attachments: [...existingUrls, ...filesToUpload],
+      attachments: attachments, // Directly use the state with Base64 strings
     };
 
     if (isEditing) {
@@ -160,7 +182,8 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
         <div className="p-8 grid grid-cols-2 gap-8 flex-grow overflow-y-auto" style={{maxHeight: '75vh'}}>
           {/* Left Column */}
           <div className="space-y-4">
-            <div>
+             {/* Search and Facility List... same as before */}
+             <div>
               <label className="text-xs font-bold text-gray-500 mb-2 block">시설물 검색</label>
               <div className="relative">
                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -180,7 +203,8 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
           {/* Right Column */}
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
-              <div>
+               {/* Response Type and Risk Level... same as before */}
+               <div>
                 <label className="text-xs font-bold text-gray-500">대응 타입</label>
                 <div className="flex mt-2 bg-gray-100 rounded-lg p-1">
                   <button onClick={() => setResponseType('정기')} className={`w-full text-center text-sm py-1.5 rounded-lg transition-all ${responseType === '정기' ? 'bg-white shadow font-semibold text-gray-800' : 'text-gray-500'}`}>정기</button>
@@ -205,9 +229,9 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
             <div>
               <label className="text-xs font-bold text-gray-500">사진 첨부</label>
               <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
-                  {attachments.map((image, index) => (
+                  {attachments.map((base64Image, index) => (
                     <div key={index} className="relative group aspect-square">
-                      <img src={image.preview} alt={`preview ${index}`} className="h-full w-full object-cover rounded-md bg-gray-100" />
+                      <img src={base64Image} alt={`preview ${index}`} className="h-full w-full object-cover rounded-md bg-gray-100" />
                       <button
                         onClick={() => handleRemoveImage(index)}
                         className="absolute top-1 right-1 p-0.5 bg-red-600 text-white rounded-full opacity-70 group-hover:opacity-100 transition-opacity"
@@ -216,15 +240,21 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
                       </button>
                     </div>
                   ))}
-                   <div
-                    className="flex justify-center items-center w-full aspect-square border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <div className="text-center">
-                      <UploadCloud className="mx-auto h-6 w-6 text-gray-400" />
-                      <p className="mt-1 text-xs text-gray-600">추가</p>
-                    </div>
-                  </div>
+                  {isProcessingImages ? (
+                     <div className="flex justify-center items-center w-full aspect-square border-2 border-gray-300 border-dashed rounded-lg bg-gray-50">
+                        <Loader2 className="animate-spin text-gray-400" size={24} />
+                     </div>
+                  ) : (
+                     <div
+                        className="flex justify-center items-center w-full aspect-square border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100"
+                        onClick={() => !isProcessingImages && fileInputRef.current?.click()}
+                      >
+                        <div className="text-center">
+                          <UploadCloud className="mx-auto h-6 w-6 text-gray-400" />
+                          <p className="mt-1 text-xs text-gray-600">추가</p>
+                        </div>
+                      </div>
+                  )}
               </div>
               <input
                 type="file"
@@ -233,14 +263,15 @@ const NewNodeModal: React.FC<NewNodeModalProps> = ({
                 className="hidden"
                 accept="image/*"
                 multiple
+                disabled={isProcessingImages}
               />
             </div>
           </div>
         </div>
 
         <div className="p-6 bg-gray-50 border-t">
-          <button onClick={handleSubmit} className="w-full bg-gray-900 text-white font-bold py-4 rounded-lg hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900">
-            {isEditing ? '노드 정보 수정 완료' : '신규 노드 등록 확정'}
+          <button onClick={handleSubmit} disabled={isProcessingImages} className="w-full bg-gray-900 text-white font-bold py-4 rounded-lg hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 disabled:bg-gray-400">
+            {isProcessingImages ? '이미지 처리 중...' : (isEditing ? '노드 정보 수정 완료' : '신규 노드 등록 확정')}
           </button>
         </div>
       </div>
