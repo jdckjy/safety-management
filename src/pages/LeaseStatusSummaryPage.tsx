@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useProjectData } from '@/providers/ProjectDataProvider';
 import { RentalHistory, Unit } from '@/types';
@@ -8,11 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LineChart, BarChart, ResponsiveContainer, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Area, Cell } from 'recharts';
-import { PlusCircle, Upload, ChevronsRight } from 'lucide-react';
+import { PlusCircle, Upload, ChevronsRight, RotateCw } from 'lucide-react';
 import RentalHistoryModal from '@/components/RentalHistoryModal';
+import InteractiveFloorPlan from '@/components/InteractiveFloorPlan';
 import * as XLSX from 'xlsx';
 
-// --- Custom Chart Tooltips (New) ---
 const CustomLineChartTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
@@ -41,7 +40,6 @@ const CustomBarChartTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-
 interface KpiMetrics {
   baseline: number;
   stdDev: number;
@@ -58,10 +56,20 @@ interface RealtimeMetrics {
   realtimeOccupancyRate: number;
 }
 
+interface SimulationChanges {
+    leasedAreaChange: number;
+    rentableAreaChange: number;
+}
+
 const LeaseStatusSummaryPage: React.FC = () => {
   const { rentalHistory, units, addRentalHistory, updateRentalHistory, setRentalHistory } = useProjectData();
   const [kpi, setKpi] = useState<KpiMetrics | null>(null);
   const [simulationInput, setSimulationInput] = useState({ newLeaseArea: 0, areaReduction: 0 });
+  
+  const [simulationChanges, setSimulationChanges] = useState<SimulationChanges>({ leasedAreaChange: 0, rentableAreaChange: 0 });
+  const [simulatedOccupiedIds, setSimulatedOccupiedIds] = useState<Set<string>>(new Set());
+  const [simulatedVacantIds, setSimulatedVacantIds] = useState<Set<string>>(new Set());
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedHistory, setSelectedHistory] = useState<RentalHistory | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -129,10 +137,10 @@ const LeaseStatusSummaryPage: React.FC = () => {
     if (!kpi) return [];
     
     const colors = {
-      targetLow: 'hsl(220 13% 80%)',     // slate-300
-      current: 'hsl(244 84% 60%)',     // indigo-500 (brand color/highlight)
-      baseline: 'hsl(220 14% 65%)',     // slate-400
-      targetHigh: 'hsl(142 71% 45%)',    // green-600 (achievement color)
+      targetLow: 'hsl(220 13% 80%)',    
+      current: 'hsl(244 84% 60%)',     
+      baseline: 'hsl(220 14% 65%)',    
+      targetHigh: 'hsl(142 71% 45%)',   
     };
 
     return [
@@ -226,39 +234,65 @@ const LeaseStatusSummaryPage: React.FC = () => {
     setSimulationInput(prev => ({ ...prev, [name]: parseFloat(value) || 0 }));
   };
 
+  const handleUnitClick = (unit: Unit) => {
+      setSimulationChanges(prev => {
+          const newChanges = {...prev};
+          const newOccupiedIds = new Set(simulatedOccupiedIds);
+          const newVacantIds = new Set(simulatedVacantIds);
+
+          if (unit.status === 'vacant') {
+              if (newOccupiedIds.has(unit.id)) { // From simulated-occupied back to vacant
+                  newChanges.leasedAreaChange -= unit.area_sqm;
+                  newOccupiedIds.delete(unit.id);
+              } else {
+                  newChanges.leasedAreaChange += unit.area_sqm;
+                  newOccupiedIds.add(unit.id);
+              }
+          } else if (unit.status === 'occupied' || unit.status === 'notice') {
+              if (newVacantIds.has(unit.id)) { // From simulated-vacant back to occupied
+                  newChanges.leasedAreaChange += unit.area_sqm;
+                  newVacantIds.delete(unit.id);
+              } else {
+                  newChanges.leasedAreaChange -= unit.area_sqm;
+                  newVacantIds.add(unit.id);
+              }
+          }
+
+          setSimulatedOccupiedIds(newOccupiedIds);
+          setSimulatedVacantIds(newVacantIds);
+          return newChanges;
+      });
+  };
+
+  const resetSimulation = () => {
+      setSimulationInput({ newLeaseArea: 0, areaReduction: 0 });
+      setSimulationChanges({ leasedAreaChange: 0, rentableAreaChange: 0 });
+      setSimulatedOccupiedIds(new Set());
+      setSimulatedVacantIds(new Set());
+  };
+
   const simulationResult = useMemo(() => {
     if (!kpi || !realtimeMetrics) return null;
 
-    // Scenario 1: Calculate based on current real-time metrics
-    const newTotalLeasedArea1 = realtimeMetrics.totalLeasedArea + simulationInput.newLeaseArea;
-    const newOccupancyRate1 = realtimeMetrics.totalRentableArea > 0 ? (newTotalLeasedArea1 / realtimeMetrics.totalRentableArea) * 100 : 0;
-    let newScore1 = 20 + ((newOccupancyRate1 - kpi.targetLow) / (kpi.targetHigh - kpi.targetLow)) * 80;
-    if (isNaN(newScore1) || newScore1 > 100) newScore1 = 100;
-    if (newScore1 < 20) newScore1 = 20;
-    
-    // Scenario 2: Calculate based on current real-time metrics
-    const newRentableArea2 = realtimeMetrics.totalRentableArea + simulationInput.areaReduction;
-    let newOccupancyRate2 = 0;
-    if (newRentableArea2 > 0) {
-        newOccupancyRate2 = (realtimeMetrics.totalLeasedArea / newRentableArea2) * 100;
-    }
-    
-    let newScore2 = 20 + ((newOccupancyRate2 - kpi.targetLow) / (kpi.targetHigh - kpi.targetLow)) * 80;
-    if (isNaN(newScore2) || newScore2 > 100) newScore2 = 100;
-    if (newScore2 < 20) newScore2 = 20;
+    const totalSimulatedLeasedArea = realtimeMetrics.totalLeasedArea + simulationInput.newLeaseArea + simulationChanges.leasedAreaChange;
+    const totalSimulatedRentableArea = realtimeMetrics.totalRentableArea + simulationInput.areaReduction + simulationChanges.rentableAreaChange;
 
-    if (newRentableArea2 <= 0) {
-        return { 
-            scenario1: { rate: newOccupancyRate1, score: newScore1, finalScore: (newScore1 / 100) * 2.5 }, 
-            scenario2: { rate: 0, score: 0, finalScore: 0} 
-        };
+    let simulatedRate = 0;
+    if (totalSimulatedRentableArea > 0) {
+        simulatedRate = (totalSimulatedLeasedArea / totalSimulatedRentableArea) * 100;
     }
+
+    let simulatedScore = 20 + ((simulatedRate - kpi.targetLow) / (kpi.targetHigh - kpi.targetLow)) * 80;
+    if (isNaN(simulatedScore) || simulatedScore > 100) simulatedScore = 100;
+    if (simulatedScore < 20) simulatedScore = 20;
 
     return {
-      scenario1: { rate: newOccupancyRate1, score: newScore1, finalScore: (newScore1 / 100) * 2.5 },
-      scenario2: { rate: newOccupancyRate2, score: newScore2, finalScore: (newScore2 / 100) * 2.5 },
+        rate: simulatedRate,
+        score: simulatedScore,
+        finalScore: (simulatedScore / 100) * 2.5,
     };
-  }, [kpi, simulationInput, realtimeMetrics]);
+}, [kpi, realtimeMetrics, simulationInput, simulationChanges]);
+
 
   const kpiCards = [
     { title: "현재 임대율", value: kpi?.currentRealtimeRate.toFixed(3) + '%' },
@@ -317,9 +351,10 @@ const LeaseStatusSummaryPage: React.FC = () => {
 
         <Card className="lg:col-span-2">
             <Tabs defaultValue="dashboard">
-                <TabsList className="w-full grid-cols-2">
+                <TabsList className="w-full grid-cols-3">
                     <TabsTrigger value="dashboard">KPI 대시보드</TabsTrigger>
-                    <TabsTrigger value="simulation">시뮬레이션</TabsTrigger>
+                    <TabsTrigger value="simulation">숫자 시뮬레이션</TabsTrigger>
+                    <TabsTrigger value="floorplan-sim">도면 시뮬레이션</TabsTrigger> 
                 </TabsList>
                 <TabsContent value="dashboard">
                     <CardContent className="space-y-6 pt-6">
@@ -332,7 +367,6 @@ const LeaseStatusSummaryPage: React.FC = () => {
                             ))}
                         </div>
                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 h-80">
-                            {/* --- Refactored Line Chart --- */}
                             <Card>
                                 <CardHeader><CardTitle className="text-base font-semibold text-slate-700">연도별 임대율 추이</CardTitle></CardHeader>
                                 <CardContent>
@@ -379,16 +413,12 @@ const LeaseStatusSummaryPage: React.FC = () => {
                                                 stroke="hsl(244 84% 60%)"
                                                 strokeWidth={2.5}
                                                 dot={false}
-                                                activeDot={{ 
-                                                    r: 5, 
-                                                    strokeWidth: 2,
-                                                }}
+                                                activeDot={{ r: 5, strokeWidth: 2, }}
                                             />
                                         </LineChart>
                                     </ResponsiveContainer>
                                 </CardContent>
                             </Card>
-                            {/* --- Refactored Bar Chart --- */}
                              <Card>
                                 <CardHeader><CardTitle className="text-base font-semibold text-slate-700">목표 대비 실적</CardTitle></CardHeader>
                                 <CardContent>
@@ -431,48 +461,93 @@ const LeaseStatusSummaryPage: React.FC = () => {
                     <CardContent className="space-y-6 pt-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <Card>
-                                <CardHeader><CardTitle className="text-base">Scenario 1: 임대율 증가 시</CardTitle></CardHeader>
+                                <CardHeader><CardTitle className="text-base">Scenario 1: 임대 면적 변경</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
                                      <div>
-                                        <label htmlFor="newLeaseArea" className="text-sm font-medium">신규 입주면적 (㎡)</label>
-                                        <Input id="newLeaseArea" name="newLeaseArea" type="number" value={simulationInput.newLeaseArea} onChange={handleSimulationInputChange} placeholder="예: 500" />
-                                     </div>
-                                     <div className="flex items-center justify-around text-center p-4 bg-slate-50 rounded-lg">
-                                        <div>
-                                            <p className="text-sm text-gray-500">예상 임대율</p>
-                                            <p className="text-xl font-bold">{simulationResult?.scenario1.rate.toFixed(3)}%</p>
-                                        </div>
-                                        <ChevronsRight className="text-gray-400" />
-                                         <div>
-                                            <p className="text-sm text-gray-500">예상 최종 득점</p>
-                                            <p className="text-xl font-bold text-blue-600">{simulationResult?.scenario1.finalScore.toFixed(3)}점</p>
-                                        </div>
+                                        <label htmlFor="newLeaseArea" className="text-sm font-medium">신규/퇴거 면적 (㎡)</label>
+                                        <Input id="newLeaseArea" name="newLeaseArea" type="number" value={simulationInput.newLeaseArea} onChange={handleSimulationInputChange} placeholder="예: 500 또는 -300" />
                                      </div>
                                 </CardContent>
                             </Card>
                              <Card>
-                                <CardHeader><CardTitle className="text-base">Scenario 2: 임대가능면적 변경 시</CardTitle></CardHeader>
+                                <CardHeader><CardTitle className="text-base">Scenario 2: 임대가능면적 변경</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
                                      <div>
                                         <label htmlFor="areaReduction" className="text-sm font-medium">면적 증감 (㎡)</label>
                                         <Input id="areaReduction" name="areaReduction" type="number" value={simulationInput.areaReduction} onChange={handleSimulationInputChange} placeholder="예: -1000" />
                                      </div>
-                                     <div className="flex items-center justify-around text-center p-4 bg-slate-50 rounded-lg">
-                                        <div>
-                                            <p className="text-sm text-gray-500">예상 임대율</p>
-                                            <p className="text-xl font-bold">{simulationResult?.scenario2.rate.toFixed(3)}%</p>
-                                        </div>
-                                        <ChevronsRight className="text-gray-400" />
-                                         <div>
-                                            <p className="text-sm text-gray-500">예상 최종 득점</p>
-                                            <p className="text-xl font-bold text-blue-600">{simulationResult?.scenario2.finalScore.toFixed(3)}점</p>
-                                        </div>
-                                     </div>
                                 </CardContent>
                             </Card>
                         </div>
+                        <Card className="bg-slate-50/70 border-dashed">
+                             <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                <CardTitle className="text-lg font-bold text-slate-800">시뮬레이션 최종 결과</CardTitle>
+                                <Button variant="outline" size="sm" onClick={resetSimulation}><RotateCw className="mr-2 h-4 w-4"/>초기화</Button>
+                            </CardHeader>
+                            <CardContent className="flex items-center justify-around text-center p-6">
+                                <div>
+                                    <p className="text-sm text-gray-500">예상 임대율</p>
+                                    <p className="text-3xl font-bold tracking-tighter">{simulationResult?.rate.toFixed(3)}%</p>
+                                </div>
+                                <ChevronsRight className="text-gray-400 mx-4" size={32} />
+                                    <div>
+                                    <p className="text-sm text-gray-500">예상 최종 득점</p>
+                                    <p className="text-3xl font-bold tracking-tighter text-blue-600">{simulationResult?.finalScore.toFixed(3)}점</p>
+                                </div>
+                            </CardContent>
+                        </Card>
                          <div className="text-xs text-gray-500 pt-4">
                            * 다년도 예측 및 시나리오 비교 차트는 향후 구현될 예정입니다.
+                        </div>
+                    </CardContent>
+                </TabsContent>
+                <TabsContent value="floorplan-sim">
+                     <CardContent className="pt-6">
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                            <div>
+                                {units && 
+                                    <InteractiveFloorPlan 
+                                        units={units}
+                                        simulatedOccupiedIds={simulatedOccupiedIds}
+                                        simulatedVacantIds={simulatedVacantIds}
+                                        onUnitClick={handleUnitClick}
+                                    />
+                                }
+                            </div>
+                            <div className="space-y-6">
+                                <Card>
+                                    <CardHeader><CardTitle className="text-base">도면 시뮬레이션 요약</CardTitle></CardHeader>
+                                    <CardContent>
+                                        <div className="flex justify-around text-center">
+                                            <div>
+                                                <p className="text-sm text-slate-500">시뮬레이션 입주 면적</p>
+                                                <p className="text-xl font-bold text-blue-600">+{simulationChanges.leasedAreaChange > 0 ? simulationChanges.leasedAreaChange.toFixed(2) : '0.00'} ㎡</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-sm text-slate-500">시뮬레이션 퇴거 면적</p>
+                                                <p className="text-xl font-bold text-red-600">{simulationChanges.leasedAreaChange < 0 ? simulationChanges.leasedAreaChange.toFixed(2) : '-0.00'} ㎡</p>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                                <Card className="bg-slate-50/70 border-dashed">
+                                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                        <CardTitle className="text-lg font-bold text-slate-800">시뮬레이션 최종 결과</CardTitle>
+                                        <Button variant="outline" size="sm" onClick={resetSimulation}><RotateCw className="mr-2 h-4 w-4"/>초기화</Button>
+                                    </CardHeader>
+                                    <CardContent className="flex items-center justify-around text-center p-6">
+                                        <div>
+                                            <p className="text-sm text-gray-500">예상 임대율</p>
+                                            <p className="text-3xl font-bold tracking-tighter">{simulationResult?.rate.toFixed(3)}%</p>
+                                        </div>
+                                        <ChevronsRight className="text-gray-400 mx-4" size={32} />
+                                        <div>
+                                            <p className="text-sm text-gray-500">예상 최종 득점</p>
+                                            <p className="text-3xl font-bold tracking-tighter text-blue-600">{simulationResult?.finalScore.toFixed(3)}점</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
                         </div>
                     </CardContent>
                 </TabsContent>
