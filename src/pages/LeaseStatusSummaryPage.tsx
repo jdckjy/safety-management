@@ -7,10 +7,40 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LineChart, BarChart, ResponsiveContainer, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { LineChart, BarChart, ResponsiveContainer, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Area, Cell } from 'recharts';
 import { PlusCircle, Upload, ChevronsRight } from 'lucide-react';
 import RentalHistoryModal from '@/components/RentalHistoryModal';
 import * as XLSX from 'xlsx';
+
+// --- Custom Chart Tooltips (New) ---
+const CustomLineChartTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="p-2.5 bg-white border rounded-lg shadow-lg border-slate-200/80">
+        <p className="text-xs font-bold text-slate-600">{label}년</p>
+        <p className="text-sm font-semibold tracking-tighter" style={{ color: 'hsl(244 84% 60%)' }}>
+          {`${payload[0].value.toFixed(3)}%`}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+const CustomBarChartTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="p-2.5 bg-white border rounded-lg shadow-lg border-slate-200/80">
+        <p className="text-xs font-bold text-slate-600">{label}</p>
+        <p className="text-sm font-semibold tracking-tighter" style={{ color: payload[0].payload.fill }}>
+          {`${payload[0].value.toFixed(3)}%`}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
 
 interface KpiMetrics {
   baseline: number;
@@ -94,6 +124,24 @@ const LeaseStatusSummaryPage: React.FC = () => {
   const displayHistory = useMemo(() => {
     return rentalHistory.filter(h => h.year !== 2021).sort((a, b) => b.year - a.year);
   }, [rentalHistory]);
+
+  const barChartData = useMemo(() => {
+    if (!kpi) return [];
+    
+    const colors = {
+      targetLow: 'hsl(220 13% 80%)',     // slate-300
+      current: 'hsl(244 84% 60%)',     // indigo-500 (brand color/highlight)
+      baseline: 'hsl(220 14% 65%)',     // slate-400
+      targetHigh: 'hsl(142 71% 45%)',    // green-600 (achievement color)
+    };
+
+    return [
+        { name: '최저목표', value: kpi.targetLow, fill: colors.targetLow },
+        { name: '현재실적', value: kpi.currentRealtimeRate, fill: colors.current },
+        { name: '기준치', value: kpi.baseline, fill: colors.baseline },
+        { name: '최고목표', value: kpi.targetHigh, fill: colors.targetHigh }
+    ];
+  }, [kpi]);
 
   const handleOpenModal = (history: RentalHistory | null) => {
     setSelectedHistory(history);
@@ -179,28 +227,38 @@ const LeaseStatusSummaryPage: React.FC = () => {
   };
 
   const simulationResult = useMemo(() => {
-    if (!kpi || !rentalHistory || rentalHistory.length === 0) return null;
-    const latestYearData = [...rentalHistory].sort((a, b) => b.year - a.year)[0];
+    if (!kpi || !realtimeMetrics) return null;
 
-    const newTotalLeasedArea1 = latestYearData.leased_area + simulationInput.newLeaseArea;
-    const newOccupancyRate1 = (newTotalLeasedArea1 / latestYearData.rentable_area) * 100;
+    // Scenario 1: Calculate based on current real-time metrics
+    const newTotalLeasedArea1 = realtimeMetrics.totalLeasedArea + simulationInput.newLeaseArea;
+    const newOccupancyRate1 = realtimeMetrics.totalRentableArea > 0 ? (newTotalLeasedArea1 / realtimeMetrics.totalRentableArea) * 100 : 0;
     let newScore1 = 20 + ((newOccupancyRate1 - kpi.targetLow) / (kpi.targetHigh - kpi.targetLow)) * 80;
     if (isNaN(newScore1) || newScore1 > 100) newScore1 = 100;
     if (newScore1 < 20) newScore1 = 20;
-
-    const newRentableArea2 = latestYearData.rentable_area - simulationInput.areaReduction;
-    if (newRentableArea2 <= 0) return { scenario1: { rate: newOccupancyRate1, score: newScore1, finalScore: newScore1 * 2.5 }, scenario2: { rate: 0, score: 0, finalScore: 0} };
-
-    const newOccupancyRate2 = (latestYearData.leased_area / newRentableArea2) * 100;
+    
+    // Scenario 2: Calculate based on current real-time metrics
+    const newRentableArea2 = realtimeMetrics.totalRentableArea + simulationInput.areaReduction;
+    let newOccupancyRate2 = 0;
+    if (newRentableArea2 > 0) {
+        newOccupancyRate2 = (realtimeMetrics.totalLeasedArea / newRentableArea2) * 100;
+    }
+    
     let newScore2 = 20 + ((newOccupancyRate2 - kpi.targetLow) / (kpi.targetHigh - kpi.targetLow)) * 80;
     if (isNaN(newScore2) || newScore2 > 100) newScore2 = 100;
     if (newScore2 < 20) newScore2 = 20;
+
+    if (newRentableArea2 <= 0) {
+        return { 
+            scenario1: { rate: newOccupancyRate1, score: newScore1, finalScore: (newScore1 / 100) * 2.5 }, 
+            scenario2: { rate: 0, score: 0, finalScore: 0} 
+        };
+    }
 
     return {
       scenario1: { rate: newOccupancyRate1, score: newScore1, finalScore: (newScore1 / 100) * 2.5 },
       scenario2: { rate: newOccupancyRate2, score: newScore2, finalScore: (newScore2 / 100) * 2.5 },
     };
-  }, [kpi, simulationInput, rentalHistory]);
+  }, [kpi, simulationInput, realtimeMetrics]);
 
   const kpiCards = [
     { title: "현재 임대율", value: kpi?.currentRealtimeRate.toFixed(3) + '%' },
@@ -244,7 +302,7 @@ const LeaseStatusSummaryPage: React.FC = () => {
                     </TableRow>
                   )}
                   {displayHistory.map((item) => (
-                    <TableRow key={item.id} onClick={() => handleOpenModal(item)} className="cursor-pointer">
+                    <TableRow key={item.id} onClick={() => handleOpenModal(item)} className="cursor-pointer hover:bg-slate-50">
                       <TableCell>{item.year}</TableCell>
                       <TableCell>{item.rentable_area.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                       <TableCell>{item.leased_area.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
@@ -268,42 +326,100 @@ const LeaseStatusSummaryPage: React.FC = () => {
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-center">
                             {kpiCards.map(card => (
                                 <Card key={card.title}>
-                                    <CardHeader className="p-2 pb-0"><CardTitle className="text-sm font-medium">{card.title}</CardTitle></CardHeader>
-                                    <CardContent className="p-2"><p className="text-2xl font-bold">{card.value}</p></CardContent>
+                                    <CardHeader className="p-2 pb-0"><CardTitle className="text-sm font-medium text-slate-500">{card.title}</CardTitle></CardHeader>
+                                    <CardContent className="p-2"><p className="text-2xl font-bold text-slate-800">{card.value}</p></CardContent>
                                 </Card>
                             ))}
                         </div>
                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 h-80">
+                            {/* --- Refactored Line Chart --- */}
                             <Card>
-                                <CardHeader><CardTitle className="text-base">연도별 임대율 추이</CardTitle></CardHeader>
+                                <CardHeader><CardTitle className="text-base font-semibold text-slate-700">연도별 임대율 추이</CardTitle></CardHeader>
                                 <CardContent>
                                     <ResponsiveContainer width="100%" height={250}>
-                                        <LineChart data={[...rentalHistory].filter(h => h.year !== 2021).reverse()}>
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis dataKey="year" />
-                                            <YAxis domain={[0, 100]} />
-                                            <Tooltip />
-                                            <Legend />
-                                            <Line type="monotone" dataKey="occupancy_rate" name="임대율" stroke="#8884d8" />
+                                        <LineChart 
+                                            data={[...rentalHistory].filter(h => h.year !== 2021).sort((a, b) => a.year - b.year)}
+                                            margin={{ top: 10, right: 25, left: -15, bottom: 0 }}
+                                        >
+                                            <defs>
+                                                <linearGradient id="occupancyGradient" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="hsl(244 84% 60%)" stopOpacity={0.2}/>
+                                                    <stop offset="95%" stopColor="hsl(244 84% 60%)" stopOpacity={0}/>
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(220 13% 94%)" />
+                                            <XAxis 
+                                                dataKey="year" 
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tick={{ fontSize: 12, fill: 'hsl(220 10% 55%)' }}
+                                                tickMargin={8}
+                                            />
+                                            <YAxis 
+                                                domain={[60, 'dataMax + 2']}
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tick={{ fontSize: 12, fill: 'hsl(220 10% 55%)' }}
+                                                tickFormatter={(value) => `${value}%`}
+                                            />
+                                            <Tooltip 
+                                                cursor={{ stroke: 'hsl(220 13% 91%)', strokeWidth: 1, strokeDasharray: "3 3" }}
+                                                content={<CustomLineChartTooltip />} 
+                                            />
+                                            <Area 
+                                                type="monotone" 
+                                                dataKey="occupancy_rate" 
+                                                stroke="none"
+                                                fill="url(#occupancyGradient)" 
+                                            />
+                                            <Line 
+                                                type="monotone" 
+                                                dataKey="occupancy_rate" 
+                                                name="임대율" 
+                                                stroke="hsl(244 84% 60%)"
+                                                strokeWidth={2.5}
+                                                dot={false}
+                                                activeDot={{ 
+                                                    r: 5, 
+                                                    strokeWidth: 2,
+                                                }}
+                                            />
                                         </LineChart>
                                     </ResponsiveContainer>
                                 </CardContent>
                             </Card>
+                            {/* --- Refactored Bar Chart --- */}
                              <Card>
-                                <CardHeader><CardTitle className="text-base">목표 대비 실적</CardTitle></CardHeader>
+                                <CardHeader><CardTitle className="text-base font-semibold text-slate-700">목표 대비 실적</CardTitle></CardHeader>
                                 <CardContent>
                                      <ResponsiveContainer width="100%" height={250}>
-                                        <BarChart data={kpi ? [
-                                            { name: '최저목표', value: kpi.targetLow },
-                                            { name: '현재실적', value: kpi.currentRealtimeRate },
-                                            { name: '기준치', value: kpi.baseline },
-                                            { name: '최고목표', value: kpi.targetHigh }
-                                        ] : []}>
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis dataKey="name" />
-                                            <YAxis domain={[0, 100]}/>
-                                            <Tooltip />
-                                            <Bar dataKey="value" name="임대율" fill="#82ca9d" />
+                                        <BarChart 
+                                            data={barChartData}
+                                            margin={{ top: 10, right: 25, left: -15, bottom: 0 }}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(220 13% 94%)" />
+                                            <XAxis 
+                                                dataKey="name"
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tick={{ fontSize: 12, fill: 'hsl(220 10% 55%)' }}
+                                                tickMargin={8}
+                                            />
+                                            <YAxis
+                                                tickLine={false}
+                                                axisLine={false}
+                                                tick={{ fontSize: 12, fill: 'hsl(220 10% 55%)' }}
+                                                tickFormatter={(value) => `${value}%`}
+                                            />
+                                            <Tooltip 
+                                                cursor={{ fill: 'hsl(220 13% 96%)' }}
+                                                content={<CustomBarChartTooltip />} 
+                                            />
+                                            <Bar dataKey="value" barSize={30} radius={[4, 4, 0, 0]}>
+                                                {barChartData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                                                ))}
+                                            </Bar>
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </CardContent>
@@ -321,34 +437,34 @@ const LeaseStatusSummaryPage: React.FC = () => {
                                         <label htmlFor="newLeaseArea" className="text-sm font-medium">신규 입주면적 (㎡)</label>
                                         <Input id="newLeaseArea" name="newLeaseArea" type="number" value={simulationInput.newLeaseArea} onChange={handleSimulationInputChange} placeholder="예: 500" />
                                      </div>
-                                     <div className="flex items-center justify-around text-center p-4 bg-slate-100 rounded-lg">
+                                     <div className="flex items-center justify-around text-center p-4 bg-slate-50 rounded-lg">
                                         <div>
                                             <p className="text-sm text-gray-500">예상 임대율</p>
                                             <p className="text-xl font-bold">{simulationResult?.scenario1.rate.toFixed(3)}%</p>
                                         </div>
                                         <ChevronsRight className="text-gray-400" />
                                          <div>
-                                            <p className="text-sm text-gray-500">예상 최종 점수</p>
+                                            <p className="text-sm text-gray-500">예상 최종 득점</p>
                                             <p className="text-xl font-bold text-blue-600">{simulationResult?.scenario1.finalScore.toFixed(3)}점</p>
                                         </div>
                                      </div>
                                 </CardContent>
                             </Card>
                              <Card>
-                                <CardHeader><CardTitle className="text-base">Scenario 2: 임대가능면적 축소 시</CardTitle></CardHeader>
+                                <CardHeader><CardTitle className="text-base">Scenario 2: 임대가능면적 변경 시</CardTitle></CardHeader>
                                 <CardContent className="space-y-4">
                                      <div>
                                         <label htmlFor="areaReduction" className="text-sm font-medium">면적 증감 (㎡)</label>
                                         <Input id="areaReduction" name="areaReduction" type="number" value={simulationInput.areaReduction} onChange={handleSimulationInputChange} placeholder="예: -1000" />
                                      </div>
-                                     <div className="flex items-center justify-around text-center p-4 bg-slate-100 rounded-lg">
+                                     <div className="flex items-center justify-around text-center p-4 bg-slate-50 rounded-lg">
                                         <div>
                                             <p className="text-sm text-gray-500">예상 임대율</p>
                                             <p className="text-xl font-bold">{simulationResult?.scenario2.rate.toFixed(3)}%</p>
                                         </div>
                                         <ChevronsRight className="text-gray-400" />
                                          <div>
-                                            <p className="text-sm text-gray-500">예상 최종 점수</p>
+                                            <p className="text-sm text-gray-500">예상 최종 득점</p>
                                             <p className="text-xl font-bold text-blue-600">{simulationResult?.scenario2.finalScore.toFixed(3)}점</p>
                                         </div>
                                      </div>
