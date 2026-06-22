@@ -247,19 +247,19 @@ const LeaseStatusSummaryPage: React.FC = () => {
 
   return (
     <div className="p-1">
-       <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-0 md:gap-8 lg:grid-cols-3 xl:grid-cols-3">
-          <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-1">
-            <Card>
+       <main className="grid flex-1 gap-4 p-4 sm:px-6 sm:py-0 md:gap-8 lg:grid-cols-3 xl:grid-cols-3">
+          <div className="flex flex-col gap-4 md:gap-8 lg:col-span-1">
+            <Card className="flex flex-1 flex-col">
               <CardHeader>
                 <CardTitle>임대율 실적 관리</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex space-x-2">
+              <CardContent className="flex flex-1 flex-col">
+                <div className="flex space-x-2">
                     <Button size="sm" variant="outline" onClick={() => handleOpenModal(null)}><PlusCircle className="mr-2 h-4 w-4"/>신규 추가</Button>
                     <Button size="sm" variant="outline" onClick={handleUploadButtonClick}><Upload className="mr-2 h-4 w-4"/>엑셀 업로드</Button>
                     <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" />
-                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto mt-4">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -299,18 +299,16 @@ const LeaseStatusSummaryPage: React.FC = () => {
             </Card>
           </div>
 
-          <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
-            <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-2">
-                <div className="lg:col-span-2">
-                     {enrichedUnits && 
-                        <InteractiveFloorPlan 
-                            units={enrichedUnits}
-                            simulatedOccupiedIds={simulatedOccupiedIds}
-                            simulatedVacantIds={simulatedVacantIds}
-                            onUnitClick={handleUnitClick}
-                        />
-                    }
-                </div>
+          <div className="flex flex-col gap-4 md:gap-8 lg:col-span-2">
+            <div className="flex-1">
+                 {enrichedUnits && 
+                    <InteractiveFloorPlan 
+                        units={enrichedUnits}
+                        simulatedOccupiedIds={simulatedOccupiedIds}
+                        simulatedVacantIds={simulatedVacantIds}
+                        onUnitClick={handleUnitClick}
+                    />
+                }
             </div>
              <Card className="bg-slate-50/70 border-dashed border-slate-300">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">

@@ -44,7 +44,7 @@ const InteractiveFloorPlan: React.FC<InteractiveFloorPlanProps> = ({
   const maxArea = Math.max(...unitsByFloor.map(u => u.area_sqm), 1);
 
   return (
-    <Card className="h-full">
+    <Card className="h-full flex flex-col">
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle className="text-lg font-bold text-slate-800">도면 시뮬레이션 ({currentFloor}F)</CardTitle>
@@ -63,8 +63,8 @@ const InteractiveFloorPlan: React.FC<InteractiveFloorPlanProps> = ({
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="p-4 bg-slate-50/80 rounded-lg min-h-[450px] flex flex-col justify-center">
+      <CardContent className="flex-1 flex flex-col">
+        <div className="p-4 bg-slate-50/80 rounded-lg flex-1 flex flex-col justify-center">
            <div className="text-center text-xs text-slate-400 mb-4">CENTRAL CORRIDOR</div>
            <div className="flex flex-wrap items-start gap-2 justify-center">
             {unitsByFloor.map(unit => {
