@@ -99,6 +99,7 @@ export interface Unit {
     id: string;
     name: string;
     floor: string;
+    tenant?: string;
     area_sqm: number;
     status: 'occupied' | 'vacant' | 'under-renovation' | 'notice' | '임대중' | '공실';
     pathData: string;
