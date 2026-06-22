@@ -9,6 +9,7 @@ interface InteractiveFloorPlanProps {
   simulatedOccupiedIds: Set<string>;
   simulatedVacantIds: Set<string>;
   onUnitClick: (unit: Unit) => void;
+  className?: string;
 }
 
 const getUnitStyle = (unit: Unit, simulatedOccupiedIds: Set<string>, simulatedVacantIds: Set<string>): string => {
@@ -43,6 +44,7 @@ const InteractiveFloorPlan: React.FC<InteractiveFloorPlanProps> = ({
   simulatedOccupiedIds,
   simulatedVacantIds,
   onUnitClick,
+  className,
 }) => {
   const floors = [...new Set(units.map(u => u.floor))].sort((a, b) => parseInt(a) - parseInt(b));
   const [currentFloor, setCurrentFloor] = useState(floors[0] || '1');
@@ -51,7 +53,7 @@ const InteractiveFloorPlan: React.FC<InteractiveFloorPlanProps> = ({
   const maxArea = Math.max(...unitsByFloor.map(u => u.area_sqm), 1);
 
   return (
-    <Card className="shadow-sm h-full flex flex-col">
+    <Card className={`shadow-sm flex flex-col ${className}`}>
       <CardHeader>
         <div className="flex justify-between items-center">
           <CardTitle className="text-xl font-bold text-slate-800">도면 시뮬레이션 ({currentFloor}F)</CardTitle>

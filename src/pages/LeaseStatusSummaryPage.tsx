@@ -11,6 +11,7 @@ import * as XLSX from 'xlsx';
 
 interface KpiMetrics {
   baseline: number;
+  mean: number;
   stdDev: number;
   targetHigh: number;
   targetLow: number;
@@ -54,9 +55,7 @@ const LeaseStatusSummaryPage: React.FC = () => {
   const realtimeMetrics = useMemo((): RealtimeMetrics | null => {
     if (!units || units.length === 0) return null;
     const totalRentableArea = units.reduce((acc, u) => acc + u.area_sqm, 0);
-    const totalLeasedArea = units
-      .filter(u => u.status === 'occupied' || u.status === 'notice')
-      .reduce((acc, u) => acc + u.area_sqm, 0);
+    const totalLeasedArea = units.filter(u => u.status === 'occupied' || u.status === 'notice').reduce((acc, u) => acc + u.area_sqm, 0);
     if (totalRentableArea === 0) return { totalRentableArea, totalLeasedArea, realtimeOccupancyRate: 0 };
     const realtimeOccupancyRate = (totalLeasedArea / totalRentableArea) * 100;
     return { totalRentableArea, totalLeasedArea, realtimeOccupancyRate };
@@ -71,7 +70,7 @@ const LeaseStatusSummaryPage: React.FC = () => {
 
   const calculateKpiMetrics = (historicalData: RentalHistory[], realtimeRate: number): KpiMetrics | null => {
     const pastData = historicalData.filter(h => h.leased_area > 0).sort((a, b) => b.year - a.year);
-    if (pastData.length === 0) return null;
+    if (pastData.length < 1) return null;
     const baselineData = pastData;
     const prevYearRate = baselineData.length > 0 ? baselineData[0].occupancy_rate : realtimeRate;
     const lastThreeYears = baselineData.slice(0, 3);
@@ -85,20 +84,13 @@ const LeaseStatusSummaryPage: React.FC = () => {
     if (targetHigh > 100) targetHigh = 100;
     let targetLow = baseline - (2 * stdDev);
     if (targetLow < 0) targetLow = 0;
-    return { baseline, stdDev, targetHigh, targetLow, currentRealtimeRate: realtimeRate };
+    return { baseline, mean, stdDev, targetHigh, targetLow, currentRealtimeRate: realtimeRate };
   };
 
   const displayHistory = useMemo(() => rentalHistory.filter(h => h.year !== 2021).sort((a, b) => b.year - a.year), [rentalHistory]);
 
-  const handleOpenModal = (history: RentalHistory | null) => {
-    setSelectedHistory(history);
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setSelectedHistory(null);
-  };
+  const handleOpenModal = (history: RentalHistory | null) => { setSelectedHistory(history); setIsModalOpen(true); };
+  const handleCloseModal = () => { setIsModalOpen(false); setSelectedHistory(null); };
 
   const handleSubmitHistory = (data: Omit<RentalHistory, 'id' | 'created_at' | 'occupancy_rate'>) => {
     const occupancy_rate = (data.leased_area / data.rentable_area) * 100;
@@ -141,28 +133,13 @@ const LeaseStatusSummaryPage: React.FC = () => {
     const newOccupiedIds = new Set(simulatedOccupiedIds);
     const newVacantIds = new Set(simulatedVacantIds);
     let areaChange = 0;
-
-    if (newOccupiedIds.has(unit.id)) {
-      newOccupiedIds.delete(unit.id);
-      areaChange = -unit.area_sqm;
-    } else if (newVacantIds.has(unit.id)) {
-      newVacantIds.delete(unit.id);
-      areaChange = unit.area_sqm;
-    } else if (unit.status === 'vacant') {
-      newOccupiedIds.add(unit.id);
-      areaChange = unit.area_sqm;
-    } else { // occupied or notice
-      newVacantIds.add(unit.id);
-      areaChange = -unit.area_sqm;
-    }
-
+    if (newOccupiedIds.has(unit.id)) { newOccupiedIds.delete(unit.id); areaChange = -unit.area_sqm; }
+    else if (newVacantIds.has(unit.id)) { newVacantIds.delete(unit.id); areaChange = unit.area_sqm; }
+    else if (unit.status === 'vacant') { newOccupiedIds.add(unit.id); areaChange = unit.area_sqm; }
+    else { newVacantIds.add(unit.id); areaChange = -unit.area_sqm; }
     setSimulatedOccupiedIds(newOccupiedIds);
     setSimulatedVacantIds(newVacantIds);
-
-    setSimulationChanges(prev => ({
-      ...prev,
-      leasedAreaChange: prev.leasedAreaChange + areaChange,
-    }));
+    setSimulationChanges(prev => ({ ...prev, leasedAreaChange: prev.leasedAreaChange + areaChange }));
     setLastUpdated(new Date());
   };
 
@@ -174,39 +151,48 @@ const LeaseStatusSummaryPage: React.FC = () => {
   };
 
   const simulationResult = useMemo(() => {
-    if (!realtimeMetrics || !kpi) {
-      return { rate: 0, finalScore: 0, score: 0 };
-    }
+    if (!realtimeMetrics || !kpi) return { rate: 0, finalScore: 0, scoreForBar: 0, rating: 0, weight: 2.5 };
+    
     const simulatedLeasedArea = realtimeMetrics.totalLeasedArea + simulationChanges.leasedAreaChange;
     const simulatedRentableArea = realtimeMetrics.totalRentableArea + simulationChanges.rentableAreaChange;
-    if (simulatedRentableArea === 0) {
-      return { rate: 0, finalScore: 0, score: 0 };
-    }
+    if (simulatedRentableArea === 0) return { rate: 0, finalScore: 0, scoreForBar: 0, rating: 0, weight: 2.5 };
+    
     const rate = (simulatedLeasedArea / simulatedRentableArea) * 100;
-    let finalScore = 0;
-    const { baseline, stdDev } = kpi;
-    if (stdDev > 0) {
-      finalScore = (rate - baseline) / stdDev;
+    const { targetLow, targetHigh } = kpi;
+
+    let scoreForBar = 0;
+    if (targetHigh > targetLow) {
+      scoreForBar = ((rate - targetLow) / (targetHigh - targetLow)) * 100;
+    } else if (rate >= targetHigh) {
+      scoreForBar = 100;
     }
-    const score = ((rate - kpi.targetLow) / (kpi.targetHigh - kpi.targetLow)) * 100;
-    return { rate, finalScore, score: Math.max(0, Math.min(100, score)) };
+    scoreForBar = Math.max(0, Math.min(100, scoreForBar));
+
+    let rating = 20 + (scoreForBar / 100) * 80;
+    rating = Math.max(20, Math.min(100, rating));
+
+    const weight = 2.5;
+    const finalScore = (rating / 100) * weight;
+
+    return { rate, finalScore, scoreForBar, rating, weight };
   }, [kpi, realtimeMetrics, simulationChanges]);
 
 
   return (
     <div className="bg-slate-50 min-h-screen p-4 sm:p-6 md:p-8 font-sans">
-       <main className="grid flex-1 items-start gap-6 lg:grid-cols-3 xl:grid-cols-3">
-          <div className="grid auto-rows-max items-start gap-6 lg:col-span-1">
-            <Card className="shadow-sm">
-              <CardHeader>
+       <main className="grid flex-1 items-stretch gap-6 lg:grid-cols-3">
+
+          <div className="lg:col-span-1">
+            <Card className="shadow-sm flex flex-col h-full">
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle className="text-xl font-bold text-slate-800">임대율 실적 관리</CardTitle>
-                 <div className="flex space-x-2 pt-2">
+                 <div className="flex space-x-2">
                     <Button size="sm" variant="outline" onClick={() => handleOpenModal(null)}><PlusCircle className="mr-2 h-4 w-4"/>신규 추가</Button>
                     <Button size="sm" variant="outline" onClick={handleUploadButtonClick}><Upload className="mr-2 h-4 w-4"/>엑셀 업로드</Button>
                     <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" />
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="flex-grow">
                   <Table>
                     <TableHeader className="bg-slate-100">
                       <TableRow>
@@ -218,7 +204,7 @@ const LeaseStatusSummaryPage: React.FC = () => {
                       {realtimeMetrics && (
                         <TableRow className="border-l-4 border-blue-500 bg-blue-50 font-bold">
                           <TableCell className="py-3">2026 (현재)</TableCell>
-                          <TableCell className="py-3">{realtimeMetrics.realtimeOccupancyRate.toFixed(2)}%</TableCell>
+                          <TableCell className="py-3">{realtimeMetrics.realtimeOccupancyRate.toFixed(3)}%</TableCell>
                         </TableRow>
                       )}
                       {displayHistory.map((item) => (
@@ -226,7 +212,7 @@ const LeaseStatusSummaryPage: React.FC = () => {
                           <TableCell className="py-3">{item.year}</TableCell>
                           <TableCell className="py-3">
                             <div className='flex items-center gap-3'>
-                                <span>{item.occupancy_rate.toFixed(2)}%</span>
+                                <span>{item.occupancy_rate.toFixed(3)}%</span>
                                 <div className='w-full bg-slate-200 rounded-full h-1.5'>
                                     <div className='bg-slate-400 h-1.5 rounded-full' style={{width: `${item.occupancy_rate}%`}}></div>
                                 </div>
@@ -238,46 +224,53 @@ const LeaseStatusSummaryPage: React.FC = () => {
                   </Table>
               </CardContent>
             </Card>
-             <Card className="shadow-sm">
-                <CardHeader className="pb-4">
-                    <CardTitle className="text-xl font-bold text-slate-800">핵심 성과 지표 (KPI)</CardTitle>
-                </CardHeader>
-                <CardContent className="grid gap-4">
-                   <div className='p-4 bg-slate-100/80 rounded-lg flex items-center justify-between'>
-                        <div className='flex items-center gap-3'>
-                            <Goal className='w-6 h-6 text-slate-600' />
-                            <span className='font-semibold text-slate-700'>2026 기준치</span>
-                        </div>
-                        <span className='text-xl font-bold text-slate-800'>{kpi?.baseline.toFixed(2)}%</span>
-                   </div>
-                   <div className='p-4 bg-green-50 rounded-lg flex items-center justify-between'>
-                        <div className='flex items-center gap-3'>
-                            <ArrowUpRight className='w-6 h-6 text-green-600' />
-                            <span className='font-semibold text-green-800'>2026 최고목표</span>
-                        </div>
-                        <span className='text-xl font-bold text-green-700'>{kpi?.targetHigh.toFixed(2)}%</span>
-                   </div>
-                   <div className='p-4 bg-amber-50 rounded-lg flex items-center justify-between'>
-                        <div className='flex items-center gap-3'>
-                            <ArrowDownRight className='w-6 h-6 text-amber-600' />
-                            <span className='font-semibold text-amber-800'>2026 최저목표</span>
-                        </div>
-                        <span className='text-xl font-bold text-amber-700'>{kpi?.targetLow.toFixed(2)}%</span>
-                   </div>
-                </CardContent>
-            </Card>
           </div>
 
-          <div className="grid auto-rows-max items-start gap-6 lg:col-span-2">
+          <div className="lg:col-span-2">
             {enrichedUnits && 
                 <InteractiveFloorPlan 
                     units={enrichedUnits}
                     simulatedOccupiedIds={simulatedOccupiedIds}
                     simulatedVacantIds={simulatedVacantIds}
                     onUnitClick={handleUnitClick}
+                    className="h-full"
                 />
             }
-             <Card className="shadow-lg border border-slate-200/80 bg-white">
+          </div>
+
+          <div className="lg:col-span-1">
+             <Card className="shadow-sm flex flex-col h-full">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-xl font-bold text-slate-800">핵심 성과 지표 (KPI)</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-3 flex-grow content-around">
+                   <div className='p-4 bg-slate-100/80 rounded-lg flex items-center justify-between'>
+                        <div className='flex items-center gap-3'>
+                            <Goal className='w-6 h-6 text-slate-600' />
+                            <span className='font-semibold text-slate-700'>2026 기준치</span>
+                        </div>
+                        <span className='text-lg font-bold text-slate-800'>{kpi?.baseline.toFixed(3)}%</span>
+                   </div>
+                   <div className='p-4 bg-green-50 rounded-lg flex items-center justify-between'>
+                        <div className='flex items-center gap-3'>
+                            <ArrowUpRight className='w-6 h-6 text-green-600' />
+                            <span className='font-semibold text-green-800'>2026 최고목표</span>
+                        </div>
+                        <span className='text-lg font-bold text-green-700'>{kpi?.targetHigh.toFixed(3)}%</span>
+                   </div>
+                   <div className='p-4 bg-amber-50 rounded-lg flex items-center justify-between'>
+                        <div className='flex items-center gap-3'>
+                            <ArrowDownRight className='w-6 h-6 text-amber-600' />
+                            <span className='font-semibold text-amber-800'>2026 최저목표</span>
+                        </div>
+                        <span className='text-lg font-bold text-amber-700'>{kpi?.targetLow.toFixed(3)}%</span>
+                   </div>
+                </CardContent>
+            </Card>
+          </div>
+
+          <div className="lg:col-span-2">
+             <Card className="shadow-lg border border-slate-200/80 bg-white flex flex-col h-full">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <div>
                         <CardTitle className="text-xl font-bold text-slate-800">시뮬레이션 최종 결과</CardTitle>
@@ -285,35 +278,39 @@ const LeaseStatusSummaryPage: React.FC = () => {
                     </div>
                     <Button variant="ghost" size="icon" onClick={resetSimulation}><RotateCw className="h-5 w-5 text-slate-500"/></Button>
                 </CardHeader>
-                <CardContent className="flex flex-col md:flex-row items-center justify-between text-center p-6 gap-6">
+                <CardContent className="flex-grow flex flex-col md:flex-row items-center justify-evenly text-center p-6 gap-6">
                     <div className="w-full md:w-1/4">
                         <p className="text-sm font-semibold text-slate-600 mb-2">시뮬레이션 요약</p>
                         <div className="flex justify-center items-center gap-2">
                             <div className="text-green-600 bg-green-100/80 font-bold text-sm px-3 py-1 rounded-md">+{simulatedOccupiedIds.size} 유닛 (입주)</div>
                              <div className="text-amber-600 bg-amber-100/80 font-bold text-sm px-3 py-1 rounded-md">-{simulatedVacantIds.size} 유닛 (퇴거)</div>
                         </div>
-                        <p className="text-xs text-slate-400 mt-2">입주/퇴거 면적(㎡): <span className='font-semibold'>{simulationChanges.leasedAreaChange.toFixed(2)}</span></p>
+                        <p className="text-xs text-slate-400 mt-2">입주/퇴거 면적(㎡): <span className='font-semibold'>{simulationChanges.leasedAreaChange.toFixed(3)}</span></p>
                     </div>
                     <ChevronRight className="text-slate-300 hidden md:block" size={32} />
                     <div className="w-full md:w-1/2 text-center">
                         <p className="text-sm font-semibold text-slate-600">예상 임대율</p>
                         <div className='flex items-end justify-center gap-1'>
-                            <p className="text-5xl font-bold tracking-tighter text-[#1A4F95]">{simulationResult?.rate.toFixed(2)}</p>
+                            <p className="text-5xl font-bold tracking-tighter text-[#1A4F95]">{simulationResult?.rate.toFixed(3)}</p>
                             <span className='text-2xl font-medium text-slate-500 mb-1'>%</span>
                         </div>
                     </div>
                     <ChevronRight className="text-slate-300 hidden md:block" size={32} />
                     <div className="w-full md:w-1/3">
                         <p className="text-sm font-semibold text-slate-600 mb-2">예상 최종 득점</p>
-                        <p className="text-4xl font-bold tracking-tighter text-indigo-600">{simulationResult?.finalScore.toFixed(2)}</p>
-                        <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
-                            <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${simulationResult?.score ?? 0}%` }}></div>
+                        <p className="text-4xl font-bold tracking-tighter text-indigo-600">{simulationResult?.finalScore.toFixed(3)}</p>
+                        <div className="text-xs text-slate-500 mt-1 space-x-2">
+                            <span>(평점: {simulationResult?.rating.toFixed(3)}점</span>
+                            <span>/ 가중치: {simulationResult?.weight.toFixed(1)})</span>
+                        </div>
+                        <div className="w-full bg-slate-200 rounded-full h-2 mt-3">
+                            <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${simulationResult?.scoreForBar ?? 0}%` }}></div>
                         </div>
                     </div>
                 </CardContent>
             </Card>
             {!kpi && (
-                <Card className="border-amber-400 bg-amber-50/50">
+                <Card className="border-amber-400 bg-amber-50/50 mt-6 lg:col-span-3">
                     <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">
                         <AlertTriangle className="w-5 h-5 text-amber-500"/>
                         <CardTitle className="text-amber-700 text-base font-bold">임대율 실적 데이터 부족</CardTitle>
@@ -327,6 +324,7 @@ const LeaseStatusSummaryPage: React.FC = () => {
                 </Card>
             )}
           </div>
+
        </main>
       <RentalHistoryModal 
         isOpen={isModalOpen}
