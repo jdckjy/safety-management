@@ -4,7 +4,7 @@ import { RentalHistory, Unit, EnrichedUnit, TenantInfo, Contract } from '@/types
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Upload, ChevronsRight, RotateCw, AlertTriangle } from 'lucide-react';
+import { PlusCircle, Upload, ChevronRight, RotateCw, AlertTriangle, ArrowUpRight, ArrowDownRight, Goal } from 'lucide-react';
 import RentalHistoryModal from '@/components/RentalHistoryModal';
 import InteractiveFloorPlan from '@/components/InteractiveFloorPlan';
 import * as XLSX from 'xlsx';
@@ -31,10 +31,10 @@ interface SimulationChanges {
 const LeaseStatusSummaryPage: React.FC = () => {
   const { rentalHistory, units, tenantInfo, contracts, addRentalHistory, updateRentalHistory, setRentalHistory } = useProjectData();
   const [kpi, setKpi] = useState<KpiMetrics | null>(null);
-  
   const [simulationChanges, setSimulationChanges] = useState<SimulationChanges>({ leasedAreaChange: 0, rentableAreaChange: 0 });
   const [simulatedOccupiedIds, setSimulatedOccupiedIds] = useState<Set<string>>(new Set());
   const [simulatedVacantIds, setSimulatedVacantIds] = useState<Set<string>>(new Set());
+  const [lastUpdated, setLastUpdated] = useState(new Date());
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedHistory, setSelectedHistory] = useState<RentalHistory | null>(null);
@@ -42,69 +42,53 @@ const LeaseStatusSummaryPage: React.FC = () => {
 
   const enrichedUnits = useMemo((): EnrichedUnit[] => {
     if (!units || !tenantInfo || !contracts) return [];
-
     const tenantInfoById = new Map<string, TenantInfo>(tenantInfo.map(t => [t.id, t]));
     const contractByUnitId = new Map<string, Contract>(contracts.map(c => [c.unitId!, c]));
-
     return units.map(unit => {
       const contract = contractByUnitId.get(unit.id);
       const tenant = contract ? tenantInfoById.get(contract.tenantId) : undefined;
-      return {
-        ...unit,
-        tenant,
-        contract,
-      };
+      return { ...unit, tenant, contract };
     });
   }, [units, tenantInfo, contracts]);
 
   const realtimeMetrics = useMemo((): RealtimeMetrics | null => {
     if (!units || units.length === 0) return null;
-    
     const totalRentableArea = units.reduce((acc, u) => acc + u.area_sqm, 0);
     const totalLeasedArea = units
       .filter(u => u.status === 'occupied' || u.status === 'notice')
       .reduce((acc, u) => acc + u.area_sqm, 0);
-    
     if (totalRentableArea === 0) return { totalRentableArea, totalLeasedArea, realtimeOccupancyRate: 0 };
-
     const realtimeOccupancyRate = (totalLeasedArea / totalRentableArea) * 100;
-
     return { totalRentableArea, totalLeasedArea, realtimeOccupancyRate };
   }, [units]);
+
+  useEffect(() => {
+    if (rentalHistory && realtimeMetrics) {
+        const metrics = calculateKpiMetrics(rentalHistory, realtimeMetrics.realtimeOccupancyRate);
+        setKpi(metrics);
+    }
+  }, [rentalHistory, realtimeMetrics]);
 
   const calculateKpiMetrics = (historicalData: RentalHistory[], realtimeRate: number): KpiMetrics | null => {
     const pastData = historicalData.filter(h => h.leased_area > 0).sort((a, b) => b.year - a.year);
     if (pastData.length === 0) return null;
-
-    const baselineData = pastData; 
+    const baselineData = pastData;
     const prevYearRate = baselineData.length > 0 ? baselineData[0].occupancy_rate : realtimeRate;
     const lastThreeYears = baselineData.slice(0, 3);
     const avgThreeYears = lastThreeYears.reduce((acc, cur) => acc + cur.occupancy_rate, 0) / lastThreeYears.length;
-    
     const baseline = Math.max(prevYearRate, avgThreeYears);
     const rates = baselineData.map(h => h.occupancy_rate);
     const mean = rates.reduce((a, b) => a + b, 0) / rates.length;
     const variance = rates.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / rates.length;
     const stdDev = Math.sqrt(variance);
-    
     let targetHigh = baseline + (2 * stdDev);
     if (targetHigh > 100) targetHigh = 100;
-    
     let targetLow = baseline - (2 * stdDev);
     if (targetLow < 0) targetLow = 0;
-    
     return { baseline, stdDev, targetHigh, targetLow, currentRealtimeRate: realtimeRate };
   };
 
-  useEffect(() => {
-    if (rentalHistory && realtimeMetrics) {
-        setKpi(calculateKpiMetrics(rentalHistory, realtimeMetrics.realtimeOccupancyRate));
-    }
-  }, [rentalHistory, realtimeMetrics]);
-
-  const displayHistory = useMemo(() => {
-    return rentalHistory.filter(h => h.year !== 2021).sort((a, b) => b.year - a.year);
-  }, [rentalHistory]);
+  const displayHistory = useMemo(() => rentalHistory.filter(h => h.year !== 2021).sort((a, b) => b.year - a.year), [rentalHistory]);
 
   const handleOpenModal = (history: RentalHistory | null) => {
     setSelectedHistory(history);
@@ -126,225 +110,218 @@ const LeaseStatusSummaryPage: React.FC = () => {
     handleCloseModal();
   };
 
-  const handleUploadButtonClick = () => {
-    fileInputRef.current?.click();
-  };
+  const handleUploadButtonClick = () => fileInputRef.current?.click();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const json: any[] = XLSX.utils.sheet_to_json(worksheet);
-
-        const updatedHistory = [...rentalHistory];
-        const existingYears = new Map(updatedHistory.map(h => [h.year, h]));
-
-        json.forEach(row => {
-          const { year, rentable_area, leased_area } = row;
-          
-          if (typeof year !== 'number' || typeof rentable_area !== 'number' || typeof leased_area !== 'number') {
-            console.warn('Skipping invalid row:', row);
-            return;
-          }
-
-          const occupancy_rate = rentable_area > 0 ? (leased_area / rentable_area) * 100 : 0;
-          
-          if (existingYears.has(year)) {
-            const existingRecord = existingYears.get(year)!;
-            const recordIndex = updatedHistory.findIndex(h => h.id === existingRecord.id);
-            if(recordIndex !== -1) {
-              updatedHistory[recordIndex] = {...existingRecord, year, rentable_area, leased_area, occupancy_rate };
-            }
-          } else {
-            const newRecord: RentalHistory = { id: `rh-${year}-${Date.now()}`, year, rentable_area, leased_area, occupancy_rate, created_at: new Date().toISOString() };
-            updatedHistory.push(newRecord);
-            existingYears.set(year, newRecord);
-          }
-        });
-        
-        setRentalHistory(updatedHistory.sort((a,b) => b.year - a.year));
-        alert('엑셀 파일이 성공적으로 업로드되었습니다.');
-
-      } catch (error) {
-        console.error("Error processing Excel file:", error);
-        alert('엑셀 파일 처리 중 오류가 발생했습니다.');
-      } finally {
-        if(event.target) {
-            event.target.value = '';
-        }
-      }
-    };
-    reader.readAsBinaryString(file);
+        const json = XLSX.utils.sheet_to_json<any>(worksheet);
+        const newHistory: RentalHistory[] = json.map((row, index) => ({
+          id: `excel-${Date.now()}-${index}`,
+          year: row.year,
+          rentable_area: row.rentable_area,
+          leased_area: row.leased_area,
+          occupancy_rate: (row.leased_area / row.rentable_area) * 100,
+          created_at: new Date().toISOString(),
+        }));
+        setRentalHistory([...rentalHistory, ...newHistory]);
+      };
+      reader.readAsArrayBuffer(file);
+    }
+    event.target.value = '';
   };
 
   const handleUnitClick = (unit: Unit) => {
-      setSimulationChanges(prev => {
-          const newChanges = {...prev};
-          const newOccupiedIds = new Set(simulatedOccupiedIds);
-          const newVacantIds = new Set(simulatedVacantIds);
+    const newOccupiedIds = new Set(simulatedOccupiedIds);
+    const newVacantIds = new Set(simulatedVacantIds);
+    let areaChange = 0;
 
-          if (unit.status === 'vacant') {
-              if (newOccupiedIds.has(unit.id)) { // From simulated-occupied back to vacant
-                  newChanges.leasedAreaChange -= unit.area_sqm;
-                  newOccupiedIds.delete(unit.id);
-              } else {
-                  newChanges.leasedAreaChange += unit.area_sqm;
-                  newOccupiedIds.add(unit.id);
-              }
-          } else if (unit.status === 'occupied' || unit.status === 'notice') {
-              if (newVacantIds.has(unit.id)) { // From simulated-vacant back to occupied
-                  newChanges.leasedAreaChange += unit.area_sqm;
-                  newVacantIds.delete(unit.id);
-              } else {
-                  newChanges.leasedAreaChange -= unit.area_sqm;
-                  newVacantIds.add(unit.id);
-              }
-          }
+    if (newOccupiedIds.has(unit.id)) {
+      newOccupiedIds.delete(unit.id);
+      areaChange = -unit.area_sqm;
+    } else if (newVacantIds.has(unit.id)) {
+      newVacantIds.delete(unit.id);
+      areaChange = unit.area_sqm;
+    } else if (unit.status === 'vacant') {
+      newOccupiedIds.add(unit.id);
+      areaChange = unit.area_sqm;
+    } else { // occupied or notice
+      newVacantIds.add(unit.id);
+      areaChange = -unit.area_sqm;
+    }
 
-          setSimulatedOccupiedIds(newOccupiedIds);
-          setSimulatedVacantIds(newVacantIds);
-          return newChanges;
-      });
+    setSimulatedOccupiedIds(newOccupiedIds);
+    setSimulatedVacantIds(newVacantIds);
+
+    setSimulationChanges(prev => ({
+      ...prev,
+      leasedAreaChange: prev.leasedAreaChange + areaChange,
+    }));
+    setLastUpdated(new Date());
   };
 
   const resetSimulation = () => {
       setSimulationChanges({ leasedAreaChange: 0, rentableAreaChange: 0 });
       setSimulatedOccupiedIds(new Set());
       setSimulatedVacantIds(new Set());
+      setLastUpdated(new Date());
   };
 
   const simulationResult = useMemo(() => {
-    if (!kpi || !realtimeMetrics) return null;
-
-    const totalSimulatedLeasedArea = realtimeMetrics.totalLeasedArea + simulationChanges.leasedAreaChange;
-    const totalSimulatedRentableArea = realtimeMetrics.totalRentableArea + simulationChanges.rentableAreaChange;
-
-    let simulatedRate = 0;
-    if (totalSimulatedRentableArea > 0) {
-        simulatedRate = (totalSimulatedLeasedArea / totalSimulatedRentableArea) * 100;
+    if (!realtimeMetrics || !kpi) {
+      return { rate: 0, finalScore: 0, score: 0 };
     }
-
-    let simulatedScore = 20 + ((simulatedRate - kpi.targetLow) / (kpi.targetHigh - kpi.targetLow)) * 80;
-    if (isNaN(simulatedScore) || simulatedScore > 100) simulatedScore = 100;
-    if (simulatedScore < 20) simulatedScore = 20;
-
-    const weightedScore = (simulatedScore / 100) * 2.5;
-
-    return {
-        rate: simulatedRate,
-        score: simulatedScore,
-        finalScore: weightedScore,
-    };
-}, [kpi, realtimeMetrics, simulationChanges]);
+    const simulatedLeasedArea = realtimeMetrics.totalLeasedArea + simulationChanges.leasedAreaChange;
+    const simulatedRentableArea = realtimeMetrics.totalRentableArea + simulationChanges.rentableAreaChange;
+    if (simulatedRentableArea === 0) {
+      return { rate: 0, finalScore: 0, score: 0 };
+    }
+    const rate = (simulatedLeasedArea / simulatedRentableArea) * 100;
+    let finalScore = 0;
+    const { baseline, stdDev } = kpi;
+    if (stdDev > 0) {
+      finalScore = (rate - baseline) / stdDev;
+    }
+    const score = ((rate - kpi.targetLow) / (kpi.targetHigh - kpi.targetLow)) * 100;
+    return { rate, finalScore, score: Math.max(0, Math.min(100, score)) };
+  }, [kpi, realtimeMetrics, simulationChanges]);
 
 
   return (
-    <div className="p-1">
-       <main className="grid flex-1 gap-4 p-4 sm:px-6 sm:py-0 md:gap-8 lg:grid-cols-3 xl:grid-cols-3">
-          <div className="flex flex-col gap-4 md:gap-8 lg:col-span-1">
-            <Card className="flex flex-1 flex-col">
+    <div className="bg-slate-50 min-h-screen p-4 sm:p-6 md:p-8 font-sans">
+       <main className="grid flex-1 items-start gap-6 lg:grid-cols-3 xl:grid-cols-3">
+          <div className="grid auto-rows-max items-start gap-6 lg:col-span-1">
+            <Card className="shadow-sm">
               <CardHeader>
-                <CardTitle>임대율 실적 관리</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col">
-                <div className="flex space-x-2">
+                <CardTitle className="text-xl font-bold text-slate-800">임대율 실적 관리</CardTitle>
+                 <div className="flex space-x-2 pt-2">
                     <Button size="sm" variant="outline" onClick={() => handleOpenModal(null)}><PlusCircle className="mr-2 h-4 w-4"/>신규 추가</Button>
                     <Button size="sm" variant="outline" onClick={handleUploadButtonClick}><Upload className="mr-2 h-4 w-4"/>엑셀 업로드</Button>
                     <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" />
                 </div>
-                <div className="flex-1 overflow-y-auto mt-4">
+              </CardHeader>
+              <CardContent>
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="bg-slate-100">
                       <TableRow>
-                        <TableHead>연도</TableHead>
-                        <TableHead>임대율(%)</TableHead>
+                        <TableHead className="w-1/3 font-semibold text-slate-600">연도</TableHead>
+                        <TableHead className="font-semibold text-slate-600">연도별 임대율</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {realtimeMetrics && (
-                        <TableRow className="bg-blue-50 font-semibold">
-                          <TableCell>2026 (현재)</TableCell>
-                          <TableCell>{realtimeMetrics.realtimeOccupancyRate.toFixed(3)}</TableCell>
+                        <TableRow className="border-l-4 border-blue-500 bg-blue-50 font-bold">
+                          <TableCell className="py-3">2026 (현재)</TableCell>
+                          <TableCell className="py-3">{realtimeMetrics.realtimeOccupancyRate.toFixed(2)}%</TableCell>
                         </TableRow>
                       )}
                       {displayHistory.map((item) => (
                         <TableRow key={item.id} onClick={() => handleOpenModal(item)} className="cursor-pointer hover:bg-slate-50">
-                          <TableCell>{item.year}</TableCell>
-                          <TableCell>{item.occupancy_rate.toFixed(3)}</TableCell>
+                          <TableCell className="py-3">{item.year}</TableCell>
+                          <TableCell className="py-3">
+                            <div className='flex items-center gap-3'>
+                                <span>{item.occupancy_rate.toFixed(2)}%</span>
+                                <div className='w-full bg-slate-200 rounded-full h-1.5'>
+                                    <div className='bg-slate-400 h-1.5 rounded-full' style={{width: `${item.occupancy_rate}%`}}></div>
+                                </div>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
-                </div>
               </CardContent>
             </Card>
-             <Card>
-                <CardHeader className="pb-2">
-                    <CardTitle className="text-base font-semibold">KPI 요약</CardTitle>
+             <Card className="shadow-sm">
+                <CardHeader className="pb-4">
+                    <CardTitle className="text-xl font-bold text-slate-800">핵심 성과 지표 (KPI)</CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="font-semibold">2026 기준치:</div> <div className="text-right">{kpi?.baseline.toFixed(2)}%</div>
-                        <div className="font-semibold">2026 최고목표:</div> <div className="text-right text-green-600">{kpi?.targetHigh.toFixed(2)}%</div>
-                        <div className="font-semibold">2026 최저목표:</div> <div className="text-right text-red-600">{kpi?.targetLow.toFixed(2)}%</div>
-                    </div>
+                <CardContent className="grid gap-4">
+                   <div className='p-4 bg-slate-100/80 rounded-lg flex items-center justify-between'>
+                        <div className='flex items-center gap-3'>
+                            <Goal className='w-6 h-6 text-slate-600' />
+                            <span className='font-semibold text-slate-700'>2026 기준치</span>
+                        </div>
+                        <span className='text-xl font-bold text-slate-800'>{kpi?.baseline.toFixed(2)}%</span>
+                   </div>
+                   <div className='p-4 bg-green-50 rounded-lg flex items-center justify-between'>
+                        <div className='flex items-center gap-3'>
+                            <ArrowUpRight className='w-6 h-6 text-green-600' />
+                            <span className='font-semibold text-green-800'>2026 최고목표</span>
+                        </div>
+                        <span className='text-xl font-bold text-green-700'>{kpi?.targetHigh.toFixed(2)}%</span>
+                   </div>
+                   <div className='p-4 bg-amber-50 rounded-lg flex items-center justify-between'>
+                        <div className='flex items-center gap-3'>
+                            <ArrowDownRight className='w-6 h-6 text-amber-600' />
+                            <span className='font-semibold text-amber-800'>2026 최저목표</span>
+                        </div>
+                        <span className='text-xl font-bold text-amber-700'>{kpi?.targetLow.toFixed(2)}%</span>
+                   </div>
                 </CardContent>
             </Card>
           </div>
 
-          <div className="flex flex-col gap-4 md:gap-8 lg:col-span-2">
-            <div className="flex-1">
-                 {enrichedUnits && 
-                    <InteractiveFloorPlan 
-                        units={enrichedUnits}
-                        simulatedOccupiedIds={simulatedOccupiedIds}
-                        simulatedVacantIds={simulatedVacantIds}
-                        onUnitClick={handleUnitClick}
-                    />
-                }
-            </div>
-             <Card className="bg-slate-50/70 border-dashed border-slate-300">
+          <div className="grid auto-rows-max items-start gap-6 lg:col-span-2">
+            {enrichedUnits && 
+                <InteractiveFloorPlan 
+                    units={enrichedUnits}
+                    simulatedOccupiedIds={simulatedOccupiedIds}
+                    simulatedVacantIds={simulatedVacantIds}
+                    onUnitClick={handleUnitClick}
+                />
+            }
+             <Card className="shadow-lg border border-slate-200/80 bg-white">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-lg font-bold text-slate-800">시뮬레이션 최종 결과</CardTitle>
-                    <Button variant="outline" size="sm" onClick={resetSimulation}><RotateCw className="mr-2 h-4 w-4"/>초기화</Button>
+                    <div>
+                        <CardTitle className="text-xl font-bold text-slate-800">시뮬레이션 최종 결과</CardTitle>
+                        <p className="text-xs text-slate-500 pt-1">마지막 업데이트: {lastUpdated.toLocaleTimeString()}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={resetSimulation}><RotateCw className="h-5 w-5 text-slate-500"/></Button>
                 </CardHeader>
-                <CardContent className="flex flex-col md:flex-row items-center justify-around text-center p-6 space-y-4 md:space-y-0">
-                    <div className="md:w-1/3">
-                        <p className="text-sm text-slate-500">시뮬레이션 요약</p>
-                        <div className="flex justify-center items-baseline space-x-2 mt-1">
-                             <p className="text-xl font-bold text-blue-600">+{simulationChanges.leasedAreaChange > 0 ? simulationChanges.leasedAreaChange.toFixed(2) : '0.00'}</p>
-                             <p className="text-xl font-bold text-red-600">{simulationChanges.leasedAreaChange < 0 ? simulationChanges.leasedAreaChange.toFixed(2) : '-0.00'}</p>
+                <CardContent className="flex flex-col md:flex-row items-center justify-between text-center p-6 gap-6">
+                    <div className="w-full md:w-1/4">
+                        <p className="text-sm font-semibold text-slate-600 mb-2">시뮬레이션 요약</p>
+                        <div className="flex justify-center items-center gap-2">
+                            <div className="text-green-600 bg-green-100/80 font-bold text-sm px-3 py-1 rounded-md">+{simulatedOccupiedIds.size} 유닛 (입주)</div>
+                             <div className="text-amber-600 bg-amber-100/80 font-bold text-sm px-3 py-1 rounded-md">-{simulatedVacantIds.size} 유닛 (퇴거)</div>
                         </div>
-                        <p className="text-xs text-slate-400">입주/퇴거 면적(㎡)</p>
+                        <p className="text-xs text-slate-400 mt-2">입주/퇴거 면적(㎡): <span className='font-semibold'>{simulationChanges.leasedAreaChange.toFixed(2)}</span></p>
                     </div>
-                    <ChevronsRight className="text-slate-400 hidden md:block" size={32} />
-                    <div className="md:w-1/3">
-                        <p className="text-sm text-slate-500">예상 임대율</p>
-                        <p className="text-4xl font-bold tracking-tighter text-slate-800">{simulationResult?.rate.toFixed(3)}%</p>
+                    <ChevronRight className="text-slate-300 hidden md:block" size={32} />
+                    <div className="w-full md:w-1/2 text-center">
+                        <p className="text-sm font-semibold text-slate-600">예상 임대율</p>
+                        <div className='flex items-end justify-center gap-1'>
+                            <p className="text-5xl font-bold tracking-tighter text-[#1A4F95]">{simulationResult?.rate.toFixed(2)}</p>
+                            <span className='text-2xl font-medium text-slate-500 mb-1'>%</span>
+                        </div>
                     </div>
-                    <ChevronsRight className="text-slate-400 hidden md:block" size={32} />
-                    <div className="md:w-1/3">
-                        <p className="text-sm text-slate-500">예상 최종 득점</p>
-                        <p className="text-4xl font-bold tracking-tighter text-indigo-600">{simulationResult?.finalScore.toFixed(3)}</p>
+                    <ChevronRight className="text-slate-300 hidden md:block" size={32} />
+                    <div className="w-full md:w-1/3">
+                        <p className="text-sm font-semibold text-slate-600 mb-2">예상 최종 득점</p>
+                        <p className="text-4xl font-bold tracking-tighter text-indigo-600">{simulationResult?.finalScore.toFixed(2)}</p>
+                        <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
+                            <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${simulationResult?.score ?? 0}%` }}></div>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
             {!kpi && (
-                 <Card className="border-amber-400 bg-amber-50/50">
-                    <CardHeader className="flex flex-row items-center space-x-2 pb-2">
-                         <AlertTriangle className="w-5 h-5 text-amber-500" />
-                        <CardTitle className="text-amber-700 font-semibold text-base">KPI 데이터 부족</CardTitle>
+                <Card className="border-amber-400 bg-amber-50/50">
+                    <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">
+                        <AlertTriangle className="w-5 h-5 text-amber-500"/>
+                        <CardTitle className="text-amber-700 text-base font-bold">임대율 실적 데이터 부족</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <p className="text-sm text-amber-600">
-                           과거 임대율 데이터가 부족하여 KPI 목표 및 점수를 계산할 수 없습니다. 엑셀 업로드 또는 수동 입력을 통해 최소 1년 치의 데이터를 추가해주세요.
+                            KPI를 계산하기 위한 과거 임대율 실적 데이터가 부족합니다.
+                            '임대율 실적 관리' 패널에서 '신규 추가' 또는 '엑셀 업로드'를 통해 최소 1년 치의 데이터를 입력해주세요.
                         </p>
                     </CardContent>
                 </Card>
