@@ -9,6 +9,7 @@ import LeaseStatusWidget from './dashboard/LeaseStatusWidget';
 import TaskStatusPieChart from './charts/TaskStatusPieChart';
 import OverdueTasks from './dashboard/OverdueTasks';
 import { Card, CardContent } from "./ui/card";
+import ManagementSimulationCard from './dashboard/ManagementSimulationCard';
 
 const Dashboard: React.FC = () => {
   const { kpiData, navigationState } = useProjectData();
@@ -170,12 +171,11 @@ const Dashboard: React.FC = () => {
         <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.OVERDUE]}</p><p className={`text-3xl font-bold ${TASK_STATUS_COLORS[TASK_STATUS.OVERDUE]}`}>{monthlyTaskStats.overdue}</p></div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <TaskStatusPieChart stats={yearlyTaskStats} />
         <LeaseStatusWidget />
-        <Card><CardContent className="p-6 h-full"></CardContent></Card>
-        <Card><CardContent className="p-6 h-full"></CardContent></Card>
-        <Card><CardContent className="p-6 h-full"></CardContent></Card>
+        <ManagementSimulationCard />
+        <Card className="col-span-1"><CardContent className="p-6 h-full"></CardContent></Card>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
