@@ -106,3 +106,11 @@ export interface TeamMember {
 }
 
 export type StateUpdater<T> = React.Dispatch<React.SetStateAction<T>>;
+
+export interface EvaluationResult {
+  id: string;
+  kpiId: string;
+  date: string;
+  score: number;
+  rating: number;
+}

@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+
+import React, { useState, useMemo, useRef } from 'react';
 import { useProjectData } from '@/providers/ProjectDataProvider';
 import { RentalHistory, Unit, EnrichedUnit, TenantInfo, Contract } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,21 +9,7 @@ import { PlusCircle, Upload, ChevronRight, RotateCw, AlertTriangle, ArrowUpRight
 import RentalHistoryModal from '@/components/RentalHistoryModal';
 import InteractiveFloorPlan from '@/components/InteractiveFloorPlan';
 import * as XLSX from 'xlsx';
-
-interface KpiMetrics {
-  baseline: number;
-  mean: number;
-  stdDev: number;
-  targetHigh: number;
-  targetLow: number;
-  currentRealtimeRate: number;
-}
-
-interface RealtimeMetrics {
-  totalRentableArea: number;
-  totalLeasedArea: number;
-  realtimeOccupancyRate: number;
-}
+import { initialRentalHistory } from '@/data/initial-rental-history';
 
 interface SimulationChanges {
     leasedAreaChange: number;
@@ -30,8 +17,18 @@ interface SimulationChanges {
 }
 
 const LeaseStatusSummaryPage: React.FC = () => {
-  const { rentalHistory, units, tenantInfo, contracts, addRentalHistory, updateRentalHistory, setRentalHistory } = useProjectData();
-  const [kpi, setKpi] = useState<KpiMetrics | null>(null);
+  const {
+    rentalHistory, 
+    units, 
+    tenantInfo, 
+    contracts, 
+    addRentalHistory, 
+    updateRentalHistory, 
+    setRentalHistory,
+    leaseKpiMetrics,
+    leaseRealtimeMetrics
+  } = useProjectData();
+  
   const [simulationChanges, setSimulationChanges] = useState<SimulationChanges>({ leasedAreaChange: 0, rentableAreaChange: 0 });
   const [simulatedOccupiedIds, setSimulatedOccupiedIds] = useState<Set<string>>(new Set());
   const [simulatedVacantIds, setSimulatedVacantIds] = useState<Set<string>>(new Set());
@@ -51,53 +48,25 @@ const LeaseStatusSummaryPage: React.FC = () => {
       return { ...unit, tenant, contract };
     });
   }, [units, tenantInfo, contracts]);
-
-  const realtimeMetrics = useMemo((): RealtimeMetrics | null => {
-    if (!units || units.length === 0) return null;
-    const totalRentableArea = units.reduce((acc, u) => acc + u.area_sqm, 0);
-    const totalLeasedArea = units.filter(u => u.status === 'occupied' || u.status === 'notice').reduce((acc, u) => acc + u.area_sqm, 0);
-    if (totalRentableArea === 0) return { totalRentableArea, totalLeasedArea, realtimeOccupancyRate: 0 };
-    const realtimeOccupancyRate = (totalLeasedArea / totalRentableArea) * 100;
-    return { totalRentableArea, totalLeasedArea, realtimeOccupancyRate };
-  }, [units]);
-
-  useEffect(() => {
-    if (rentalHistory && realtimeMetrics) {
-        const metrics = calculateKpiMetrics(rentalHistory, realtimeMetrics.realtimeOccupancyRate);
-        setKpi(metrics);
+  
+  const currentRentalHistory = useMemo(() => {
+    if (rentalHistory && rentalHistory.length > 0) {
+      return rentalHistory;
     }
-  }, [rentalHistory, realtimeMetrics]);
+    return initialRentalHistory;
+  }, [rentalHistory]);
 
-  const calculateKpiMetrics = (historicalData: RentalHistory[], realtimeRate: number): KpiMetrics | null => {
-    const pastData = historicalData.filter(h => h.leased_area > 0).sort((a, b) => b.year - a.year);
-    if (pastData.length < 1) return null;
-    const baselineData = pastData;
-    const prevYearRate = baselineData.length > 0 ? baselineData[0].occupancy_rate : realtimeRate;
-    const lastThreeYears = baselineData.slice(0, 3);
-    const avgThreeYears = lastThreeYears.reduce((acc, cur) => acc + cur.occupancy_rate, 0) / lastThreeYears.length;
-    const baseline = Math.max(prevYearRate, avgThreeYears);
-    const rates = baselineData.map(h => h.occupancy_rate);
-    const mean = rates.reduce((a, b) => a + b, 0) / rates.length;
-    const variance = rates.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / rates.length;
-    const stdDev = Math.sqrt(variance);
-    let targetHigh = baseline + (2 * stdDev);
-    if (targetHigh > 100) targetHigh = 100;
-    let targetLow = baseline - (2 * stdDev);
-    if (targetLow < 0) targetLow = 0;
-    return { baseline, mean, stdDev, targetHigh, targetLow, currentRealtimeRate: realtimeRate };
-  };
-
-  const displayHistory = useMemo(() => rentalHistory.filter(h => h.year !== 2021).sort((a, b) => b.year - a.year), [rentalHistory]);
+  const displayHistory = useMemo(() => currentRentalHistory.filter(h => h.year !== 2021).sort((a, b) => b.year - a.year), [currentRentalHistory]);
 
   const handleOpenModal = (history: RentalHistory | null) => { setSelectedHistory(history); setIsModalOpen(true); };
   const handleCloseModal = () => { setIsModalOpen(false); setSelectedHistory(null); };
 
-  const handleSubmitHistory = (data: Omit<RentalHistory, 'id' | 'created_at' | 'occupancy_rate'>) => {
+  const handleSubmitHistory = (data: Omit<RentalHistory, 'id' | 'created_at'>) => {
     const occupancy_rate = (data.leased_area / data.rentable_area) * 100;
     if (selectedHistory) {
       updateRentalHistory({ ...selectedHistory, ...data, occupancy_rate });
     } else {
-      addRentalHistory({ ...data, occupancy_rate, created_at: new Date().toISOString() });
+      addRentalHistory({ ...data, occupancy_rate });
     }
     handleCloseModal();
   };
@@ -151,14 +120,14 @@ const LeaseStatusSummaryPage: React.FC = () => {
   };
 
   const simulationResult = useMemo(() => {
-    if (!realtimeMetrics || !kpi) return { rate: 0, finalScore: 0, scoreForBar: 0, rating: 0, weight: 2.5 };
+    if (!leaseRealtimeMetrics || !leaseKpiMetrics) return { rate: 0, finalScore: 0, scoreForBar: 0, rating: 0, weight: 2.5 };
     
-    const simulatedLeasedArea = realtimeMetrics.totalLeasedArea + simulationChanges.leasedAreaChange;
-    const simulatedRentableArea = realtimeMetrics.totalRentableArea + simulationChanges.rentableAreaChange;
+    const simulatedLeasedArea = leaseRealtimeMetrics.totalLeasedArea + simulationChanges.leasedAreaChange;
+    const simulatedRentableArea = leaseRealtimeMetrics.totalRentableArea + simulationChanges.rentableAreaChange;
     if (simulatedRentableArea === 0) return { rate: 0, finalScore: 0, scoreForBar: 0, rating: 0, weight: 2.5 };
     
     const rate = (simulatedLeasedArea / simulatedRentableArea) * 100;
-    const { targetLow, targetHigh } = kpi;
+    const { targetLow, targetHigh } = leaseKpiMetrics;
 
     let scoreForBar = 0;
     if (targetHigh > targetLow) {
@@ -175,7 +144,7 @@ const LeaseStatusSummaryPage: React.FC = () => {
     const finalScore = (rating / 100) * weight;
 
     return { rate, finalScore, scoreForBar, rating, weight };
-  }, [kpi, realtimeMetrics, simulationChanges]);
+  }, [leaseKpiMetrics, leaseRealtimeMetrics, simulationChanges]);
 
 
   return (
@@ -200,10 +169,10 @@ const LeaseStatusSummaryPage: React.FC = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {realtimeMetrics && (
+                    {leaseRealtimeMetrics && (
                       <TableRow className="border-l-4 border-blue-500 bg-blue-50 font-bold">
                         <TableCell className="py-1 text-sm">2026 (현재)</TableCell>
-                        <TableCell className="py-1 text-sm">{realtimeMetrics.realtimeOccupancyRate.toFixed(3)}%</TableCell>
+                        <TableCell className="py-1 text-sm">{leaseRealtimeMetrics.realtimeOccupancyRate.toFixed(3)}%</TableCell>
                       </TableRow>
                     )}
                     {displayHistory.map((item) => (
@@ -233,21 +202,21 @@ const LeaseStatusSummaryPage: React.FC = () => {
                           <ArrowUpRight className='w-5 h-5 text-green-600' />
                           <span className='font-semibold text-sm text-green-800'>최고목표</span>
                       </div>
-                      <span className='text-base font-bold text-green-700'>{kpi?.targetHigh.toFixed(3)}%</span>
+                      <span className='text-base font-bold text-green-700'>{leaseKpiMetrics?.targetHigh.toFixed(3)}%</span>
                  </div>
                  <div className='p-2 bg-amber-50 rounded-lg flex items-center justify-between'>
                       <div className='flex items-center gap-2'>
                           <ArrowDownRight className='w-5 h-5 text-amber-600' />
                           <span className='font-semibold text-sm text-amber-800'>최저목표</span>
                       </div>
-                      <span className='text-base font-bold text-amber-700'>{kpi?.targetLow.toFixed(3)}%</span>
+                      <span className='text-base font-bold text-amber-700'>{leaseKpiMetrics?.targetLow.toFixed(3)}%</span>
                  </div>
                  <div className='p-2 bg-blue-50 rounded-lg flex items-center justify-between'>
                       <div className='flex items-center gap-2'>
                           <TrendingUp className='w-5 h-5 text-blue-600' />
                           <span className='font-semibold text-sm text-blue-800'>현임대율</span>
                       </div>
-                      <span className='text-base font-bold text-blue-700'>{realtimeMetrics?.realtimeOccupancyRate.toFixed(3)}%</span>
+                      <span className='text-base font-bold text-blue-700'>{leaseRealtimeMetrics?.realtimeOccupancyRate.toFixed(3)}%</span>
                  </div>
                  <div className='p-2 bg-violet-50 rounded-lg flex items-center justify-between'>
                       <div className='flex items-center gap-2'>
@@ -318,7 +287,7 @@ const LeaseStatusSummaryPage: React.FC = () => {
           </Card>
         </div>
         
-        {!kpi && (
+        {!leaseKpiMetrics && (
             <div className="lg:col-span-3">
               <Card className="border-amber-400 bg-amber-50/50 mt-4">
                   <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">

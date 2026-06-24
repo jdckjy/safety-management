@@ -5,11 +5,10 @@ import { useProjectData } from '@/providers/ProjectDataProvider';
 import { Badge } from '../ui/badge';
 
 const ManagementSimulationCard: React.FC = () => {
-    const { kpiData } = useProjectData();
+    const { latestEvaluationResult } = useProjectData();
 
-    const leaseRateKpi = kpiData.find(kpi => kpi.title === "임대율");
-    
-    const currentScore = leaseRateKpi?.rating ?? 1.599; 
+    // 전역 상태에서 점수를 가져오고, 없을 경우 0으로 초기화합니다.
+    const currentScore = latestEvaluationResult?.score ?? 0;
     const targetScore = 2.5; // 총 배점 2.5점 기준
 
     const percentage = targetScore > 0 ? (currentScore / targetScore) * 100 : 0;

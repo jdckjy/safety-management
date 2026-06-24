@@ -1,43 +1,194 @@
-export interface Unit {
+
+import { LatLngExpression } from 'leaflet';
+import React from 'react';
+
+// Base data structures
+export interface IProjectData {
+  safetyKPIs: KPI[];
+  leaseKPIs: KPI[];
+  assetKPIs: KPI[];
+  infraKPIs: KPI[];
+  hotspots: HotSpot[];
+  facilities: Facility[];
+  complexFacilities: ComplexFacility[];
+  teamMembers: TeamMember[];
+  units: Unit[];
+  tenantInfo: TenantInfo[];
+  contracts: Contract[];
+  attachments: Attachment[];
+  generalActivities: GeneralActivity[];
+  customTabs: CustomTab[];
+  monthly_reports: MonthlyReport[];
+  rentalHistory: RentalHistory[];
+  evaluationResults: EvaluationResult[];
+}
+
+export interface NavigationState {
+  menuKey: string;
+  selectedMonth: number;
+}
+
+// KPI and related items
+export interface KPI {
+  id: string;
+  title: string;
+  description: string;
+  current: number;
+  target: number;
+  previous: number;
+  unit: string;
+  activities: Activity[];
+}
+
+export interface Activity {
   id: string;
   name: string;
-  floor: string;
-  area_sqm: number;
-  status: 'occupied' | 'vacant' | 'under-renovation' | 'notice' | '임대중' | '공실';
-  pathData: string;
-  position_x: number;
-  position_y: number;
-}
-
-export interface TenantInfo {
-  id: string;
-  businessName: string;
-  companyName: string;
-  contact: string;
-  email: string;
-  industry: string;
-}
-
-export interface Contract {
-  id: string;
-  unitId: string;
-  tenantId: string;
+  description: string;
   startDate: string;
   endDate: string;
-  rent: number;
-  deposit: number;
+  status: string;
+  tasks: Task[];
+}
+
+export interface Task {
+  id: string;
+  name: string;
+  description?: string;
+  startDate: string;
+  endDate: string;
+  status: string;
+  assignees: TeamMember[];
+  records: TaskRecord[];
+  comments: Comment[];
+}
+
+export interface TaskRecord {
+  id: string;
+  date: string;
+  content: string;
+}
+
+export interface Comment {
+  id: string;
+  author: string;
+  timestamp: string;
+  content: string;
+}
+
+export interface GeneralActivity {
+  id: string;
+  date: string;
+  author: string;
+  category: string;
+  content: string;
+}
+
+// Spatial and facility types
+export interface HotSpot {
+  id: string;
+  position: LatLngExpression;
+  facilityId: string;
+  facilityName: string;
+  responseType: '정기' | '긴급';
+  riskLevel: 'Level 1 (낮음)' | 'Level 2 (중간)' | 'Level 3 (높음)';
+  details: string;
+}
+
+export interface Facility {
+  id: string;
+  category: string;
+  name: string;
+  area?: number;
+  ratio?: number;
+}
+
+export interface ComplexFacility {
+    id: string;
+    name: string;
+    type: string;
+    location: string;
+    area: number;
+    description: string;
+}
+
+// Team and Tenant Management
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  avatarUrl: string;
+}
+
+export interface Unit {
+    id: string;
+    floor: number;
+    unit_number: string;
+    area_sqm: number;
+    status: 'occupied' | 'vacant' | 'notice';
+    usage: string;
 }
 
 export interface EnrichedUnit extends Unit {
-  tenant?: TenantInfo;
-  contract?: Contract;
+    tenant?: TenantInfo;
+    contract?: Contract;
+}
+
+export interface TenantInfo {
+    id: string;
+    name: string;
+    contact: string;
+    business_type: string;
+    entry_date: string;
+}
+
+export interface Contract {
+    id: string;
+    tenantId: string;
+    unitId: string;
+    startDate: string;
+    endDate: string;
+    deposit: number;
+    rent: number;
+    status?: 'active' | 'expired' | 'pending' | 'unknown';
+}
+
+export interface Attachment {
+    id: string;
+    tenantId: string;
+    fileName: string;
+    url: string;
+    uploadedAt: string;
+}
+
+// Reporting and History
+export interface MonthlyReport {
+  id: string;
+  year: number;
+  month: number;
+  report_date: string;
+  raw_data: any;
 }
 
 export interface RentalHistory {
-  id: string;
-  year: number;
-  rentable_area: number;
-  leased_area: number;
-  occupancy_rate: number;
-  created_at: string;
+    id: string;
+    year: number;
+    rentable_area: number;
+    leased_area: number;
+    occupancy_rate: number;
+    created_at: string;
+}
+
+export interface EvaluationResult {
+    id: string;
+    kpiId: string;
+    date: string;
+    score: number;
+    rating: number;
+}
+
+// UI and other types
+export interface CustomTab {
+  key: string;
+  label: string;
+  color: 'orange' | 'blue' | 'emerald' | 'purple';
 }

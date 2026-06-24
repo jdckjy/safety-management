@@ -1,17 +1,17 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, GeneralActivity, CustomTab, MonthlyReport, TenantInfo, Contract, Attachment, Unit, RentalHistory, EvaluationResult } from '../types';
+import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, GeneralActivity, CustomTab, MonthlyReport, TenantInfo, Contract, Attachment, Unit, RentalHistory, EvaluationResult } from '@/types';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
-import { useAuth } from '../features/auth/AuthContext';
+import { useAuth } from '@/features/auth/AuthContext';
 import { Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
-import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '../constants';
-import { initialComplexFacilities } from '../data/initial-complex-facilities';
-import { initialTeamMembers } from '../data/initial-team-members';
-import { initialUnits } from '../data/initial-units';
-import { initialTenantInfo } from '../data/initial-tenant-info';
-import { initialContracts } from '../data/initial-contracts';
-import { initialRentalHistory } from '../data/initial-rental-history';
-import rawFebruaryReportData from '../data/2026-02-report.json';
+import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '@/constants';
+import { initialComplexFacilities } from '@/data/initial-complex-facilities';
+import { initialTeamMembers } from '@/data/initial-team-members';
+import { initialUnits } from '@/data/initial-units';
+import { initialTenantInfo } from '@/data/initial-tenant-info';
+import { initialContracts } from '@/data/initial-contracts';
+import { initialRentalHistory } from '@/data/initial-rental-history';
+import rawFebruaryReportData from '@/data/2026-02-report.json';
 
 
 // Raw JSON data structure interface
@@ -70,6 +70,23 @@ const transformRawDataToMonthlyReport = (rawData: RawReportData): MonthlyReport 
 
 const februaryReportData: MonthlyReport = transformRawDataToMonthlyReport(rawFebruaryReportData as unknown as RawReportData);
 
+// Interfaces for Lease evaluation
+interface KpiMetrics {
+  baseline: number;
+  mean: number;
+  stdDev: number;
+  targetHigh: number;
+  targetLow: number;
+  currentRealtimeRate: number;
+}
+
+interface RealtimeMetrics {
+  totalRentableArea: number;
+  totalLeasedArea: number;
+  realtimeOccupancyRate: number;
+}
+
+
 interface IProjectDataContext extends IProjectData {
   kpiData: (KPI & { type: string; icon: React.ReactNode; color: string; })[];
   navigationState: NavigationState;
@@ -81,6 +98,9 @@ interface IProjectDataContext extends IProjectData {
   attachments: Attachment[];
   rentalHistory: RentalHistory[];
   evaluationResults: EvaluationResult[];
+  latestEvaluationResult: EvaluationResult | null;
+  leaseKpiMetrics: KpiMetrics | null;
+  leaseRealtimeMetrics: RealtimeMetrics | null;
   setData: React.Dispatch<React.SetStateAction<IProjectData>>;
   addActivityToKpi: (kpiId: string, newActivity: Omit<Activity, 'id' | 'status' | 'tasks'>) => Promise<Activity>;
   updateActivityInKpi: (kpiId: string, updatedActivity: Activity) => void;
@@ -127,7 +147,7 @@ interface IProjectDataContext extends IProjectData {
   addAttachment: (tenantId: string, file: File) => void;
   deleteAttachment: (attachmentId: string) => void;
   setRentalHistory: React.Dispatch<React.SetStateAction<RentalHistory[]>>;
-  addRentalHistory: (newHistory: Omit<RentalHistory, 'id'>) => void;
+  addRentalHistory: (newHistory: Omit<RentalHistory, 'id' | 'created_at'>) => void;
   updateRentalHistory: (updatedHistory: RentalHistory) => void;
   deleteRentalHistory: (historyId: string) => void;
   setEvaluationResults: React.Dispatch<React.SetStateAction<EvaluationResult[]>>;
@@ -209,6 +229,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
   const db = getFirestore();
   const [data, setData] = useState<IProjectData>(initialData);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [latestEvaluationResult, setLatestEvaluationResult] = useState<EvaluationResult | null>(null);
   
   const [navigationState, setNavigationState] = useState<NavigationState>({
     menuKey: 'dashboard',
@@ -279,7 +300,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
                 facilities: firestoreData.facilities || [],
                 complexFacilities: firestoreData.complexFacilities || [],
                 teamMembers: firestoreData.teamMembers || [],
-                units: firestoreData.units || [],
+                units: firestoreData.units || initialUnits,
                 tenantInfo: firestoreData.tenantInfo || [],
                 contracts: firestoreData.contracts || [],
                 attachments: firestoreData.attachments || [],
@@ -363,16 +384,16 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
       return { ...contract, status };
     });
 
-    const updatedUnits = (data.units || []).map(unit => {
+    const currentUnits = (data.units && data.units.length > 0) ? data.units : initialUnits;
+    const updatedUnits = currentUnits.map(unit => {
       const activeOrPendingContracts = updatedContracts.filter(c => c.unitId === unit.id && c.status !== 'expired');
       
       let newStatus: 'occupied' | 'vacant' | 'notice' = 'vacant';
 
       if (activeOrPendingContracts.length > 0) {
-        // Check for active contract first
         if (activeOrPendingContracts.some(c => c.status === 'active')) {
           newStatus = 'occupied';
-        } else { // All are pending
+        } else { 
           newStatus = 'notice';
         }
       } 
@@ -382,6 +403,90 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
 
     return { units: updatedUnits, contracts: updatedContracts };
   }, [data.units, data.contracts]);
+
+    // --- LEASE EVALUATION LOGIC ---
+    const leaseRealtimeMetrics = useMemo((): RealtimeMetrics | null => {
+        const units = processedData.units;
+        if (!units || units.length === 0) return null;
+        
+        const totalRentableArea = units.reduce((acc, u) => acc + u.area_sqm, 0);
+        const totalLeasedArea = units
+            .filter(u => u.status === 'occupied' || u.status === 'notice')
+            .reduce((acc, u) => acc + u.area_sqm, 0);
+            
+        if (totalRentableArea === 0) return { totalRentableArea, totalLeasedArea, realtimeOccupancyRate: 0 };
+        
+        const realtimeOccupancyRate = (totalLeasedArea / totalRentableArea) * 100;
+        return { totalRentableArea, totalLeasedArea, realtimeOccupancyRate };
+    }, [processedData.units]);
+
+    const leaseKpiMetrics = useMemo((): KpiMetrics | null => {
+        const currentRentalHistory = (data.rentalHistory && data.rentalHistory.length > 0) 
+            ? data.rentalHistory 
+            : initialRentalHistory;
+
+        if (!leaseRealtimeMetrics) return null;
+
+        const historicalData = currentRentalHistory;
+        const realtimeRate = leaseRealtimeMetrics.realtimeOccupancyRate;
+
+        const pastData = historicalData.filter(h => h.leased_area > 0).sort((a, b) => b.year - a.year);
+        if (pastData.length < 1) return null;
+
+        const baselineData = pastData;
+        const prevYearRate = baselineData.length > 0 ? baselineData[0].occupancy_rate : realtimeRate;
+        const lastThreeYears = baselineData.slice(0, 3);
+        const avgThreeYears = lastThreeYears.reduce((acc, cur) => acc + cur.occupancy_rate, 0) / lastThreeYears.length;
+        const baseline = Math.max(prevYearRate, avgThreeYears);
+        
+        const rates = baselineData.map(h => h.occupancy_rate);
+        const mean = rates.reduce((a, b) => a + b, 0) / rates.length;
+        const variance = rates.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / rates.length;
+        const stdDev = Math.sqrt(variance);
+
+        let targetHigh = baseline + (2 * stdDev);
+        if (targetHigh > 100) targetHigh = 100;
+
+        let targetLow = baseline - (2 * stdDev);
+        if (targetLow < 0) targetLow = 0;
+
+        return { baseline, mean, stdDev, targetHigh, targetLow, currentRealtimeRate: realtimeRate };
+    }, [data.rentalHistory, leaseRealtimeMetrics]);
+
+    useEffect(() => {
+        if (!leaseRealtimeMetrics || !leaseKpiMetrics) {
+            setLatestEvaluationResult(null); // Clear result if data is missing
+            return;
+        }
+
+        const currentRate = leaseRealtimeMetrics.realtimeOccupancyRate;
+        const { targetLow, targetHigh } = leaseKpiMetrics;
+
+        let scoreForBar = 0;
+        if (targetHigh > targetLow) {
+            scoreForBar = ((currentRate - targetLow) / (targetHigh - targetLow)) * 100;
+        } else if (currentRate >= targetHigh) {
+            scoreForBar = 100;
+        }
+        scoreForBar = Math.max(0, Math.min(100, scoreForBar));
+
+        let rating = 20 + (scoreForBar / 100) * 80;
+        rating = Math.max(20, Math.min(100, rating));
+
+        const weight = 2.5;
+        const finalScore = (rating / 100) * weight;
+
+        const result: EvaluationResult = {
+            id: 'latest-lease-evaluation', 
+            kpiId: 'lease-rate', 
+            date: new Date().toISOString(),
+            score: finalScore,
+            rating: rating
+        };
+        
+        setLatestEvaluationResult(result);
+
+    }, [leaseKpiMetrics, leaseRealtimeMetrics]);
 
 
   const updateKpiArray = useCallback((updateFn: (data: IProjectData) => IProjectData) => {
@@ -621,8 +726,11 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     tenantInfo: data.tenantInfo || [], 
     contracts: processedData.contracts,
     attachments: data.attachments || [],
-    rentalHistory: data.rentalHistory || [],
+    rentalHistory: (data.rentalHistory && data.rentalHistory.length > 0) ? data.rentalHistory : initialRentalHistory,
     evaluationResults: data.evaluationResults || [],
+    latestEvaluationResult,
+    leaseKpiMetrics,
+    leaseRealtimeMetrics,
     setData, 
     addActivityToKpi, 
     updateActivityInKpi, 
