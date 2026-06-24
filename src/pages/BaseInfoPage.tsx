@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import ComplexFacilitiesTab from './ComplexFacilitiesTab';
 import { TeamMembersTab } from './TeamMembersTab';
+import VisitorStatusDashboard from '../components/dashboard/VisitorStatusDashboard'; // Import the new dashboard
 import { Plus } from 'lucide-react';
 
 interface Tab {
@@ -15,9 +16,10 @@ const BaseInfoPage: React.FC = () => {
   const [tabs, setTabs] = useState<Tab[]>([
     { id: 'complex-info', title: '단지정보', isRemovable: false },
     { id: 'team-members', title: '팀원정보', isRemovable: false },
+    { id: 'visitor-status', title: '이용객 현황', isRemovable: false }, // Add the new permanent tab
   ]);
 
-  const [activeTab, setActiveTab] = useState<string>('complex-info');
+  const [activeTab, setActiveTab] = useState<string>('visitor-status'); // Set new tab as active by default
   const [nextTabId, setNextTabId] = useState(1);
 
   const addTab = () => {
@@ -57,6 +59,11 @@ const BaseInfoPage: React.FC = () => {
         </TabsContent>
         <TabsContent value="team-members" className="pt-6">
           <TeamMembersTab />
+        </TabsContent>
+        
+        {/* Add the content for the new tab */}
+        <TabsContent value="visitor-status" className="pt-6">
+          <VisitorStatusDashboard />
         </TabsContent>
 
         {tabs.filter(t => t.isRemovable).map((tab) => (
