@@ -133,12 +133,20 @@ export interface EnrichedUnit extends Unit {
     contract?: Contract;
 }
 
+export type CompanySize = '대기업' | '중견' | '중소' | '스타트업';
+export type BusinessCategory = '의료' | '교육' | '연구' | '근생' | '기타';
+export type AcquisitionChannel = '직접 유치' | '유관기관 소개' | '온라인' | '기타';
+
 export interface TenantInfo {
     id: string;
-    name: string;
+    companyName: string;
+    businessRegistrationNumber: string;
+    representativeName: string;
     contact: string;
-    business_type: string;
-    entry_date: string;
+    businessCategory: BusinessCategory;
+    companySize: CompanySize;
+    businessDescription: string;
+    acquisitionChannel: AcquisitionChannel;
 }
 
 export interface Contract {

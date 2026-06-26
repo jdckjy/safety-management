@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { doc, getDoc, collection, addDoc, updateDoc, deleteDoc, serverTimestamp, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { doc, collection, addDoc, updateDoc, deleteDoc, serverTimestamp, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '@/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,12 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { Users } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useProjectData } from '@/providers/ProjectDataProvider';
 
-
-interface Tenant {
-    id: string;
-    companyName: string;
-}
 
 interface VisitorData {
     id: string;
@@ -29,7 +25,7 @@ interface VisitorData {
 }
 
 const VisitorStatusDashboard: React.FC = () => {
-    const [tenants, setTenants] = useState<Tenant[]>([]);
+    const { tenantInfo } = useProjectData();
     const [visitorData, setVisitorData] = useState<VisitorData[]>([]);
     const [selectedTenant, setSelectedTenant] = useState<string>('');
     const [year, setYear] = useState<string>('');
@@ -37,26 +33,6 @@ const VisitorStatusDashboard: React.FC = () => {
     const [visitorCount, setVisitorCount] = useState<string>('');
     const [remarks, setRemarks] = useState<string>('');
     const [editingVisitorId, setEditingVisitorId] = useState<string | null>(null);
-
-    useEffect(() => {
-        const fetchTenants = async () => {
-            const docRef = doc(db, "projects", "main-project");
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-                const projectData = docSnap.data();
-                if (projectData.tenantInfo) {
-                    setTenants(projectData.tenantInfo.map((tenant: any) => ({
-                        id: tenant.id,
-                        companyName: tenant.companyName
-                    })));
-                }
-            } else {
-                console.log("No such document!");
-            }
-        };
-
-        fetchTenants();
-    }, []);
 
     useEffect(() => {
         const q = query(collection(db, "visitorData"), orderBy("createdAt", "desc"));
@@ -132,9 +108,9 @@ const VisitorStatusDashboard: React.FC = () => {
     const enrichedVisitorData = useMemo(() => {
         return visitorData.map(v => ({
             ...v,
-            tenantName: tenants.find(t => t.id === v.tenantId)?.companyName || '알 수 없음'
+            tenantName: tenantInfo.find(t => t.id === v.tenantId)?.companyName || '알 수 없음'
         }));
-    }, [visitorData, tenants]);
+    }, [visitorData, tenantInfo]);
 
     const { totalVisitors, visitorGrowthRate } = useMemo(() => {
         const currentMonthData = enrichedVisitorData.filter(d => d.year === new Date().getFullYear() && d.month === new Date().getMonth() + 1);
@@ -185,7 +161,7 @@ const VisitorStatusDashboard: React.FC = () => {
                         <Select value={selectedTenant} onValueChange={setSelectedTenant}>
                             <SelectTrigger><SelectValue placeholder="입주기관 선택" /></SelectTrigger>
                             <SelectContent>
-                                {tenants.map(t => <SelectItem key={t.id} value={t.id}>{t.companyName}</SelectItem>)}
+                                {tenantInfo.map(t => <SelectItem key={t.id} value={t.id}>{t.companyName}</SelectItem>)}
                             </SelectContent>
                         </Select>
                         <div className="grid grid-cols-2 gap-4">
