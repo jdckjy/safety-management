@@ -31,8 +31,8 @@ const VisitorStatusDashboard: React.FC = () => {
     const { tenantInfo } = useProjectData();
     const [visitorData, setVisitorData] = useState<VisitorData[]>([]);
     const [selectedTenant, setSelectedTenant] = useState<string>('');
-    const [year, setYear] = useState<string>('');
-    const [month, setMonth] = useState<string>('');
+    const [year, setYear] = useState<string>(String(new Date().getFullYear()));
+    const [month, setMonth] = useState<string>(String(new Date().getMonth() + 1));
     const [visitorCount, setVisitorCount] = useState<string>('');
     const [remarks, setRemarks] = useState<string>('');
     const [editingVisitorId, setEditingVisitorId] = useState<string | null>(null);
@@ -109,8 +109,8 @@ const VisitorStatusDashboard: React.FC = () => {
     const resetForm = () => {
         setEditingVisitorId(null);
         setSelectedTenant('');
-        setYear('');
-        setMonth('');
+        setYear(String(new Date().getFullYear()));
+        setMonth(String(new Date().getMonth() + 1));
         setVisitorCount('');
         setRemarks('');
     }
@@ -122,27 +122,51 @@ const VisitorStatusDashboard: React.FC = () => {
         }));
     }, [visitorData, tenantInfo]);
 
-    const { totalVisitors, visitorGrowthRate, activeTenantsCount } = useMemo(() => {
+    const {
+        prevMonthDisplay,
+        totalVisitorsPrevMonth,
+        visitorGrowthRate,
+        activeTenantsPrevMonth,
+        cumulativeVisitorsThisYear,
+        yearlyTarget,
+        goalAchievement
+    } = useMemo(() => {
         const now = new Date();
-        const currentYear = now.getFullYear();
-        const currentMonth = now.getMonth() + 1;
+        const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const prevYear = prevMonthDate.getFullYear();
+        const prevMonth = prevMonthDate.getMonth() + 1;
 
-        const prevDate = new Date();
-        prevDate.setMonth(prevDate.getMonth() - 1);
-        const prevMonthYear = prevDate.getFullYear();
-        const prevMonth = prevDate.getMonth() + 1;
+        const twoMonthsAgoDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+        const twoMonthsAgoYear = twoMonthsAgoDate.getFullYear();
+        const twoMonthsAgoMonth = twoMonthsAgoDate.getMonth() + 1;
 
-        const currentMonthData = enrichedVisitorData.filter(d => d.year === currentYear && d.month === currentMonth);
-        const prevMonthData = enrichedVisitorData.filter(d => d.year === prevMonthYear && d.month === prevMonth);
+        const prevMonthData = enrichedVisitorData.filter(d => d.year === prevYear && d.month === prevMonth);
+        const twoMonthsAgoData = enrichedVisitorData.filter(d => d.year === twoMonthsAgoYear && d.month === twoMonthsAgoMonth);
         
-        const totalCurrent = currentMonthData.reduce((sum, item) => sum + item.visitorCount, 0);
-        const totalPrev = prevMonthData.reduce((sum, item) => sum + item.visitorCount, 0);
+        const totalVisitorsPrevMonth = prevMonthData.reduce((sum, item) => sum + item.visitorCount, 0);
+        const totalVisitorsTwoMonthsAgo = twoMonthsAgoData.reduce((sum, item) => sum + item.visitorCount, 0);
         
-        const growth = totalPrev > 0 ? ((totalCurrent - totalPrev) / totalPrev) * 100 : (totalCurrent > 0 ? 100 : 0);
+        const growth = totalVisitorsTwoMonthsAgo > 0 ? ((totalVisitorsPrevMonth - totalVisitorsTwoMonthsAgo) / totalVisitorsTwoMonthsAgo) * 100 : (totalVisitorsPrevMonth > 0 ? 100 : 0);
         
-        const activeTenants = new Set(currentMonthData.map(d => d.tenantId)).size;
+        const activeTenantsPrevMonth = new Set(prevMonthData.map(d => d.tenantId)).size;
 
-        return { totalVisitors: totalCurrent, visitorGrowthRate: growth, activeTenantsCount: activeTenants };
+        const yearlyTarget = 41769;
+        const currentYear = new Date().getFullYear();
+        const cumulativeVisitorsThisYear = enrichedVisitorData
+            .filter(d => d.year === currentYear)
+            .reduce((sum, item) => sum + item.visitorCount, 0);
+
+        const goalAchievement = yearlyTarget > 0 ? (cumulativeVisitorsThisYear / yearlyTarget) * 100 : 0;
+
+        return { 
+            prevMonthDisplay: `${prevYear}년 ${prevMonth}월`,
+            totalVisitorsPrevMonth, 
+            visitorGrowthRate: growth, 
+            activeTenantsPrevMonth,
+            cumulativeVisitorsThisYear,
+            yearlyTarget,
+            goalAchievement,
+        };
     }, [enrichedVisitorData]);
 
     const monthlyVisitorTrend = useMemo(() => {
@@ -156,11 +180,9 @@ const VisitorStatusDashboard: React.FC = () => {
             });
         return trend;
     }, [enrichedVisitorData]);
-    
-    const goalAchievement = 85.4;
 
     return (
-        <div className="h-screen overflow-hidden bg-gray-50 flex flex-col p-6 font-sans">
+        <div className="bg-gray-50 flex flex-col p-6 font-sans">
             <header className="flex items-center justify-between mb-4">
                 <h1 className="text-2xl font-bold text-gray-800">이용객 현황 관리 대시보드</h1>
                 <Button onClick={() => setIsSlideOverOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
@@ -169,39 +191,42 @@ const VisitorStatusDashboard: React.FC = () => {
                 </Button>
             </header>
 
-            <main className="flex-grow flex flex-col gap-6">
+            <main className="flex flex-col gap-6">
                 {/* KPI Cards */}
                 <div className="grid grid-cols-3 gap-6">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium">총 이용객 (월)</CardTitle>
+                            <CardTitle className="text-sm font-medium">총 이용객 ({prevMonthDisplay})</CardTitle>
                             <Users className="h-4 w-4 text-gray-400" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{totalVisitors.toLocaleString()}명</div>
+                            <div className="text-2xl font-bold">{totalVisitorsPrevMonth.toLocaleString()}명</div>
                             <p className={`text-xs ${visitorGrowthRate >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 <TrendingUp className="inline-block h-3 w-3 mr-1" />
-                                {visitorGrowthRate.toFixed(1)}% 전월 대비
+                                {visitorGrowthRate.toFixed(1)}% 직전월 대비
                             </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium">기관별 데이터 현황</CardTitle>
+                            <CardTitle className="text-sm font-medium">기관별 데이터 현황 ({prevMonthDisplay})</CardTitle>
                             <Users className="h-4 w-4 text-gray-400" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{activeTenantsCount} / {tenantInfo.length} <span className="text-base font-normal">기관</span></div>
-                            <p className="text-xs text-gray-500">이번 달 데이터 제출 기관 수</p>
+                            <div className="text-2xl font-bold">{activeTenantsPrevMonth} / {tenantInfo.length} <span className="text-base font-normal">기관</span></div>
+                            <p className="text-xs text-gray-500">데이터 제출 기관 수</p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium">목표 달성률</CardTitle>
+                            <CardTitle className="text-sm font-medium">연간 목표 달성률</CardTitle>
                             <Target className="h-4 w-4 text-gray-400" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{goalAchievement}%</div>
+                            <div className="text-2xl font-bold">{goalAchievement.toFixed(1)}%</div>
+                            <p className="text-xs text-gray-500">
+                                {cumulativeVisitorsThisYear.toLocaleString()} / {yearlyTarget.toLocaleString()} 명
+                            </p>
                             <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
                                 <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${goalAchievement}%` }}></div>
                             </div>
@@ -210,13 +235,13 @@ const VisitorStatusDashboard: React.FC = () => {
                 </div>
 
                 {/* Main Content */}
-                <div className="flex-grow grid grid-cols-12 gap-6">
-                    <div className="col-span-4 h-full">
-                        <Card className="h-full flex flex-col">
+                <div className="grid grid-cols-12 gap-6">
+                    <div className="col-span-4">
+                        <Card className="flex flex-col">
                             <CardHeader>
                                 <CardTitle className="text-lg">{editingVisitorId ? '이용객 정보 수정' : '신규 이용객 등록'}</CardTitle>
                             </CardHeader>
-                            <CardContent className="flex-grow flex flex-col gap-4">
+                            <CardContent className="flex flex-col gap-4">
                                 <div className="space-y-1">
                                     <Label htmlFor="tenant">입주기관</Label>
                                     <Select value={selectedTenant} onValueChange={setSelectedTenant}>
@@ -240,9 +265,9 @@ const VisitorStatusDashboard: React.FC = () => {
                                     <Label htmlFor="visitorCount">월 이용객 수</Label>
                                     <Input id="visitorCount" type="number" placeholder="이용객 수를 입력하세요" value={visitorCount} onChange={e => setVisitorCount(e.target.value)} />
                                 </div>
-                                <div className="space-y-1 flex-grow flex flex-col">
+                                <div className="space-y-1 flex flex-col">
                                     <Label htmlFor="remarks">비고</Label>
-                                    <Textarea id="remarks" placeholder="(옵션)" value={remarks} onChange={e => setRemarks(e.target.value)} className="flex-grow" />
+                                    <Textarea id="remarks" placeholder="(옵션)" value={remarks} onChange={e => setRemarks(e.target.value)} />
                                 </div>
                             </CardContent>
                             <CardFooter className="flex justify-end gap-2">
@@ -251,8 +276,8 @@ const VisitorStatusDashboard: React.FC = () => {
                             </CardFooter>
                         </Card>
                     </div>
-                    <div className="col-span-8 h-full">
-                        <Card className="h-full flex flex-col">
+                    <div className="col-span-8">
+                        <Card className="flex flex-col h-[450px]">
                             <CardHeader>
                                 <CardTitle>금년 월별 이용객 추이</CardTitle>
                             </CardHeader>
