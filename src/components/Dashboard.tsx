@@ -8,8 +8,8 @@ import { ko } from 'date-fns/locale';
 import LeaseStatusWidget from './dashboard/LeaseStatusWidget';
 import TaskStatusPieChart from './charts/TaskStatusPieChart';
 import OverdueTasks from './dashboard/OverdueTasks';
-import { Card, CardContent } from "./ui/card";
 import ManagementSimulationCard from './dashboard/ManagementSimulationCard';
+import VisitorSummaryCard from './dashboard/VisitorSummaryCard';
 
 const Dashboard: React.FC = () => {
   const { kpiData, navigationState } = useProjectData();
@@ -161,9 +161,9 @@ const Dashboard: React.FC = () => {
   }, [navigationState.selectedMonth]);
 
   return (
-    <div className="flex flex-col gap-6 p-4 sm:p-6">
+    <div className="flex flex-col gap-4 p-4 sm:p-6">
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{selectedMonthName} 총 업무</p><p className="text-3xl font-bold text-gray-800">{monthlyTaskStats.total}</p></div>
         <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.NOT_STARTED]}</p><p className="text-3xl font-bold text-gray-500">{monthlyTaskStats.notStarted}</p></div>
         <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.IN_PROGRESS]}</p><p className={`text-3xl font-bold ${TASK_STATUS_COLORS[TASK_STATUS.IN_PROGRESS]}`}>{monthlyTaskStats.inProgress}</p></div>
@@ -171,14 +171,15 @@ const Dashboard: React.FC = () => {
         <div className="bg-white p-5 rounded-2xl shadow-sm"><p className="text-sm text-gray-500">{TASK_STATUS_DISPLAY_NAMES[TASK_STATUS.OVERDUE]}</p><p className={`text-3xl font-bold ${TASK_STATUS_COLORS[TASK_STATUS.OVERDUE]}`}>{monthlyTaskStats.overdue}</p></div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <TaskStatusPieChart stats={yearlyTaskStats} />
         <LeaseStatusWidget />
         <ManagementSimulationCard />
-        <Card className="col-span-1"><CardContent className="p-6 h-full"></CardContent></Card>
+        <VisitorSummaryCard />
+        <div className="bg-white p-6 rounded-2xl shadow-sm h-full" />
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <OverdueTasks />
         <div className="bg-white p-6 rounded-2xl shadow-md">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">최근 활동 피드</h3>
