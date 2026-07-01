@@ -81,6 +81,9 @@ export interface GeneralActivity {
   author: string;
   category: string;
   content: string;
+  createdAt?: string;
+  title?: string;
+  type?: 'generalActivity';
 }
 
 // Spatial and facility types
@@ -92,6 +95,9 @@ export interface HotSpot {
   responseType: '정기' | '긴급';
   riskLevel: 'Level 1 (낮음)' | 'Level 2 (중간)' | 'Level 3 (높음)';
   details: string;
+  createdAt?: string;
+  title?: string;
+  type?: 'hotspot';
 }
 
 export interface Facility {

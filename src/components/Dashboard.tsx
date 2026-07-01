@@ -10,6 +10,7 @@ import TaskStatusPieChart from './charts/TaskStatusPieChart';
 import OverdueTasks from './dashboard/OverdueTasks';
 import ManagementSimulationCard from './dashboard/ManagementSimulationCard';
 import VisitorSummaryCard from './dashboard/VisitorSummaryCard';
+import { ProfitSummaryCard } from './ProfitSummaryCard'; // ProfitSummaryCard를 import 합니다.
 
 const Dashboard: React.FC = () => {
   const { kpiData, navigationState } = useProjectData();
@@ -176,7 +177,7 @@ const Dashboard: React.FC = () => {
         <LeaseStatusWidget />
         <ManagementSimulationCard />
         <VisitorSummaryCard />
-        <div className="bg-white p-6 rounded-2xl shadow-sm h-full" />
+        <ProfitSummaryCard /> 
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -1,9 +1,10 @@
 
 import React from 'react';
+import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider, useAuth } from './features/auth/AuthContext';
 import { ProjectDataProvider } from './providers/ProjectDataProvider';
 import { NotificationProvider } from './providers/NotificationProvider';
-import { SearchProvider } from './providers/SearchProvider'; // 1. SearchProvider 임포트
+import { SearchProvider } from './providers/SearchProvider';
 import LoginPage from './features/auth/LoginPage';
 import MainLayout from './layouts/MainLayout';
 
@@ -19,15 +20,17 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <ProjectDataProvider>
-          <SearchProvider> {/* 2. SearchProvider 추가 */}
-            <AppContent />
-          </SearchProvider>
-        </ProjectDataProvider>
-      </NotificationProvider>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <NotificationProvider>
+          <ProjectDataProvider>
+            <SearchProvider>
+              <AppContent />
+            </SearchProvider>
+          </ProjectDataProvider>
+        </NotificationProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 };
 
