@@ -8,15 +8,15 @@ import {
   HardHat,
   ChevronDown,
   FolderOpen,
-  Calendar, // 1. Calendar 아이콘을 임포트합니다.
+  Calendar,
   BarChart
 } from 'lucide-react';
 import { MenuKey } from '../types';
+import logo from '../assets/logo.png';
 
-// 2. activeMenu와 onMenuChange의 타입에 'calendar' | 'statistics'를 추가합니다.
 interface SidebarProps {
-  activeMenu: MenuKey | 'base-info' | 'calendar' | 'statistics';
-  onMenuChange: (menu: MenuKey | 'base-info' | 'calendar' | 'statistics') => void;
+  activeMenu: MenuKey;
+  onMenuChange: (menu: MenuKey) => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange }) => {
@@ -25,7 +25,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange }) => {
       title: '탐색',
       items: [
         { key: 'dashboard', label: '대시보드', icon: <LayoutDashboard size={18} /> },
-        // 3. '대시보드' 다음에 '캘린더' 메뉴 아이템을 추가합니다.
         { key: 'calendar', label: '캘린더', icon: <Calendar size={18} /> },
         { key: 'safety', label: '안전 관리', icon: <ShieldCheck size={18} /> },
         { key: 'lease', label: '임대 및 세대', icon: <Building2 size={18} /> },
@@ -35,13 +34,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange }) => {
     }
   ];
 
-  const renderMenuItem = (key: string, label: string, icon: React.ReactNode) => {
+  const renderMenuItem = (key: MenuKey, label: string, icon: React.ReactNode) => {
     const isActive = activeMenu === key;
     return (
       <button
         key={key}
-        // 4. onMenuChange 핸들러의 타입 캐스팅을 업데이트합니다.
-        onClick={() => onMenuChange(key as MenuKey | 'base-info' | 'calendar' | 'statistics')}
+        onClick={() => onMenuChange(key)}
         className={`w-full flex items-center p-3 rounded-lg transition-all group ${
           isActive
             ? 'bg-white text-black font-bold shadow-sm ring-1 ring-gray-100'
@@ -58,12 +56,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange }) => {
 
   return (
     <div className="w-64 h-full flex flex-col py-6 px-4 transition-all duration-300 z-50 bg-[#F8F7F4] border-r border-gray-100">
-      <div className="mb-8 flex items-center gap-3 px-4">
-        <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center text-white text-xs font-black">C</div>
-        <div className="flex items-center gap-1 cursor-pointer group">
-          <span className="font-bold text-sm tracking-tight">Codename.com</span>
-          <ChevronDown size={14} className="text-gray-400 group-hover:text-black transition-colors" />
-        </div>
+       <div className="mb-8 px-2">
+        <button 
+          onClick={() => onMenuChange('dashboard')} 
+          className="w-full flex justify-center items-center rounded-lg hover:bg-white/50 transition-colors"
+        >
+          <img src={logo} alt="H-Town Management Logo" className="h-32 mix-blend-multiply" />
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-hide px-2 space-y-8">
@@ -73,7 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange }) => {
               <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">{section.title}</span>
             </div>
             <div className="space-y-1">
-              {section.items.map((item) => renderMenuItem(item.key, item.label, item.icon))}
+              {section.items.map((item) => renderMenuItem(item.key as MenuKey, item.label, item.icon))}
             </div>
           </div>
         ))}

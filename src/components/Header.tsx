@@ -115,7 +115,7 @@ const Header: React.FC<HeaderProps> = ({ activeMenu }) => {
         {currentUser ? (
             <>
                 <img 
-                  src={currentUserMemberInfo?.avatar || currentUser.photoURL || `https://i.pravatar.cc/40?u=${currentUser.uid}`}
+                  src={currentUserMemberInfo?.avatarUrl || currentUser.photoURL || `https://i.pravatar.cc/40?u=${currentUser.uid}`}
                   alt="user" 
                   className="w-10 h-10 rounded-full border-2 border-white shadow-md" 
                 />

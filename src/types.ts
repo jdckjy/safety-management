@@ -1,4 +1,4 @@
-
+'''
 import { LatLngExpression } from 'leaflet';
 import React from 'react';
 
@@ -206,3 +206,6 @@ export interface CustomTab {
   label: string;
   color: 'orange' | 'blue' | 'emerald' | 'purple';
 }
+
+export type MenuKey = 'dashboard' | 'safety' | 'lease' | 'asset' | 'infra' | 'calendar' | 'base-info' | 'statistics';
+''
