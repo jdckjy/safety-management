@@ -59,9 +59,9 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuChange }) => {
        <div className="mb-8 px-2">
         <button 
           onClick={() => onMenuChange('dashboard')} 
-          className="w-full flex justify-center items-center rounded-lg hover:bg-white/50 transition-colors"
+          className="w-full flex justify-center items-center rounded-lg transition-colors"
         >
-          <img src={logo} alt="H-Town Management Logo" className="h-32 mix-blend-multiply" />
+          <img src={logo} alt="H-Town Management Logo" className="w-full h-auto" />
         </button>
       </div>
 
