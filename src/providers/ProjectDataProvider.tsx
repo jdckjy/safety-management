@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
-import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, GeneralActivity, CustomTab, MonthlyReport, TenantInfo, Contract, Attachment, Unit, RentalHistory, EvaluationResult } from '@/types';
+import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, GeneralActivity, CustomTab, MonthlyReport, TenantInfo, Contract, Attachment, Unit, RentalHistory, EvaluationResult, TaskStatus } from '@/types';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
 import { useAuth } from '@/features/auth/AuthContext';
 import { Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
@@ -105,7 +105,7 @@ interface IProjectDataContext extends IProjectData {
   addActivityToKpi: (kpiId: string, newActivity: Omit<Activity, 'id' | 'status' | 'tasks'>) => Promise<Activity>;
   updateActivityInKpi: (kpiId: string, updatedActivity: Activity) => void;
   deleteActivityFromKpi: (kpiId: string, activityId: string) => void;
-  addTask: (kpiId: string, activityId: string, newTaskData: Omit<Task, 'id' | 'status' | 'records' | 'comments'>) => void;
+  addTask: (kpiId: string, activityId: string, newTaskData: Omit<Task, 'id' | 'status' | 'records' | 'comments' | 'assigneeIds'>) => void;
   updateTask: (kpiId: string, activityId: string, updatedTask: Task) => void;
   deleteTask: (kpiId: string, activityId: string, taskId: string) => void;
   addCommentToTask: (kpiId: string, activityId: string, taskId: string, content: string) => void;
@@ -199,7 +199,6 @@ const newUserInitialData: IProjectData = {
   evaluationResults: [],
 };
 
-
 const sanitizeKpi = (partialKpi: Partial<KPI>): KPI => {
   const defaults: Omit<KPI, 'id'> = { title: '이름 없음 - 수정 필요', description: '', current: 0, target: 100, unit: '%', activities: [], previous: 0 };
   const id = partialKpi.id || `kpi-${Date.now()}-${Math.random()}`;
@@ -207,18 +206,23 @@ const sanitizeKpi = (partialKpi: Partial<KPI>): KPI => {
   const activities = (partialKpi.activities || []).map(act => ({
     ...act,
     id: act.id || `act-${Date.now()}-${Math.random()}`,
-    status: MASTER_STATUS_TRANSITION_MAP[act.status as any] || TASK_STATUS.NOT_STARTED,
-    tasks: (act.tasks || []).map(task => ({
-      ...task,
-      id: task.id || `task-${Date.now()}-${Math.random()}`,
-      name: task.name || '이름 없는 업무',
-      startDate: task.startDate || new Date().toISOString(),
-      endDate: task.endDate || new Date().toISOString(),
-      status: MASTER_STATUS_TRANSITION_MAP[task.status as any] || TASK_STATUS.NOT_STARTED,
-      records: task.records || [],
-      comments: task.comments || [],
-      assignees: task.assignees || [],
-    })),
+    status: (MASTER_STATUS_TRANSITION_MAP[act.status as any] || TASK_STATUS.NOT_STARTED) as TaskStatus,
+    tasks: (act.tasks || []).map((task: any) => {
+      const assigneeIds = task.assigneeIds || (task.assignees || []).map((a: TeamMember) => a.id);
+      const newTask: Task = {
+        ...task,
+        id: task.id || `task-${Date.now()}-${Math.random()}`,
+        name: task.name || '이름 없는 업무',
+        startDate: task.startDate || new Date().toISOString(),
+        endDate: task.endDate || new Date().toISOString(),
+        status: (MASTER_STATUS_TRANSITION_MAP[task.status as any] || TASK_STATUS.NOT_STARTED) as TaskStatus,
+        records: task.records || [],
+        comments: task.comments || [],
+        assigneeIds: assigneeIds,
+      };
+      delete (newTask as any).assignees; // Remove old field
+      return newTask;
+    }),
   }));
 
   return { ...defaults, ...partialKpi, id, activities };
@@ -335,30 +339,6 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     fetchData();
   }, [currentUser, db]);
   
-  useEffect(() => {
-    if (!isDataLoaded || !currentUser) {
-        return;
-    }
-
-    const nonReportData = { ...data };
-    delete (nonReportData as Partial<IProjectData>).monthly_reports;
-
-    const debounceSave = setTimeout(() => {
-        if (!currentUser) return;
-        console.log(`[Data Save] Debounced save triggered for user ${currentUser.uid}.`);
-        try {
-            setDoc(doc(db, 'users', currentUser.uid), nonReportData, { merge: true });
-            console.log("[Data Save] Successfully requested save to Firestore.");
-        } catch (error) {
-            console.error("[Data Save] Error saving data:", error);
-        }
-    }, 1000);
-
-    return () => {
-        clearTimeout(debounceSave);
-    };
-  }, [data, currentUser, db, isDataLoaded]);
-
 
   const processedData = useMemo(() => {
     const today = new Date();
@@ -430,7 +410,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
         const historicalData = currentRentalHistory;
         const realtimeRate = leaseRealtimeMetrics.realtimeOccupancyRate;
 
-        const pastData = historicalData.filter(h => h.leased_area > 0).sort((a, b) => b.year - a.year);
+        const pastData = historicalData.filter(h => h.total_leased_area > 0).sort((a, b) => b.year - a.year);
         if (pastData.length < 1) return null;
 
         const baselineData = pastData;
@@ -518,16 +498,66 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     updateKpiArray(data => findAndUpdatKpi(kpiId, data, kpi => ({ ...kpi, activities: (kpi.activities || []).filter(act => act.id !== activityId) })));
   }, [updateKpiArray, findAndUpdatKpi]);
 
-  const addTask = useCallback((kpiId: string, activityId: string, newTaskData: Omit<Task, 'id' | 'status' | 'records' | 'comments'>) => {
-    const newTask: Task = { ...newTaskData, id: `task-${Date.now()}`, status: TASK_STATUS.NOT_STARTED, records: [], comments: [], assignees: [] };
+  const addTask = useCallback((kpiId: string, activityId: string, newTaskData: Omit<Task, 'id' | 'status' | 'records' | 'comments' | 'assigneeIds'>) => {
+    const newTask: Task = { ...newTaskData, id: `task-${Date.now()}`, status: TASK_STATUS.NOT_STARTED, records: [], comments: [], assigneeIds: [] };
     const updateActivitiesFn = (kpi: KPI): KPI => ({ ...kpi, activities: (kpi.activities || []).map(act => act.id === activityId ? { ...act, tasks: [...(act.tasks || []), newTask] } : act) });
     updateKpiArray(data => findAndUpdatKpi(kpiId, data, updateActivitiesFn));
   }, [updateKpiArray, findAndUpdatKpi]);
 
   const updateTask = useCallback((kpiId: string, activityId: string, updatedTask: Task) => {
-    const updateActivitiesFn = (kpi: KPI): KPI => ({ ...kpi, activities: (kpi.activities || []).map(act => act.id === activityId ? { ...act, tasks: (act.tasks || []).map(t => t.id === updatedTask.id ? updatedTask : t) } : act) });
-    updateKpiArray(data => findAndUpdatKpi(kpiId, data, updateActivitiesFn));
-  }, [updateKpiArray, findAndUpdatKpi]);
+    if (!currentUser) return;
+
+    const userDocRef = doc(db, 'users', currentUser.uid);
+
+    setData(prevData => {
+        const kpiArrays: (keyof IProjectData)[] = ['safetyKPIs', 'leaseKPIs', 'assetKPIs', 'infraKPIs'];
+        let targetKpiKey: keyof IProjectData | undefined;
+
+        for (const key of kpiArrays) {
+            if ((prevData[key] as KPI[])?.some(kpi => kpi.id === kpiId)) {
+                targetKpiKey = key;
+                break;
+            }
+        }
+
+        if (!targetKpiKey) {
+            console.error(`[updateTask] Critical: Could not find KPI array for kpiId: ${kpiId}`);
+            return prevData;
+        }
+        
+        const cleanTask = (task: Task): Task => {
+            const newTask = { ...task };
+            delete (newTask as any).assignees; // Make sure to remove the old field before saving
+            return newTask;
+        };
+
+        const updatedKpiArray = (prevData[targetKpiKey] as KPI[]).map(kpi => {
+            if (kpi.id === kpiId) {
+                const updatedActivities = kpi.activities.map(activity => {
+                    if (activity.id === activityId) {
+                        const updatedTasks = activity.tasks.map(task =>
+                            task.id === updatedTask.id ? cleanTask(updatedTask) : task
+                        );
+                        return { ...activity, tasks: updatedTasks };
+                    }
+                    return activity;
+                });
+                return { ...kpi, activities: updatedActivities };
+            }
+            return kpi;
+        });
+
+        setDoc(userDocRef, { [targetKpiKey]: updatedKpiArray }, { merge: true })
+            .then(() => {
+                console.log(`[Firestore] Successfully updated task in ${targetKpiKey}.`);
+            })
+            .catch(error => {
+                console.error(`[Firestore] Error updating task in ${targetKpiKey}:`, error);
+            });
+
+        return { ...prevData, [targetKpiKey]: updatedKpiArray };
+    });
+}, [currentUser, db]);
 
   const deleteTask = useCallback((kpiId: string, activityId: string, taskId: string) => {
     const updateActivitiesFn = (kpi: KPI): KPI => ({ ...kpi, activities: (kpi.activities || []).map(act => act.id === activityId ? { ...act, tasks: (act.tasks || []).filter(t => t.id !== taskId) } : act) });

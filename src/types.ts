@@ -1,8 +1,8 @@
-'''
-import { LatLngExpression } from 'leaflet';
-import React from 'react';
 
-// Base data structures
+export type TaskStatus = 'not-started' | 'in-progress' | 'completed' | 'waiting' | 'deferred' | 'overdue';
+
+export type KpiCategory = 'safety' | 'lease' | 'asset' | 'infra';
+
 export interface IProjectData {
   safetyKPIs: KPI[];
   leaseKPIs: KPI[];
@@ -18,17 +18,11 @@ export interface IProjectData {
   attachments: Attachment[];
   generalActivities: GeneralActivity[];
   customTabs: CustomTab[];
-  monthly_reports: MonthlyReport[];
+  monthly_reports?: MonthlyReport[];
   rentalHistory: RentalHistory[];
   evaluationResults: EvaluationResult[];
 }
 
-export interface NavigationState {
-  menuKey: string;
-  selectedMonth: number;
-}
-
-// KPI and related items
 export interface KPI {
   id: string;
   title: string;
@@ -46,26 +40,27 @@ export interface Activity {
   description: string;
   startDate: string;
   endDate: string;
-  status: string;
+  status: TaskStatus;
   tasks: Task[];
 }
 
 export interface Task {
   id: string;
   name: string;
-  description?: string;
   startDate: string;
   endDate: string;
-  status: string;
-  assignees: TeamMember[];
-  records: TaskRecord[];
+  status: TaskStatus;
+  records: WeeklyRecord[];
   comments: Comment[];
+  assigneeIds: string[];
+  assignees?: TeamMember[]; // For backward compatibility
 }
 
-export interface TaskRecord {
-  id: string;
-  date: string;
-  content: string;
+export interface WeeklyRecord {
+  year: number;
+  month: number;
+  week: number;
+  status: TaskStatus;
 }
 
 export interface Comment {
@@ -75,121 +70,114 @@ export interface Comment {
   content: string;
 }
 
-export interface GeneralActivity {
-  id: string;
-  date: string;
-  author: string;
-  category: string;
-  content: string;
-  createdAt?: string;
-  title?: string;
-  type?: 'generalActivity';
-}
-
-// Spatial and facility types
 export interface HotSpot {
   id: string;
-  position: LatLngExpression;
-  facilityId: string;
-  facilityName: string;
-  responseType: '정기' | '긴급';
-  riskLevel: 'Level 1 (낮음)' | 'Level 2 (중간)' | 'Level 3 (높음)';
-  details: string;
-  createdAt?: string;
-  title?: string;
-  type?: 'hotspot';
+  name: string;
+  type: '안전' | '보안' | '환경' | '기타';
+  location: string;
+  description: string;
+  image: string;
 }
 
 export interface Facility {
   id: string;
-  category: string;
   name: string;
-  area?: number;
-  ratio?: number;
+  type: string;
+  location: string;
+  status: 'operational' | 'maintenance' | 'inactive';
 }
 
-export interface ComplexFacility {
-    id: string;
-    name: string;
-    type: string;
-    location: string;
-    area: number;
-    description: string;
+export interface NavigationState {
+  menuKey: string;
+  selectedMonth: number;
 }
 
-// Team and Tenant Management
 export interface TeamMember {
   id: string;
   name: string;
-  role: string;
-  avatarUrl: string;
+  position: string;
+  team: string;
+  photo: string;
 }
 
-export interface Unit {
-    id: string;
-    floor: number;
-    unit_number: string;
-    area_sqm: number;
-    status: 'occupied' | 'vacant' | 'notice';
-    usage: string;
-}
-
-export interface EnrichedUnit extends Unit {
-    tenant?: TenantInfo;
-    contract?: Contract;
-}
-
-export type CompanySize = '대기업' | '중견' | '중소' | '스타트업';
-export type BusinessCategory = '의료' | '교육' | '연구' | '근생' | '기타';
-export type AcquisitionChannel = '직접 유치' | '유관기관 소개' | '온라인' | '기타';
-
-export interface TenantInfo {
-    id: string;
-    companyName: string;
-    businessRegistrationNumber: string;
-    representativeName: string;
-    contact: string;
-    businessCategory: BusinessCategory;
-    companySize: CompanySize;
-    businessDescription: string;
-    acquisitionChannel: AcquisitionChannel;
-}
-
-export interface Contract {
-    id: string;
-    tenantId: string;
-    unitId: string;
-    startDate: string;
-    endDate: string;
-    deposit: number;
-    rent: number;
-    status?: 'active' | 'expired' | 'pending' | 'unknown';
-}
-
-export interface Attachment {
-    id: string;
-    tenantId: string;
-    fileName: string;
-    url: string;
-    uploadedAt: string;
-}
-
-// Reporting and History
-export interface MonthlyReport {
+export interface ComplexFacility {
   id: string;
+  name: string;
+  floor: string;
+  location: string;
+  area: number; 
+  status: string;
+  lastInspection?: string; 
+}
+
+export interface GeneralActivity {
+  id: string;
+  category: 'finance' | 'maintenance' | 'community';
+  date: string;
+  description: string;
+  amount?: number;
+  related_docs?: string[];
+}
+
+export interface CustomTab {
+  id: string;
+  title: string;
+  content: string; // Could be markdown or structured data
+}
+
+
+export interface MonthlyReport {
+  id: string; // e.g., "2023-05"
   year: number;
   month: number;
   report_date: string;
   raw_data: any;
 }
 
+
+export interface TenantInfo {
+  id: string;
+  name: string; // Tenant or Company Name
+  businessType: string; // Type of business
+  contactPerson: string;
+  phone: string;
+  email: string;
+}
+
+export interface Contract {
+  id: string;
+  tenantId: string;
+  unitId: string;
+  startDate: string;
+  endDate: string;
+  rent: number;
+  deposit: number;
+}
+
+export interface Attachment {
+  id: string;
+  tenantId: string;
+  fileName: string;
+  url: string;
+  uploadedAt: string;
+}
+
+export interface Unit {
+  id: string;
+  name: string;
+  floor: number;
+  area_sqm: number;
+  type: 'office' | 'retail' | 'storage' | 'parking';
+  status: 'occupied' | 'vacant' | 'notice'
+}
+
 export interface RentalHistory {
-    id: string;
-    year: number;
-    rentable_area: number;
-    leased_area: number;
-    occupancy_rate: number;
-    created_at: string;
+  id: string;
+  year: number;
+  total_rentable_area: number;
+  total_leased_area: number;
+  occupancy_rate: number;
+  created_at: string;
 }
 
 export interface EvaluationResult {
@@ -199,13 +187,3 @@ export interface EvaluationResult {
     score: number;
     rating: number;
 }
-
-// UI and other types
-export interface CustomTab {
-  key: string;
-  label: string;
-  color: 'orange' | 'blue' | 'emerald' | 'purple';
-}
-
-export type MenuKey = 'dashboard' | 'safety' | 'lease' | 'asset' | 'infra' | 'calendar' | 'base-info' | 'statistics';
-''

@@ -23,7 +23,7 @@ const getWeekOfMonth = (date: Date) => {
 // --- Component Props Interface ---
 interface TaskEditModalProps {
   task: Task | null;
-  kpiId: string; // 명시적으로 kpiId와 activityId를 받습니다.
+  kpiId: string;
   activityId: string;
   onClose: () => void;
 }
@@ -31,18 +31,15 @@ interface TaskEditModalProps {
 // --- Main Component ---
 const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, kpiId, activityId, onClose }) => {
   const { teamMembers, updateTask } = useProjectData();
-  
-  // --- State ---
   const [records, setRecords] = useState<WeeklyRecord[]>([]);
   const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([]);
 
-  // --- Effects ---
   useEffect(() => {
     if (task) {
-      // 담당자 ID 배열 설정
-      setSelectedAssigneeIds(task.assignees?.map(a => a.id) || []);
+        // Use assigneeIds, but fall back to assignees for old data structure.
+        const assigneeIds = task.assigneeIds || (task.assignees?.map(a => a.id) || []);
+        setSelectedAssigneeIds(assigneeIds);
 
-      // 주간 실적 레코드 설정
       const startDate = parseISO(task.startDate);
       const endDate = parseISO(task.endDate);
       const weeks = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 0 });
@@ -59,7 +56,6 @@ const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, kpiId, activityId, 
 
   if (!task) return null;
 
-  // --- Event Handlers ---
   const handleStatusChange = (weekIndex: number, newStatus: TaskStatus) => {
     const updatedRecords = [...records];
     updatedRecords[weekIndex].status = newStatus;
@@ -69,33 +65,33 @@ const TaskEditModal: React.FC<TaskEditModalProps> = ({ task, kpiId, activityId, 
   const handleAssigneeChange = (memberId: string) => {
     setSelectedAssigneeIds(prevIds =>
       prevIds.includes(memberId)
-        ? prevIds.filter(id => id !== memberId) // Deselect
-        : [...prevIds, memberId] // Select
+        ? prevIds.filter(id => id !== memberId)
+        : [...prevIds, memberId]
     );
   };
 
   const handleSave = () => {
-    // Prop으로 받은 kpiId와 activityId를 사용합니다.
-    if (!kpiId || !activityId) {
-        console.error("FATAL: kpiId or activityId is missing in props!");
+    if (!kpiId || !activityId || !task) {
+        console.error("FATAL: kpiId, activityId, or task is missing!");
         return;
     }
 
     const newStatus = deriveTaskStatus(records);
-    const selectedAssignees = teamMembers.filter(m => selectedAssigneeIds.includes(m.id));
 
+    // Create the updated task object with the new structure
     const updatedTaskData: Task = {
       ...task,
       status: newStatus,
       records: records,
-      assignees: selectedAssignees, // 업데이트된 담당자 배열 저장
+      assigneeIds: selectedAssigneeIds,
     };
+    
+    // The old 'assignees' field is not included, so it will be removed upon update.
 
     updateTask(kpiId, activityId, updatedTaskData);
     onClose();
   };
 
-  // --- Render ---
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in-fast">
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-2xl">

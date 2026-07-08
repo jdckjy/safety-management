@@ -70,7 +70,7 @@ interface WeeklyPerformanceModalProps {
 
 export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ kpi, activity, onClose }) => {
   // --- STATE ---
-  const { addTask, deleteTask, deleteActivityFromKpi, kpiData, addCommentToTask } = useProjectData();
+  const { addTask, deleteTask, deleteActivityFromKpi, kpiData, addCommentToTask, teamMembers } = useProjectData();
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -138,7 +138,7 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
     }
     const startDate = addDays(weekStart, startDay);
     const endDate = addDays(weekStart, endDay);
-    addTask(kpi.id, activity.id, { name: newTaskName.trim(), startDate: startDate.toISOString(), endDate: endDate.toISOString(), assignees: [] });
+    addTask(kpi.id, activity.id, { name: newTaskName.trim(), startDate: startDate.toISOString(), endDate: endDate.toISOString() });
     setNewTaskName('');
     setDaySelection([null, null]);
   };
@@ -227,7 +227,8 @@ export const WeeklyPerformanceModal: React.FC<WeeklyPerformanceModalProps> = ({ 
             tasksForSelectedWeek.map(task => {
               const computedStatus = getComputedTaskStatus(task);
               const commentCount = task.comments?.length || 0;
-              const assignees = task.assignees || [];
+              const assigneeIds = task.assigneeIds || [];
+              const assignees = teamMembers.filter(member => assigneeIds.includes(member.id));
 
               return (
                 <div key={task.id} onClick={() => handleTaskClick(task)} className="p-4 bg-white border rounded-lg cursor-pointer hover:bg-gray-50 transition-all group flex justify-between items-center shadow-sm hover:shadow-md">
