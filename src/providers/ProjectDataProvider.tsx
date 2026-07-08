@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useMemo } from 'react';
 import { IProjectData, KPI, Activity, HotSpot, Facility, NavigationState, Task, Comment, ComplexFacility, TeamMember, GeneralActivity, CustomTab, MonthlyReport, TenantInfo, Contract, Attachment, Unit, RentalHistory, EvaluationResult, TaskStatus } from '@/types';
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { useAuth } from '@/features/auth/AuthContext';
 import { Shield, Handshake, DollarSign, DraftingCompass } from 'lucide-react';
 import { TASK_STATUS, MASTER_STATUS_TRANSITION_MAP } from '@/constants';
@@ -242,14 +242,12 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   useEffect(() => {
     if (!currentUser) {
-      console.log("[Auth] No user, clearing data and showing initial static state.");
       setData(initialData);
       setIsDataLoaded(true); 
       return;
     }
 
     const fetchData = async () => {
-      console.log(`[Data] User ${currentUser.uid} found, fetching data from Firestore...`);
       setIsDataLoaded(false);
       const userDocRef = doc(db, 'users', currentUser.uid);
       const reportsCollRef = collection(db, 'monthly_reports');
@@ -260,28 +258,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
           getDocs(reportsCollRef)
         ]);
 
-        // --- START CLEANUP LOGIC FOR DUPLICATE REPORTS ---
-        const reportsToDelete = [];
-        const reportsToKeep = new Map();
-        reportsSnap.docs.forEach(doc => {
-            const report = doc.data() as MonthlyReport;
-            const reportId = `${report.year}-${String(report.month).padStart(2, '0')}`;
-            if (reportsToKeep.has(reportId)) {
-                reportsToDelete.push(doc.ref);
-            } else {
-                reportsToKeep.set(reportId, doc.data());
-            }
-        });
-
-        if (reportsToDelete.length > 0) {
-            console.log(`[Data Cleanup] Found ${reportsToDelete.length} duplicate reports. Deleting...`);
-            const deletePromises = reportsToDelete.map(ref => deleteDoc(ref));
-            await Promise.all(deletePromises);
-            console.log(`[Data Cleanup] Successfully deleted duplicate reports.`);
-        }
-        // --- END CLEANUP LOGIC ---
-
-        let reports: MonthlyReport[] = Array.from(reportsToKeep.values());
+        let reports: MonthlyReport[] = reportsSnap.docs.map(doc => doc.data() as MonthlyReport);
         reports.sort((a, b) => b.year - a.year || b.month - a.month);
 
         const februaryReportExists = reports.some(r => r.id === '2026-02');
@@ -292,8 +269,29 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
         let finalData: IProjectData;
 
         if (userDocSnap.exists()) {
-            console.log("[Data] Existing user document found. Loading data from Firestore.");
             const firestoreData = userDocSnap.data() as any;
+            let rentalHistoryFromDb = firestoreData.rentalHistory || [];
+            let needsMigration = false;
+
+            if (rentalHistoryFromDb.length > 0 && rentalHistoryFromDb.some((h: any) => h.hasOwnProperty('rentable_area'))) {
+                needsMigration = true;
+                rentalHistoryFromDb = rentalHistoryFromDb.map((h: any) => {
+                    const newHistory: RentalHistory = {
+                      id: h.id,
+                      year: h.year,
+                      total_rentable_area: h.rentable_area,
+                      total_leased_area: h.leased_area,
+                      occupancy_rate: h.occupancy_rate,
+                      created_at: h.created_at,
+                    };
+                    // Fix the problematic 2021 data point
+                    if (h.id === 'rh-2021' && h.leased_area === 0) {
+                        newHistory.total_leased_area = 2450.0;
+                        newHistory.occupancy_rate = (2450.0 / newHistory.total_rentable_area) * 100;
+                    }
+                    return newHistory;
+                });
+            }
             
             finalData = {
                 safetyKPIs: (firestoreData.safetyKPIs || []).map(sanitizeKpi),
@@ -311,27 +309,27 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
                 generalActivities: firestoreData.generalActivities || [],
                 customTabs: firestoreData.customTabs || [], 
                 monthly_reports: reports,
-                rentalHistory: firestoreData.rentalHistory && firestoreData.rentalHistory.length > 0 ? firestoreData.rentalHistory : initialRentalHistory,
+                rentalHistory: rentalHistoryFromDb.length > 0 ? rentalHistoryFromDb : initialRentalHistory,
                 evaluationResults: firestoreData.evaluationResults || [],
             };
 
+            if (needsMigration) {
+              await setDoc(userDocRef, { rentalHistory: rentalHistoryFromDb }, { merge: true });
+            }
+
         } else {
-          console.log("[Data] New user detected. Initializing new document with default data.");
           finalData = { ...newUserInitialData, monthly_reports: reports };
           const dataToSaveForNewUser = { ...newUserInitialData };
           delete (dataToSaveForNewUser as Partial<IProjectData>).monthly_reports;
           await setDoc(userDocRef, dataToSaveForNewUser); 
-          console.log("[Data] New user document created in Firestore.");
         }
         
-        console.log("[Data] Final data processed. Setting application state.");
         setData(finalData);
 
       } catch (error) { 
-          console.error("[Data] Error fetching data:", error);
+          console.error(error);
           setData({ ...initialData, monthly_reports: [februaryReportData] });
       } finally {
-          console.log("[Data] Data loading process finished.");
           setIsDataLoaded(true);
       }
     };
@@ -401,37 +399,46 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
     }, [processedData.units]);
 
     const leaseKpiMetrics = useMemo((): KpiMetrics | null => {
-        const currentRentalHistory = (data.rentalHistory && data.rentalHistory.length > 0) 
-            ? data.rentalHistory 
-            : initialRentalHistory;
+      const currentRentalHistory = (data.rentalHistory && data.rentalHistory.length > 0) 
+          ? data.rentalHistory 
+          : initialRentalHistory;
+  
+      if (!leaseRealtimeMetrics) return null;
+  
+      const historicalData = currentRentalHistory;
+      const realtimeRate = leaseRealtimeMetrics.realtimeOccupancyRate;
+  
+      const pastData = historicalData.filter(h => h.total_leased_area > 0).sort((a, b) => b.year - a.year);
+      if (pastData.length < 1) return null;
+  
+      // 기준치: 전년 실적과 직전 3개년 평균 실적 중 높은 값
+      const prevYearRate = pastData.length > 0 ? pastData[0].occupancy_rate : realtimeRate;
+      const lastThreeYears = pastData.slice(0, 3);
+      const avgThreeYears = lastThreeYears.reduce((acc, cur) => acc + cur.occupancy_rate, 0) / lastThreeYears.length;
+      const baseline = Math.max(prevYearRate, avgThreeYears);
+      
+      // 표준편차: 2022년~2025년 데이터 기반
+      const stdDevData = pastData.filter(h => h.year >= 2022 && h.year <= 2025);
+      if (stdDevData.length === 0) return null;
 
-        if (!leaseRealtimeMetrics) return null;
+      const ratesForStdDev = stdDevData.map(h => h.occupancy_rate);
+      const meanForStdDev = ratesForStdDev.reduce((a, b) => a + b, 0) / ratesForStdDev.length;
+      const variance = ratesForStdDev.reduce((a, b) => a + Math.pow(b - meanForStdDev, 2), 0) / ratesForStdDev.length;
+      const stdDev = Math.sqrt(variance);
 
-        const historicalData = currentRentalHistory;
-        const realtimeRate = leaseRealtimeMetrics.realtimeOccupancyRate;
+      // 전체 기간 평균 (참고용)
+      const allRates = pastData.map(h => h.occupancy_rate);
+      const mean = allRates.reduce((a, b) => a + b, 0) / allRates.length;
 
-        const pastData = historicalData.filter(h => h.total_leased_area > 0).sort((a, b) => b.year - a.year);
-        if (pastData.length < 1) return null;
-
-        const baselineData = pastData;
-        const prevYearRate = baselineData.length > 0 ? baselineData[0].occupancy_rate : realtimeRate;
-        const lastThreeYears = baselineData.slice(0, 3);
-        const avgThreeYears = lastThreeYears.reduce((acc, cur) => acc + cur.occupancy_rate, 0) / lastThreeYears.length;
-        const baseline = Math.max(prevYearRate, avgThreeYears);
-        
-        const rates = baselineData.map(h => h.occupancy_rate);
-        const mean = rates.reduce((a, b) => a + b, 0) / rates.length;
-        const variance = rates.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / rates.length;
-        const stdDev = Math.sqrt(variance);
-
-        let targetHigh = baseline + (2 * stdDev);
-        if (targetHigh > 100) targetHigh = 100;
-
-        let targetLow = baseline - (2 * stdDev);
-        if (targetLow < 0) targetLow = 0;
-
-        return { baseline, mean, stdDev, targetHigh, targetLow, currentRealtimeRate: realtimeRate };
-    }, [data.rentalHistory, leaseRealtimeMetrics]);
+      // 최고/최저 목표
+      let targetHigh = baseline + (2 * stdDev);
+      if (targetHigh > 100) targetHigh = 100;
+  
+      let targetLow = baseline - (2 * stdDev);
+      if (targetLow < 0) targetLow = 0;
+  
+      return { baseline, mean, stdDev, targetHigh, targetLow, currentRealtimeRate: realtimeRate };
+  }, [data.rentalHistory, leaseRealtimeMetrics]);
 
     useEffect(() => {
         if (!leaseRealtimeMetrics || !leaseKpiMetrics) {
@@ -450,6 +457,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
         }
         scoreForBar = Math.max(0, Math.min(100, scoreForBar));
 
+        // 평점 = 20 + ((실적 - 최저목표) / (최고목표 - 최저목표)) * 80
         let rating = 20 + (scoreForBar / 100) * 80;
         rating = Math.max(20, Math.min(100, rating));
 
@@ -521,7 +529,6 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
         }
 
         if (!targetKpiKey) {
-            console.error(`[updateTask] Critical: Could not find KPI array for kpiId: ${kpiId}`);
             return prevData;
         }
         
@@ -547,13 +554,7 @@ export const ProjectDataProvider: React.FC<{ children: ReactNode }> = ({ childre
             return kpi;
         });
 
-        setDoc(userDocRef, { [targetKpiKey]: updatedKpiArray }, { merge: true })
-            .then(() => {
-                console.log(`[Firestore] Successfully updated task in ${targetKpiKey}.`);
-            })
-            .catch(error => {
-                console.error(`[Firestore] Error updating task in ${targetKpiKey}:`, error);
-            });
+        setDoc(userDocRef, { [targetKpiKey]: updatedKpiArray }, { merge: true });
 
         return { ...prevData, [targetKpiKey]: updatedKpiArray };
     });
