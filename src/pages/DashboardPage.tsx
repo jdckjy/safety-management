@@ -11,6 +11,8 @@ import { TaskStatusChart } from '@/components/TaskStatusChart';
 import { format, subMonths, getMonth } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { ProfitSummaryCard } from '@/components/ProfitSummaryCard';
+import { TASK_STATUS } from '@/constants';
+import { HotSpot, GeneralActivity } from '@/types';
 
 interface TaskItemProps {
   type: 'Hot Spot' | '업무';
@@ -30,18 +32,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ type, title, status, statusColor })
   </div>
 );
 
-const DashboardCard: React.FC<{ title: string; value: React.ReactNode; subValue?: string; icon: React.ReactNode; children?: React.ReactNode; className?: string }> = ({ title, value, subValue, icon, children, className }) => (
-  <Card className={className}>
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-sm font-medium text-gray-600">{title}</CardTitle>
-      {icon}
-    </CardHeader>
-    <CardContent>
-      <div className="text-3xl font-bold">{value}</div>
-      {subValue && <p className="text-xs text-gray-500 mt-1">{subValue}</p>}
-      {children}
-    </CardContent>
-  </Card>
+const DashboardCard: React.FC<{ title: string; value: React.ReactNode; icon: React.ReactNode; className?: string }> = ({ title, value, icon, className }) => (
+    <Card className={className}>
+        <CardContent className="p-3 flex items-center justify-between">
+            <div className="flex items-baseline space-x-2">
+                <p className="text-sm font-medium text-gray-600">{title}</p>
+                <p className="text-xl font-bold">{value}</p>
+            </div>
+            {icon}
+        </CardContent>
+    </Card>
 );
 
 const MiniChartCard: React.FC<{ title: string; data: any[]; dataKey: string; color: string; icon: React.ReactNode; value: string; change: string; }> = ({ title, data, dataKey, color, icon, value, change }) => (
@@ -74,6 +74,13 @@ const MiniChartCard: React.FC<{ title: string; data: any[]; dataKey: string; col
   </Card>
 );
 
+interface UnifiedActivity {
+  id: string;
+  title: string;
+  date: string;
+  isHotspot: boolean;
+}
+
 const DashboardPage: React.FC = () => {
   const { kpiData, hotspots, generalActivities, leaseRealtimeMetrics } = useProjectData();
 
@@ -84,14 +91,14 @@ const DashboardPage: React.FC = () => {
 
     const monthlyTasks = allTasks.filter(task => task && new Date(task.startDate).getMonth() === currentMonth);
 
-    const monthlyCompleted = monthlyTasks.filter(t => t.status === '완료').length;
-    const monthlyInProgress = monthlyTasks.filter(t => t.status === '진행중').length;
-    const monthlyPending = monthlyTasks.filter(t => t.status === '예정').length;
-    const monthlyDelayed = monthlyTasks.filter(t => t.status === '지연').length;
+    const monthlyCompleted = monthlyTasks.filter(t => t.status === TASK_STATUS.COMPLETED).length;
+    const monthlyInProgress = monthlyTasks.filter(t => t.status === TASK_STATUS.IN_PROGRESS).length;
+    const monthlyPending = monthlyTasks.filter(t => t.status === TASK_STATUS.NOT_STARTED).length;
+    const monthlyDelayed = monthlyTasks.filter(t => t.status === TASK_STATUS.OVERDUE).length;
 
-    const overallCompleted = allTasks.filter(t => t.status === '완료').length;
-    const overallInProgress = allTasks.filter(t => t.status === '진행중').length;
-    const overallPending = allTasks.filter(t => t.status === '예정' || t.status === '대기').length;
+    const overallCompleted = allTasks.filter(t => t.status === TASK_STATUS.COMPLETED).length;
+    const overallInProgress = allTasks.filter(t => t.status === TASK_STATUS.IN_PROGRESS).length;
+    const overallPending = allTasks.filter(t => t.status === TASK_STATUS.NOT_STARTED || t.status === 'waiting').length;
     const overallTotal = allTasks.length;
 
     return {
@@ -110,11 +117,24 @@ const DashboardPage: React.FC = () => {
     };
   }, [kpiData]);
 
-  const recentActivities = useMemo(() => {
-    const allActivities = [...(hotspots || []), ...(generalActivities || [])].filter(Boolean);
-    return allActivities
-      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-      .slice(0, 5);
+  const recentActivities: UnifiedActivity[] = useMemo(() => {
+    const hotspotActivities = (hotspots || []).map((h: HotSpot) => ({
+        id: h.id,
+        title: h.name,
+        date: new Date().toISOString(), // HotSpot has no date, so using current for now.
+        isHotspot: true,
+    }));
+
+    const generalSystemActivities = (generalActivities || []).map((g: GeneralActivity) => ({
+        id: g.id,
+        title: g.description,
+        date: g.date,
+        isHotspot: false,
+    }));
+
+    const all = [...hotspotActivities, ...generalSystemActivities];
+    all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return all.slice(0, 5);
   }, [hotspots, generalActivities]);
 
   const visitorData = useMemo(() => {
@@ -232,11 +252,11 @@ const DashboardPage: React.FC = () => {
                   {recentActivities.map(activity => (
                     <div key={activity.id} className="flex items-start text-sm">
                       <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center mr-3">
-                        {activity.type === 'hotspot' ? <AlertTriangle size={16} className="text-yellow-600" /> : <FileText size={16} className="text-blue-600" />}
+                        {activity.isHotspot ? <AlertTriangle size={16} className="text-yellow-600" /> : <FileText size={16} className="text-blue-600" />}
                       </div>
                       <div className="flex-1">
                         <p className="font-medium">{activity.title}</p>
-                        <p className="text-xs text-gray-500">{format(new Date(activity.createdAt || 0), 'yyyy년 M월 d일', { locale: ko })}</p>
+                        <p className="text-xs text-gray-500">{format(new Date(activity.date), 'yyyy년 M월 d일', { locale: ko })}</p>
                       </div>
                     </div>
                   ))}

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Plus } from 'lucide-react';
 import PopulationInfoTab from './PopulationInfoTab';
+import SmartAttractionTab from './SmartAttractionTab'; // 새로 추가
 
 interface Tab {
   id: string;
@@ -16,13 +17,16 @@ const StatisticsPage: React.FC = () => {
   ]);
 
   const [activeTab, setActiveTab] = useState<string>('population-info');
-  const [nextTabId, setNextTabId] = useState(1);
 
   const addTab = () => {
-    const newTabId = `new-tab-${nextTabId}`;
-    const newTabs = [...tabs, { id: newTabId, title: `새 탭 ${nextTabId}`, isRemovable: true }];
+    const newTabId = `smart-attraction-tab`;
+    if (tabs.find(tab => tab.id === newTabId)) {
+      setActiveTab(newTabId);
+      return;
+    }
+
+    const newTabs = [...tabs, { id: newTabId, title: `스마트 유치`, isRemovable: true }];
     setTabs(newTabs);
-    setNextTabId(nextTabId + 1);
     setActiveTab(newTabId);
   };
 
@@ -54,11 +58,10 @@ const StatisticsPage: React.FC = () => {
           <PopulationInfoTab />
         </TabsContent>
 
-        {tabs.filter(t => t.isRemovable).map((tab) => (
-          <TabsContent key={tab.id} value={tab.id} className="pt-6">
-            <p>이것은 동적으로 생성된 탭입니다.</p>
-          </TabsContent>
-        ))}
+        <TabsContent value="smart-attraction-tab" className="pt-6">
+          <SmartAttractionTab />
+        </TabsContent>
+        
       </Tabs>
     </div>
   );
