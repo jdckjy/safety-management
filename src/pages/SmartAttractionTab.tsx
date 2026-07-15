@@ -111,7 +111,7 @@ const SmartAttractionTab: React.FC = () => {
                       <TableCell className="text-right font-bold">{target.totalScore}</TableCell>
                     </TableRow>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[800px]">
+                  <DialogContent className="sm:max-w-[800px] bg-white">
                     <DialogHeader>
                       <DialogTitle>{target.companyName}</DialogTitle>
                     </DialogHeader>
