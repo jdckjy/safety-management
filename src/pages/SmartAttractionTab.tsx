@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
+import React, { useState, useEffect, useCallback } from 'react';
+import { collection, onSnapshot, query, orderBy, addDoc, serverTimestamp, limit, startAfter, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
@@ -30,25 +30,68 @@ interface IRActivity {
   createdAt: any;
 }
 
+const PAGE_SIZE = 20; // 한 번에 불러올 데이터 개수
+
 const SmartAttractionTab: React.FC = () => {
   const [targets, setTargets] = useState<TargetCompany[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadingMore, setLoadingMore] = useState<boolean>(false);
+  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot<DocumentData> | null>(null);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+
   const [selectedTarget, setSelectedTarget] = useState<TargetCompany | null>(null);
   const [activities, setActivities] = useState<IRActivity[]>([]);
   const [newActivityType, setNewActivityType] = useState('');
   const [newActivityContent, setNewActivityContent] = useState('');
   const [isLogDialogOpen, setIsLogDialogOpen] = useState(false);
 
-  // --- 데이터 로딩 ---
-  useEffect(() => {
-    const q = query(collection(db, 'attraction_targets'), orderBy('totalScore', 'desc'));
+  // --- 데이터 로딩 (페이지네이션 적용) ---
+  const fetchTargets = useCallback((isInitialLoad: boolean) => {
+    if (isInitialLoad) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
+    let q = query(
+      collection(db, 'attraction_targets'), 
+      orderBy('totalScore', 'desc'), 
+      limit(PAGE_SIZE)
+    );
+
+    if (!isInitialLoad && lastVisible) {
+      q = query(q, startAfter(lastVisible));
+    }
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const companies = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TargetCompany));
-      setTargets(companies);
-      setLoading(false);
+      const newCompanies = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TargetCompany));
+      const lastDoc = snapshot.docs[snapshot.docs.length - 1];
+
+      setTargets(prev => isInitialLoad ? newCompanies : [...prev, ...newCompanies]);
+      setLastVisible(lastDoc);
+      setHasMore(newCompanies.length === PAGE_SIZE);
+      
+      if (isInitialLoad) setLoading(false);
+      setLoadingMore(false);
+    }, (error) => {
+        console.error("Error fetching targets: ", error);
+        if (isInitialLoad) setLoading(false);
+        setLoadingMore(false);
     });
-    return () => unsubscribe();
-  }, []);
+
+    return unsubscribe;
+  }, [lastVisible]);
+
+  useEffect(() => {
+    const unsubscribe = fetchTargets(true);
+    return () => unsubscribe && unsubscribe();
+  }, []); // 초기 로딩 시 한 번만 호출
+
+  const handleLoadMore = () => {
+    if (hasMore && !loadingMore) {
+      fetchTargets(false);
+    }
+  };
 
   // --- IR 활동 로딩 ---
   useEffect(() => {
@@ -84,7 +127,6 @@ const SmartAttractionTab: React.FC = () => {
 
   return (
     <div>
-      {/* ... (Header remains the same) ... */}
       <h2 className="text-xl font-semibold mb-2">스마트 타겟팅: 잠재 유치 기업 리스트</h2>
       <p className="text-sm text-gray-600 mb-4">심평원 및 통계청 데이터를 기반으로 자동 분석된 헬스케어타운 최적화 잠재 유치 기업 목록입니다.</p>
       <div className="border rounded-lg">
@@ -111,7 +153,7 @@ const SmartAttractionTab: React.FC = () => {
                       <TableCell className="text-right font-bold">{target.totalScore}</TableCell>
                     </TableRow>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[800px] bg-white">
+                   <DialogContent className="sm:max-w-[800px] bg-white">
                     <DialogHeader>
                       <DialogTitle>{target.companyName}</DialogTitle>
                     </DialogHeader>
@@ -174,6 +216,13 @@ const SmartAttractionTab: React.FC = () => {
           </TableBody>
         </Table>
       </div>
+      {hasMore && (
+        <div className="mt-4 text-center">
+          <Button onClick={handleLoadMore} disabled={loadingMore}>
+            {loadingMore ? '불러오는 중...' : '더 보기'}
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
